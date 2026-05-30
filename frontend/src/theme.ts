@@ -6,17 +6,15 @@ const STORAGE_KEY = "mc-theme";
 function getInitial(): Theme {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return "dark";
 }
 
-// Тема: prefers-color-scheme как дефолт + ручной переключатель (запоминается).
+// Тема ставится на обёртку .mc (data-theme). Дефолт — dark (где приземлился
+// дизайн), ручной переключатель запоминается в localStorage.
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(getInitial);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 

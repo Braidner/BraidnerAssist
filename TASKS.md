@@ -28,6 +28,36 @@
 > чтение статуса/лога Hermes и постановка команд в очередь — всё через Prisma.
 > Остальные эндпоинты отдают `{ configured: false }` / `pending` до своих фаз.
 
+## Деплой (hermes.lan) ✅ ГОТОВО
+
+- [x] SSH-ключ настроен (braidner@hermes.lan, key-based)
+- [x] Репо склонировано в ~/mission-control, .env создан с MCP_TOKEN
+- [x] GitHub Actions: build-and-push → GHCR (публичные образы, triggered on push to main)
+- [x] docker-compose.prod.yml: тянет образы из GHCR, никакой сборки на сервере
+- [x] systemd oneshot-сервис `/etc/systemd/system/mission-control-deploy.service`
+      — Hermes запускает `sudo systemctl start mission-control-deploy.service`
+      — выполняет `docker compose pull && up -d` в фоне
+- [x] Проверено: оба контейнера Up, /healthz OK, frontend HTTP 200
+
+> Деплой: git push main → CI (~1 мин) → Hermes вызывает systemctl → обновление.
+
+## Редизайн UI — Неоморфизм  ✅ ГОТОВО
+
+- [x] Дизайн-система портирована из Claude Design бандла в `frontend/src/styles.css`
+      (токены `--depth/--radius/--accent`, темы `.mc[data-theme]`, примитивы
+      `.neu/.neu-in/.neu-sm`, шрифты Outfit + Inconsolata)
+- [x] Компоненты: `Card`, `Ring`, `icons` + `panels/` (TopBar, StatStrip, Tasks,
+      Habits, SystemStatus, Notes, HermesLog, Placeholder); удалён старый `Widget.tsx`
+- [x] Раскладка C (three columns): полоса мини-статов + 3 колонки
+- [x] Гибрид панелей: 5 панелей дизайна + плейсхолдеры Погода/HA/Календарь
+- [x] Данные: Tasks + HermesLog — реальные (бэкенд), остальное — мок/плейсхолдеры
+- [x] Тема dark/light, дефолт dark, акцент `#34d399`
+- [x] Проверено: `npm run build` ok; dev-сервер + браузер (обе темы, тоггл задач
+      шлёт PUT и персистит, реальный лог Hermes, плейсхолдеры рендерятся)
+
+> Tweaks-панель (слайдеры глубины/радиуса/выбор акцента) — вне скоупа, значения
+> зафиксированы на «приземлённых» в дизайне (depth .8, radius 19, accent #34d399).
+
 ## Фаза 2 — Основные интеграции
 
 - [ ] GitLab tasks (issues assigned + MRs) + локальные задачи (CRUD)

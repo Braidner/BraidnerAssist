@@ -95,6 +95,24 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 6. **Calendar** — CalDAV или локальные/iCal события.
 7. **Hermes Agent Monitor** — статус агента, лог действий, очередь команд.
 
+## UI / Дизайн-система (неоморфизм)
+
+Текущий визуальный стандарт фронтенда — **неоморфизм** (портирован из Claude Design
+бандла). Источник токенов и компонентных классов — `frontend/src/styles.css`.
+
+- **Токены** (`:root`): `--depth` (0.8), `--radius` (19px), `--accent` (`#34d399`),
+  шрифты `--font` Inconsolata (моно/числа) + `--font-ui` Outfit (UI).
+- **Темы** — палитра под `.mc[data-theme="dark"|"light"]` (dark по умолчанию).
+  Тема ставится на обёртку `.mc` (не на `:root`); переключатель в `theme.ts`.
+- **Примитивы теней**: `.neu` (выпуклый), `.neu-in` (вдавленный), `.neu-sm` (мелкий).
+- **Компоненты**: `frontend/src/components/` — `Card`, `Ring`, `icons` (SVG-набор) +
+  `panels/` (TopBar, StatStrip, Tasks, Habits, SystemStatus, Notes, HermesLog,
+  Placeholder). Раскладка — **вариант C (three columns)**: полоса мини-статов + 3 колонки.
+- **Данные**: Tasks и HermesLog тянут реальные данные (`lib/api.ts` → бэкенд);
+  Habits/SystemStatus/Notes — статический мок (`data/mock.ts`) до своих фаз;
+  Погода/HomeAssistant/Календарь — неоморфные плейсхолдеры «Не подключено · Phase N».
+- Новые виджеты/панели делать в этой же системе (классы `.card .neu`, токены тем).
+
 ## Прогресс по фазам
 
 - **Фаза 1 — Скелет**: монорепо, Docker, Prisma+SQLite, базовый UI layout. ✅ ГОТОВО

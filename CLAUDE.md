@@ -64,9 +64,26 @@ cd frontend && npm install
 npm run dev                     # vite dev (порт 3000)
 npm run build                   # прод-сборка
 
-# Всё вместе
+# Всё вместе (локальная сборка)
 docker compose up --build
 ```
+
+## Деплой (GHCR + сервер hermes.lan)
+
+CI (`.github/workflows/build.yml`) на push в main / тег `v*` собирает образы
+`ghcr.io/braidner/braidnerassist-{backend,frontend}` и пушит в GHCR (публичные).
+
+На сервере (`~/mission-control`, доступ по SSH-ключу `braidner@hermes.lan`):
+
+```bash
+cd ~/mission-control && git pull
+IMAGE_TAG=latest docker compose -f docker-compose.prod.yml pull
+IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
+```
+
+`docker-compose.yml` (с `build:`) — для локальной разработки;
+`docker-compose.prod.yml` (с `image:` из GHCR) — для сервера.
+`.env` создаётся на сервере из `.env.example` (в гит не коммитится).
 
 ## Модули (виджеты)
 

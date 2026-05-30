@@ -1,0 +1,27 @@
+# Продакшн: тянем готовые образы из GHCR (собраны в GitHub Actions),
+# на сервере ничего не собирается.
+#
+#   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml pull
+#   IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
+#
+# IMAGE_TAG можно зафиксировать на версии релиза (напр. v0.1.0) или sha-<коммит>.
+
+services:
+  backend:
+    image: ghcr.io/braidner/braidnerassist-backend:${IMAGE_TAG:-latest}
+    env_file: .env
+    environment:
+      DATABASE_URL: file:/data/mission-control.db
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/braidner/braidnerassist-frontend:${IMAGE_TAG:-latest}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -51,6 +51,8 @@ export const config = {
     },
   },
 
+  servicesFile: env("SERVICES_FILE") ?? "/data/services.json",
+
   health: {
     exportPath: env("HEALTH_EXPORT_PATH") ?? "/data/health/export.xml",
   },

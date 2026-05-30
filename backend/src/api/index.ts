@@ -1,23 +1,28 @@
 import { Router } from "express";
-import { config } from "../config.js";
 import { prisma } from "../db/client.js";
 import { tasksRouter } from "./tasks.js";
+import { getWeather } from "../integrations/weather.js";
+import { getServices } from "../integrations/services.js";
+import { config } from "../config.js";
 
 export const apiRouter = Router();
 
 apiRouter.use("/tasks", tasksRouter);
 
-// ─── Заглушки интеграций (реализация в фазах 2–5) ───────────────────
-// Каждый эндпоинт изолирован: если интеграция не настроена, отдаём
-// { configured: false } со статусом 200, чтобы виджет показал "Not configured".
-
-apiRouter.get("/weather", (_req, res) => {
-  if (!config.weather.configured) return res.json({ configured: false });
-  res.json({ configured: true, pending: "phase-2", current: null, forecast: [] });
+apiRouter.get("/weather", async (_req, res) => {
+  try {
+    res.json(await getWeather());
+  } catch (e) {
+    res.status(502).json({ configured: true, error: String(e) });
+  }
 });
 
-apiRouter.get("/services", (_req, res) => {
-  res.json({ configured: true, pending: "phase-2", services: [] });
+apiRouter.get("/services", async (_req, res) => {
+  try {
+    res.json(await getServices());
+  } catch (e) {
+    res.status(502).json({ configured: false, error: String(e) });
+  }
 });
 
 apiRouter.get("/homeassistant/automations", (_req, res) => {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db/client.js";
+import { getGitLabTasks } from "../integrations/gitlab.js";
 
 export const tasksRouter = Router();
 
@@ -11,11 +12,23 @@ tasksRouter.get("/", async (req, res) => {
   if (status) where.status = status;
   if (priority) where.priority = priority;
 
-  const tasks = await prisma.task.findMany({
-    where,
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+  const [local, gitlab] = await Promise.all([
+    prisma.task.findMany({
+      where,
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    }),
+    // Only include GitLab tasks when no source filter (or source=gitlab)
+    !source || source === "gitlab" ? getGitLabTasks() : Promise.resolve([]),
+  ]);
+
+  // GitLab tasks filtered by status/priority if requested
+  const filteredGitlab = gitlab.filter((t) => {
+    if (status && t.status !== status) return false;
+    if (priority && t.priority !== priority) return false;
+    return true;
   });
-  res.json(tasks);
+
+  res.json([...local, ...filteredGitlab]);
 });
 
 // POST /api/tasks

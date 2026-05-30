@@ -58,11 +58,23 @@
 > Tweaks-панель (слайдеры глубины/радиуса/выбор акцента) — вне скоупа, значения
 > зафиксированы на «приземлённых» в дизайне (depth .8, radius 19, accent #34d399).
 
-## Фаза 2 — Основные интеграции
+## Фаза 2 — Основные интеграции  ✅ ГОТОВО
 
-- [ ] GitLab tasks (issues assigned + MRs) + локальные задачи (CRUD)
-- [ ] Homelab services статус (ping/HTTP healthcheck, polling)
-- [ ] Погода (Open-Meteo, текущая + 3 дня)
+- [x] GitLab tasks (issues assigned + MRs) + локальные задачи (CRUD)
+      — бэкенд: `integrations/gitlab.ts`, кеш POLL_TASKS; задачи мёрджатся в `GET /api/tasks`
+      — фронтенд: кнопка «+» в панели Tasks, `createTask()` → `POST /api/tasks`
+      — GitLab-задачи read-only (toggle игнорируется), помечены тегом `gitlab`
+- [x] Homelab services статус (ping/HTTP healthcheck, polling)
+      — бэкенд: `integrations/services.ts`; читает `/data/services.json`, кеш POLL_SERVICES
+      — фронтенд: `SystemStatusPanel` получает реальные сервисы, при `!configured` — мок
+      — конфиг: `SERVICES_FILE=/data/services.json`; формат: `[{name,url},...]`
+- [x] Погода (Open-Meteo, текущая + 3 дня)
+      — бэкенд: `integrations/weather.ts`; без API-ключа, кеш POLL_WEATHER
+      — фронтенд: `WeatherPanel` (current temp/desc/wind + 3 forecast tiles)
+      — при `!configured` (нет WEATHER_LAT/LON) → карточка с инструкцией
+
+> Проверено: `npm run build` ok; dev-сервер + браузер (задача создана через «+» и
+> персистилась, Weather «not configured» рендерится, SystemStatus mock-fallback ok).
 
 ## Фаза 3 — Health + Calendar
 

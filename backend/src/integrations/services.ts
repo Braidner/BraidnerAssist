@@ -1,0 +1,60 @@
+import { readFile } from "fs/promises";
+import { config } from "../config.js";
+
+interface ServiceConfig {
+  name: string;
+  url: string;
+}
+
+export interface ServiceResult {
+  name: string;
+  status: "ok" | "warn" | "bad";
+  tag: string;
+}
+
+let cache: { data: ServiceResult[]; at: number } | null = null;
+
+async function checkService(svc: ServiceConfig): Promise<ServiceResult> {
+  const start = Date.now();
+  try {
+    const res = await fetch(svc.url, { signal: AbortSignal.timeout(5_000) });
+    const latency = Date.now() - start;
+    return {
+      name: svc.name,
+      status: res.ok ? "ok" : "warn",
+      tag: `${latency}ms`,
+    };
+  } catch {
+    return { name: svc.name, status: "bad", tag: "timeout" };
+  }
+}
+
+export async function getServices(): Promise<{
+  configured: boolean;
+  services: ServiceResult[];
+}> {
+  if (cache && Date.now() - cache.at < config.poll.services) {
+    return { configured: true, services: cache.data };
+  }
+
+  let configs: ServiceConfig[];
+  try {
+    const raw = await readFile(config.servicesFile, "utf-8");
+    configs = JSON.parse(raw) as ServiceConfig[];
+  } catch {
+    // No file → not configured; return stale cache if available
+    return cache
+      ? { configured: true, services: cache.data }
+      : { configured: false, services: [] };
+  }
+
+  const results = await Promise.allSettled(configs.map(checkService));
+  const services = results.map((r) =>
+    r.status === "fulfilled"
+      ? r.value
+      : { name: "unknown", status: "bad" as const, tag: "error" },
+  );
+
+  cache = { data: services, at: Date.now() };
+  return { configured: true, services };
+}

@@ -87,6 +87,71 @@ export async function toggleTask(id: string, done: boolean): Promise<boolean> {
   }
 }
 
+export async function createTask(title: string): Promise<PanelTask | null> {
+  try {
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) return null;
+    const t = (await res.json()) as BackendTask;
+    return { id: t.id, label: t.title, done: false, prio: PRIO_MAP[t.priority] ?? "info", tag: t.source, hermes: false };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Services ────────────────────────────────────────────────────────
+
+export interface ServiceStatus {
+  name: string;
+  status: "ok" | "warn" | "bad";
+  tag: string;
+}
+
+export interface ServicesData {
+  configured: boolean;
+  services: ServiceStatus[];
+}
+
+export async function getServices(): Promise<ServicesData> {
+  try {
+    const res = await fetch("/api/services");
+    if (!res.ok) throw new Error();
+    const data = (await res.json()) as { configured: boolean; services?: ServiceStatus[] };
+    return { configured: data.configured, services: data.services ?? [] };
+  } catch {
+    return { configured: false, services: [] };
+  }
+}
+
+// ─── Weather ────────────────────────────────────────────────────────
+
+export interface WeatherDay {
+  date: string;
+  code: number;
+  max: number;
+  min: number;
+}
+
+export interface WeatherData {
+  configured: boolean;
+  current: { temp: number; code: number; wind: number } | null;
+  forecast: WeatherDay[];
+}
+
+export async function getWeather(): Promise<WeatherData> {
+  try {
+    const res = await fetch("/api/weather");
+    if (!res.ok) throw new Error();
+    const data = (await res.json()) as { configured: boolean } & Partial<WeatherData>;
+    return { configured: data.configured, current: data.current ?? null, forecast: data.forecast ?? [] };
+  } catch {
+    return { configured: false, current: null, forecast: [] };
+  }
+}
+
 export async function getHermes(): Promise<HermesData> {
   const empty: HermesData = { status: "idle", message: null, log: [] };
   try {

@@ -108,16 +108,17 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 - **Компоненты**: `frontend/src/components/` — `Card`, `Ring`, `icons` (SVG-набор) +
   `panels/` (TopBar, StatStrip, Tasks, Habits, SystemStatus, Notes, HermesLog,
   Placeholder). Раскладка — **вариант C (three columns)**: полоса мини-статов + 3 колонки.
-- **Данные**: Tasks и HermesLog тянут реальные данные (`lib/api.ts` → бэкенд);
-  Habits/SystemStatus/Notes — статический мок (`data/mock.ts`) до своих фаз;
-  Погода/HomeAssistant/Календарь — неоморфные плейсхолдеры «Не подключено · Phase N».
+- **Данные**: Tasks (local + GitLab) и HermesLog — реальные; Weather — реальная
+  (Open-Meteo, если WEATHER_LAT/LON заданы); SystemStatus services — реальные
+  (если есть /data/services.json), ресурсы CPU/RAM/DISK — мок до Phase 3;
+  Habits/Notes — статический мок (`data/mock.ts`); HA/Календарь — плейсхолдеры.
 - Новые виджеты/панели делать в этой же системе (классы `.card .neu`, токены тем).
 
 ## Прогресс по фазам
 
 - **Фаза 1 — Скелет**: монорепо, Docker, Prisma+SQLite, базовый UI layout. ✅ ГОТОВО
-- **Фаза 2 — GitLab + локальные задачи, Homelab services, Погода** ← СЛЕДУЮЩАЯ
-- Фаза 3 — Apple Health XML, Календарь
+- **Фаза 2 — GitLab + Tasks CRUD + Services + Weather**: `integrations/` модули, WeatherPanel, SystemStatus real data, «+» в Tasks. ✅ ГОТОВО
+- Фаза 3 — Apple Health XML, Календарь ← СЛЕДУЮЩАЯ
 - Фаза 4 — Home Assistant (автоматизации, WebSocket)
 - Фаза 5 — MCP сервер, Agent monitor, очередь команд
 - Фаза 6 — Drag-and-drop, настройки из UI, PWA

@@ -13,7 +13,7 @@ frontend/dist/
 backend/dist/
 
 # Database & data
-data/
+/data/
 *.db
 *.db-journal
 *.sqlite

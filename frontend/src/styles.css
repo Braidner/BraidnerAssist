@@ -1,0 +1,260 @@
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Code",
+    Menlo, Consolas, monospace;
+
+  /* Статус-цвета — чёткие, не пастельные */
+  --ok: #16c060;
+  --warn: #f5a623;
+  --down: #ff3b30;
+  --idle: #6b7280;
+}
+
+/* ─── Dark (default operational) ─────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg: #0a0e14;
+  --bg-grid: #0d121b;
+  --panel: #111824;
+  --panel-2: #0c121c;
+  --border: #1e2a3a;
+  --border-bright: #2c3e54;
+  --text: #d6e1f0;
+  --text-dim: #7d8da3;
+  --accent: #38bdf8;
+}
+
+/* ─── Light ──────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  --bg: #eef1f5;
+  --bg-grid: #e6eaf0;
+  --panel: #ffffff;
+  --panel-2: #f6f8fb;
+  --border: #d4dae3;
+  --border-bright: #b9c2cf;
+  --text: #1a2230;
+  --text-dim: #5c6878;
+  --accent: #0284c7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  background-image: linear-gradient(var(--bg-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Topbar ──────────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.topbar__logo {
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.topbar__name {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar__clock {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-theme {
+  background: var(--panel);
+  border: 1px solid var(--border-bright);
+  color: var(--text);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-theme:hover {
+  border-color: var(--accent);
+}
+
+/* ─── Grid ───────────────────────────────────────────────────────── */
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 20px;
+  align-content: start;
+}
+
+@media (max-width: 1100px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Widget ─────────────────────────────────────────────────────── */
+.widget {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.widget:hover {
+  border-color: var(--border-bright);
+}
+.widget[data-span="2"] {
+  grid-column: span 2;
+}
+@media (max-width: 640px) {
+  .widget[data-span="2"] {
+    grid-column: span 1;
+  }
+}
+
+.widget__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.widget__title {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text);
+}
+
+.widget__body {
+  padding: 14px;
+  flex: 1;
+}
+
+/* ─── Status pill ────────────────────────────────────────────────── */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+.status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--idle);
+}
+.status--ok .status__dot {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+.status--warn .status__dot {
+  background: var(--warn);
+  box-shadow: 0 0 8px var(--warn);
+}
+.status--down .status__dot {
+  background: var(--down);
+  box-shadow: 0 0 8px var(--down);
+}
+.status--ok {
+  color: var(--ok);
+}
+.status--warn {
+  color: var(--warn);
+}
+.status--down {
+  color: var(--down);
+}
+
+/* Пульсация для активного агента / онлайн-статуса */
+.status--ok .status__dot {
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ─── Misc ───────────────────────────────────────────────────────── */
+.muted {
+  color: var(--text-dim);
+  margin: 0;
+}
+.mono {
+  font-family: var(--font-mono);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}

@@ -1,0 +1,19 @@
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: file:/data/mission-control.db
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    volumes:
+      - ./data:/data            # SQLite + Apple Health export
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

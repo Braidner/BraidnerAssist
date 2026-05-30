@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Локальная задача (источник "local"). GitLab-задачи не хранятся в БД —
+// они подтягиваются на лету и сливаются с локальными в Tasks Hub.
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("todo") // todo | in_progress | done
+  priority    String    @default("medium") // low | medium | high
+  dueDate     DateTime?
+  source      String    @default("local") // local (GitLab проксируется отдельно)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Лог действий агента Hermes (через MCP log_action).
+model AgentLog {
+  id        String   @id @default(cuid())
+  action    String
+  details   String?
+  result    String?
+  createdAt DateTime @default(now())
+}
+
+// Очередь команд агенту + его задачи (active/done).
+model AgentTask {
+  id          String    @id @default(cuid())
+  command     String
+  payload     String? // JSON-строка
+  status      String    @default("queued") // queued | active | done | error
+  result      String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+}
+
+// Текущий статус агента (single-row, обновляется report_status).
+model AgentStatus {
+  id        Int      @id @default(1)
+  status    String   @default("idle") // active | idle | error
+  message   String?
+  updatedAt DateTime @updatedAt
+}
+
+// Локальные события календаря (если нет CalDAV).
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  location    String?
+  source      String   @default("local") // local | caldav | ics
+  createdAt   DateTime @default(now())
+}

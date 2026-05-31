@@ -32,6 +32,7 @@ export interface PanelTask {
   prio: Prio;
   tag: string;
   hermes: boolean;
+  updatedAt: string;
   // GitLab detail fields (present when tag === "gitlab")
   webUrl?: string;
   descriptionText?: string | null;
@@ -64,6 +65,7 @@ interface BackendTask {
   status: string;
   priority: string;
   source: string;
+  updatedAt?: string;
   // GitLab-only extras
   webUrl?: string;
   descriptionText?: string | null;
@@ -107,6 +109,7 @@ export async function getTasks(): Promise<PanelTask[]> {
       prio: t.status === "done" ? "ok" : PRIO_MAP[t.priority] ?? "info",
       tag: t.source,
       hermes: t.source !== "local",
+      updatedAt: t.updatedAt ?? new Date().toISOString(),
       webUrl: t.webUrl,
       descriptionText: t.descriptionText,
       labels: t.labels,
@@ -143,7 +146,7 @@ export async function createTask(title: string): Promise<PanelTask | null> {
     });
     if (!res.ok) return null;
     const t = (await res.json()) as BackendTask;
-    return { id: t.id, label: t.title, done: false, prio: PRIO_MAP[t.priority] ?? "info", tag: t.source, hermes: false };
+    return { id: t.id, label: t.title, done: false, prio: PRIO_MAP[t.priority] ?? "info", tag: t.source, hermes: false, updatedAt: t.updatedAt ?? new Date().toISOString() };
   } catch {
     return null;
   }

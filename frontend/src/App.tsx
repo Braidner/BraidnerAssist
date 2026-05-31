@@ -13,7 +13,6 @@ import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
 import { HabitsPanel } from "./components/panels/Habits.tsx";
 import { SystemStatusPanel } from "./components/panels/SystemStatus.tsx";
-import { NotesPanel } from "./components/panels/Notes.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { WeatherPanel } from "./components/panels/Weather.tsx";
 import { Placeholder } from "./components/panels/Placeholder.tsx";
@@ -110,15 +109,14 @@ export function App() {
         <StatStrip openTasks={openTasks} hermesActions={hermes.log.length} />
 
         <div className="cols-3">
-          <div className="col">
+          <div className="col-fill">
             <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} />
-            <Placeholder icon="calendar" title="Календарь" phase="Phase 3" />
           </div>
 
           <div className="col">
             <HabitsPanel />
             <WeatherPanel data={weather} />
-            <NotesPanel />
+            <Placeholder icon="calendar" title="Календарь" phase="Phase 3" />
           </div>
 
           <div className="col">

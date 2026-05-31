@@ -10,6 +10,22 @@ const PRIO_VAR: Record<Prio, string> = {
   info: "var(--info)",
 };
 
+function fmtUpdated(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffH = Math.floor(diffMin / 60);
+  const diffD = Math.floor(diffH / 24);
+
+  if (diffMin < 2) return "только что";
+  if (diffMin < 60) return `${diffMin}м назад`;
+  if (diffH < 24) return `${diffH}ч назад`;
+  if (diffD === 1) return "вчера";
+  if (diffD < 7) return `${diffD}д назад`;
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
 interface TasksPanelProps {
   tasks: PanelTask[];
   onToggle: (t: PanelTask) => void;
@@ -19,67 +35,47 @@ interface TasksPanelProps {
 
 export function TasksPanel({ tasks, onToggle, onAdd, onSelect }: TasksPanelProps) {
   const open = tasks.filter((t) => !t.done).length;
-  const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function startAdding() {
-    setAdding(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function submit(e?: React.FormEvent) {
+    e?.preventDefault();
     const t = draft.trim();
-    if (t) { onAdd(t); setDraft(""); setAdding(false); }
-  }
-
-  function cancel() {
+    if (!t) return;
+    onAdd(t);
     setDraft("");
-    setAdding(false);
+    inputRef.current?.focus();
   }
 
   return (
     <Card
       icon="list"
-      title="Задачи · Today"
-      className="grow"
+      title="Задачи"
       action={
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>{open} активн.</span>
-          <button
-            className="icon-btn"
-            title="Добавить задачу"
-            onClick={startAdding}
-            style={{ padding: 4 }}
-          >
-            <icons.plus style={{ width: 14, height: 14 }} />
-          </button>
-        </div>
+        <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
+          {open} активн.
+        </span>
       }
     >
-      {adding && (
-        <form onSubmit={submit} style={{ marginBottom: 8, display: "flex", gap: 6 }}>
-          <input
-            ref={inputRef}
-            className="note-input"
-            style={{ flex: 1, fontSize: 13 }}
-            placeholder="Название задачи…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && cancel()}
-          />
-          <button className="icon-btn" type="submit" style={{ padding: 4 }}>
-            <icons.check style={{ width: 14, height: 14 }} />
-          </button>
-        </form>
-      )}
+      {/* persistent quick-add input */}
+      <form onSubmit={submit} className="note-input" style={{ marginBottom: 16 }}>
+        <input
+          ref={inputRef}
+          placeholder="$ новая задача…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button className="icon-btn" type="submit" aria-label="Добавить">
+          <icons.plus style={{ width: 16, height: 16 }} />
+        </button>
+      </form>
+
       <div
         className="scroll"
         style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}
       >
-        {tasks.length === 0 && !adding && (
-          <div className="empty">Нет задач. Нажми + или создай через Hermes.</div>
+        {tasks.length === 0 && (
+          <div className="empty">Нет задач. Введи название выше или создай через Hermes.</div>
         )}
         {tasks.map((t) => (
           <div
@@ -107,6 +103,7 @@ export function TasksPanel({ tasks, onToggle, onAdd, onSelect }: TasksPanelProps
                     Hermes
                   </span>
                 )}
+                <span className="task-updated">{fmtUpdated(t.updatedAt)}</span>
               </div>
             </div>
           </div>

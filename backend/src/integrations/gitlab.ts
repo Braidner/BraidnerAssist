@@ -10,6 +10,8 @@ interface GitLabIssue {
   due_date: string | null;
   web_url: string;
   references?: { full?: string };
+  created_at: string;
+  updated_at: string;
 }
 
 interface GitLabMR {
@@ -23,6 +25,8 @@ interface GitLabMR {
   target_branch: string;
   web_url: string;
   references?: { full?: string };
+  created_at: string;
+  updated_at: string;
 }
 
 export interface GitLabTask {
@@ -72,7 +76,6 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
     glFetch<GitLabMR[]>(`/merge_requests?assignee_id=${uid}&state=opened&scope=all&order_by=updated_at&sort=desc&per_page=100`),
   ]);
 
-  const now = new Date().toISOString();
   const tasks: GitLabTask[] = [];
 
   if (issuesResult.status === "fulfilled") {
@@ -91,8 +94,8 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
         kind: "issue",
         dueDate: i.due_date,
         branchInfo: null,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: i.created_at,
+        updatedAt: i.updated_at,
       });
     }
   }
@@ -113,8 +116,8 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
         kind: "mr",
         dueDate: null,
         branchInfo: `${mr.source_branch} → ${mr.target_branch}`,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: mr.created_at,
+        updatedAt: mr.updated_at,
       });
     }
   }

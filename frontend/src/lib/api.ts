@@ -199,6 +199,24 @@ export async function getWeather(): Promise<WeatherData> {
   }
 }
 
+// ─── Version ────────────────────────────────────────────────────────
+
+export interface VersionData {
+  version: string;
+  latest: string | null;
+  hasUpdate: boolean;
+}
+
+export async function getVersion(): Promise<VersionData> {
+  try {
+    const res = await fetch("/api/version");
+    if (!res.ok) throw new Error();
+    return (await res.json()) as VersionData;
+  } catch {
+    return { version: "—", latest: null, hasUpdate: false };
+  }
+}
+
 export async function getHermes(): Promise<HermesData> {
   const empty: HermesData = { status: "idle", message: null, log: [] };
   try {

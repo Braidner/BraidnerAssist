@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "./theme.ts";
 import {
-  getTasks, toggleTask, createTask, getHermes, getServices, getWeather,
+  getTasks, toggleTask, createTask, getHermes, getServices, getWeather, getVersion,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type ServicesData, type WeatherData,
+  type PanelTask, type HermesData, type ServicesData, type WeatherData, type VersionData,
 } from "./lib/api.ts";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
@@ -38,6 +38,7 @@ export function App() {
   const [hermes, setHermes] = useState<HermesData>({ status: "idle", message: null, log: [] });
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
+  const [versionData, setVersionData] = useState<VersionData | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -56,6 +57,7 @@ export function App() {
     getHermes().then(setHermes);
     getServices().then(setServicesData);
     getWeather().then(setWeather);
+    getVersion().then(setVersionData);
 
     const serviceTimer = setInterval(() => getServices().then(setServicesData), 60_000);
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
@@ -103,7 +105,7 @@ export function App() {
     <div className="mc" data-theme={theme}>
       <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
       <div className="mc-shell">
-        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} />
+        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} versionData={versionData} />
 
         <StatStrip openTasks={openTasks} hermesActions={hermes.log.length} />
 

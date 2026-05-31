@@ -68,8 +68,8 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
 
   const uid = config.gitlab.userId;
   const [issuesResult, mrsResult] = await Promise.allSettled([
-    glFetch<GitLabIssue[]>(`/issues?assignee_id=${uid}&state=opened&per_page=50`),
-    glFetch<GitLabMR[]>(`/merge_requests?assignee_id=${uid}&state=opened&per_page=50`),
+    glFetch<GitLabIssue[]>(`/issues?assignee_id=${uid}&state=opened&scope=all&order_by=updated_at&sort=desc&per_page=100`),
+    glFetch<GitLabMR[]>(`/merge_requests?assignee_id=${uid}&state=opened&scope=all&order_by=updated_at&sort=desc&per_page=100`),
   ]);
 
   const now = new Date().toISOString();

@@ -1,5 +1,6 @@
 import { icons } from "../icons.tsx";
 import type { Theme } from "../../theme.ts";
+import type { VersionData } from "../../lib/api.ts";
 
 type Backend = "up" | "down" | "checking";
 
@@ -9,6 +10,7 @@ interface TopBarProps {
   theme: Theme;
   onToggleTheme: () => void;
   onLogout: () => void;
+  versionData: VersionData | null;
 }
 
 const DOW = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
@@ -24,7 +26,7 @@ function fmtDate(d: Date): string {
   return `${DOW[d.getDay()]} · ${d.getDate()} ${MONTH[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function TopBar({ clock, backend, theme, onToggleTheme, onLogout }: TopBarProps) {
+export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, versionData }: TopBarProps) {
   const linkDot = backend === "up" ? "ok" : backend === "down" ? "bad" : "idle";
   const linkText = backend === "up" ? "LINK OK" : backend === "down" ? "NO LINK" : "…";
 
@@ -38,6 +40,17 @@ export function TopBar({ clock, backend, theme, onToggleTheme, onLogout }: TopBa
         </div>
       </div>
       <div className="topbar-right">
+        {versionData && (
+          <span
+            className={`pill version-pill${versionData.hasUpdate ? " has-update" : ""}`}
+            title={versionData.hasUpdate ? `Доступна версия ${versionData.latest}` : `Версия ${versionData.version}`}
+          >
+            v{versionData.version}
+            {versionData.hasUpdate && (
+              <span className="update-dot" title={`→ v${versionData.latest}`} />
+            )}
+          </span>
+        )}
         <span className="pill" title="Статус связи с backend">
           <span className={`dot ${linkDot}`} />
           {linkText}

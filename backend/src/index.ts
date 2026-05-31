@@ -7,14 +7,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Опц. защита API bearer-токеном (MCP_TOKEN). В LAN всё равно сетевой порт.
-app.use("/api", (req, res, next) => {
-  if (!config.mcpToken) return next();
-  const auth = req.header("authorization");
-  if (auth === `Bearer ${config.mcpToken}`) return next();
-  res.status(401).json({ error: "unauthorized" });
-});
-
 // Healthcheck (без авторизации — для docker/uptime).
 app.get("/healthz", (_req, res) => {
   res.json({

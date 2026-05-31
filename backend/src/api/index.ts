@@ -3,6 +3,7 @@ import { prisma } from "../db/client.js";
 import { tasksRouter } from "./tasks.js";
 import { getWeather } from "../integrations/weather.js";
 import { getServices } from "../integrations/services.js";
+import { getHealthSummary, pushDay } from "../integrations/health.js";
 import { config } from "../config.js";
 
 export const apiRouter = Router();
@@ -40,12 +41,26 @@ apiRouter.post("/homeassistant/scripts/:id/trigger", (_req, res) => {
   res.status(501).json({ error: "not implemented (phase-4)" });
 });
 
-apiRouter.get("/health/summary", (_req, res) => {
-  res.json({ configured: true, pending: "phase-3", steps: null, activity: null });
+apiRouter.get("/health/summary", async (_req, res) => {
+  try {
+    res.json(await getHealthSummary());
+  } catch (e) {
+    res.status(502).json({ configured: false, error: String(e) });
+  }
 });
 
-apiRouter.post("/health/import", (_req, res) => {
-  res.status(501).json({ error: "not implemented (phase-3)" });
+apiRouter.post("/health/push", async (req, res) => {
+  const { date, steps, km } = req.body ?? {};
+  if (!date || steps === undefined || km === undefined) {
+    return res.status(400).json({ error: "date, steps and km are required" });
+  }
+  const s = Number(steps);
+  const k = Number(km);
+  if (!Number.isFinite(s) || !Number.isFinite(k)) {
+    return res.status(400).json({ error: "steps and km must be numbers" });
+  }
+  await pushDay(String(date), Math.round(s), k);
+  res.json({ ok: true, date, steps: Math.round(s), km: k });
 });
 
 // Календарь — локальные события уже работают через Prisma.

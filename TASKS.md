@@ -76,12 +76,34 @@
 > Проверено: `npm run build` ok; dev-сервер + браузер (задача создана через «+» и
 > персистилась, Weather «not configured» рендерится, SystemStatus mock-fallback ok).
 
-## Фаза 3 — Health + Calendar
+## Фаза 2 — Доработки UI и UX  ✅ ГОТОВО
 
-- [ ] Apple Health XML парсер (`/api/health/import`, авто-парс из папки)
-- [ ] Календарь (CalDAV или локальный + iCal импорт)
+- [x] GitLab drawer — клик на задачу открывает slide-in панель с деталями
+      (kind badge, project ref, labels, branch, due date, описание, ссылка в GitLab)
+- [x] SHA-версия в TopBar — `APP_VERSION` build-arg в Dockerfile, CI прокидывает `${{ github.sha }}`;
+      `version.ts` читает из env и возвращает `sha`; TopBar показывает `v0.1.0 <sha>`
+- [x] Viewport-lock раскладка — Tasks в левой колонке растягивается на 100% высоты экрана,
+      внутри — scroll; `col-fill` CSS-класс для height-fill колонок
+- [x] StatStrip overhaul — 4 тайла: задачи | сервисы | погода (сегодня/завтра/послезавтра) | шаги
+- [x] Удалены панели: Habits, Notes, WeatherPanel, Calendar — не используются
+- [x] Финальная раскладка: кол.1=Tasks, кол.2=SystemStatus+Health+HA, кол.3=HermesLog
 
-## Фаза 4 — Home Assistant
+## Фаза 3 — Apple Health  ✅ ГОТОВО
+
+- [x] Prisma: модель `HealthDay` (date, steps, km, updatedAt) + миграция
+- [x] `backend/src/integrations/health.ts` — `pushDay()` (upsert), `getHealthSummary()` (7 дней, кеш 60с)
+- [x] `POST /api/health/push` — принимает `{date, steps, km}` от iOS Shortcuts
+- [x] `GET /api/health/summary` — возвращает `{configured, today, week[]}`
+- [x] Панель «Активность» — Ring (% от 10 000), шаги+км, недельные бары (.health-bars)
+      при `!configured` → Placeholder с инструкцией по настройке Shortcuts
+- [x] StatStrip: реальные шаги + км из `HealthSummary`; реальный счётчик сервисов
+- [x] Calendar — удалён полностью (пользователь не использует)
+
+> iOS Shortcut для автоматической отправки (22:00 daily):
+> Health «Get Step Count» + «Walking Distance» → POST http://hermes.lan:3001/api/health/push
+> Body: `{ "date": "YYYY-MM-DD", "steps": N, "km": X.X }`, Header: `Authorization: Bearer <APP_TOKEN>`
+
+## Фаза 4 — Home Assistant  ← СЛЕДУЮЩАЯ
 
 - [ ] Автоматизации (list/toggle), скрипты (trigger)
 - [ ] WebSocket для real-time обновлений

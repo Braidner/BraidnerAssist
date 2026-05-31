@@ -221,6 +221,24 @@ export async function getVersion(): Promise<VersionData> {
   }
 }
 
+// ─── Health ────────────────────────────────────────────────────────
+
+export interface HealthSummary {
+  configured: boolean;
+  today: { steps: number; km: number } | null;
+  week: Array<{ date: string; steps: number; km: number }>;
+}
+
+export async function getHealth(): Promise<HealthSummary> {
+  try {
+    const res = await apiFetch("/api/health/summary");
+    if (!res.ok) throw new Error();
+    return (await res.json()) as HealthSummary;
+  } catch {
+    return { configured: false, today: null, week: [] };
+  }
+}
+
 export async function getHermes(): Promise<HermesData> {
   const empty: HermesData = { status: "idle", message: null, log: [] };
   try {

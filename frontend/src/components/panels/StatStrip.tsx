@@ -1,4 +1,4 @@
-import type { WeatherData } from "../../lib/api.ts";
+import type { WeatherData, ServicesData, HealthSummary } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
   0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
@@ -110,15 +110,27 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
 interface StatStripProps {
   openTasks: number;
   weather: WeatherData;
+  services: ServicesData;
+  health: HealthSummary;
 }
 
-export function StatStrip({ openTasks, weather }: StatStripProps) {
+export function StatStrip({ openTasks, weather, services, health }: StatStripProps) {
+  const onlineCount = services.services.filter((s) => s.status === "ok").length;
+  const totalCount = services.services.length;
+  const svcValue = services.configured && totalCount > 0 ? `${onlineCount}/${totalCount}` : "—";
+  const svcSub = services.configured && totalCount > 0 ? "СЕРВИСЫ ОНЛАЙН" : "СЕРВИСЫ";
+
+  const stepsValue = health.today ? health.today.steps.toLocaleString("ru-RU") : "—";
+  const stepsSub = health.today
+    ? `${health.today.km.toFixed(1).replace(".", ",")} КМ · СЕГОДНЯ`
+    : "ШАГОВ · СЕГОДНЯ";
+
   return (
     <div className="stat-strip">
       <MiniStat value={openTasks} unit="откр." sub="ЗАДАЧИ СЕГОДНЯ" />
-      <MiniStat value="6/6" unit="up" sub="СЕРВИСЫ ОНЛАЙН" />
+      <MiniStat value={svcValue} unit={services.configured && totalCount > 0 ? "up" : undefined} sub={svcSub} />
       <WeatherStat weather={weather} />
-      <MiniStat value="—" sub="ШАГОВ · СЕГОДНЯ" />
+      <MiniStat value={stepsValue} sub={stepsSub} />
     </div>
   );
 }

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "./theme.ts";
 import {
-  getTasks, toggleTask, createTask, getHermes, getServices, getWeather, getVersion,
+  getTasks, toggleTask, createTask, getHermes, getServices, getWeather, getVersion, getHealth,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type ServicesData, type WeatherData, type VersionData,
+  type PanelTask, type HermesData, type ServicesData, type WeatherData, type VersionData, type HealthSummary,
 } from "./lib/api.ts";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
@@ -13,6 +13,7 @@ import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
 import { SystemStatusPanel } from "./components/panels/SystemStatus.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
+import { HealthPanel } from "./components/panels/Health.tsx";
 import { Placeholder } from "./components/panels/Placeholder.tsx";
 
 type Backend = "up" | "down" | "checking";
@@ -35,6 +36,7 @@ export function App() {
   const [hermes, setHermes] = useState<HermesData>({ status: "idle", message: null, log: [] });
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
+  const [health, setHealth] = useState<HealthSummary>({ configured: false, today: null, week: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
 
   useEffect(() => {
@@ -54,16 +56,19 @@ export function App() {
     getHermes().then(setHermes);
     getServices().then(setServicesData);
     getWeather().then(setWeather);
+    getHealth().then(setHealth);
     getVersion().then(setVersionData);
 
     const serviceTimer = setInterval(() => getServices().then(setServicesData), 60_000);
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
+    const healthTimer = setInterval(() => getHealth().then(setHealth), 300_000);
 
     return () => {
       clearInterval(serviceTimer);
       clearInterval(weatherTimer);
       clearInterval(tasksTimer);
+      clearInterval(healthTimer);
     };
   }, [authed]);
 
@@ -104,7 +109,7 @@ export function App() {
       <div className="mc-shell">
         <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} versionData={versionData} />
 
-        <StatStrip openTasks={openTasks} weather={weather} />
+        <StatStrip openTasks={openTasks} weather={weather} services={servicesData} health={health} />
 
         <div className="cols-3">
           <div className="col-fill">
@@ -113,6 +118,7 @@ export function App() {
 
           <div className="col">
             <SystemStatusPanel services={servicesData.services} configured={servicesData.configured} />
+            <HealthPanel data={health} />
             <Placeholder icon="home" title="Home Assistant" phase="Phase 4" />
           </div>
 

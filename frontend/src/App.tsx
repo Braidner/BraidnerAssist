@@ -14,7 +14,6 @@ import { TasksPanel } from "./components/panels/Tasks.tsx";
 import { HabitsPanel } from "./components/panels/Habits.tsx";
 import { SystemStatusPanel } from "./components/panels/SystemStatus.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
-import { WeatherPanel } from "./components/panels/Weather.tsx";
 import { Placeholder } from "./components/panels/Placeholder.tsx";
 
 type Backend = "up" | "down" | "checking";
@@ -106,7 +105,7 @@ export function App() {
       <div className="mc-shell">
         <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} versionData={versionData} />
 
-        <StatStrip openTasks={openTasks} hermesActions={hermes.log.length} />
+        <StatStrip openTasks={openTasks} weather={weather} />
 
         <div className="cols-3">
           <div className="col-fill">
@@ -115,8 +114,6 @@ export function App() {
 
           <div className="col">
             <HabitsPanel />
-            <WeatherPanel data={weather} />
-            <Placeholder icon="calendar" title="Календарь" phase="Phase 3" />
           </div>
 
           <div className="col">

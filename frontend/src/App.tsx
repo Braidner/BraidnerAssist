@@ -11,7 +11,6 @@ import { Drawer } from "./components/Drawer.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
 import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
-import { HabitsPanel } from "./components/panels/Habits.tsx";
 import { SystemStatusPanel } from "./components/panels/SystemStatus.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { Placeholder } from "./components/panels/Placeholder.tsx";
@@ -113,12 +112,11 @@ export function App() {
           </div>
 
           <div className="col">
-            <HabitsPanel />
-          </div>
-
-          <div className="col">
             <SystemStatusPanel services={servicesData.services} configured={servicesData.configured} />
             <Placeholder icon="home" title="Home Assistant" phase="Phase 4" />
+          </div>
+
+          <div className="col-fill">
             <HermesLogPanel data={hermes} />
           </div>
         </div>

@@ -7,6 +7,7 @@ export const versionRouter = Router();
 
 const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "../../package.json");
 const { version } = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string };
+const sha = (process.env.APP_VERSION ?? "dev").substring(0, 7);
 
 let latestCache: { data: string | null; at: number } | null = null;
 const CACHE_TTL = 3_600_000; // 1 hour
@@ -31,5 +32,5 @@ async function fetchLatest(): Promise<string | null> {
 
 versionRouter.get("/", async (_req, res) => {
   const latest = await fetchLatest();
-  res.json({ version, latest, hasUpdate: latest !== null && latest !== version });
+  res.json({ version, sha, latest, hasUpdate: latest !== null && latest !== version });
 });

@@ -206,6 +206,7 @@ export async function getWeather(): Promise<WeatherData> {
 
 export interface VersionData {
   version: string;
+  sha: string;
   latest: string | null;
   hasUpdate: boolean;
 }
@@ -216,7 +217,7 @@ export async function getVersion(): Promise<VersionData> {
     if (!res.ok) throw new Error();
     return (await res.json()) as VersionData;
   } catch {
-    return { version: "—", latest: null, hasUpdate: false };
+    return { version: "—", sha: "???", latest: null, hasUpdate: false };
   }
 }
 

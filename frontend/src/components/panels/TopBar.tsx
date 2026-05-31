@@ -43,12 +43,19 @@ export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, version
         {versionData && (
           <span
             className={`pill version-pill${versionData.hasUpdate ? " has-update" : ""}`}
-            title={versionData.hasUpdate ? `Доступна версия ${versionData.latest}` : `${versionData.version} · ${versionData.sha}`}
+            title={`${versionData.version} · ${versionData.sha}`}
           >
-            v{versionData.version}
-            <span className="mono" style={{ fontSize: 10, opacity: 0.6, marginLeft: 2 }}>{versionData.sha}</span>
-            {versionData.hasUpdate && (
-              <span className="update-dot" title={`→ v${versionData.latest}`} />
+            {versionData.hasUpdate ? (
+              <>
+                v{versionData.version}
+                <span style={{ opacity: 0.55, margin: "0 1px" }}>→</span>
+                v{versionData.latest}
+              </>
+            ) : (
+              <>
+                v{versionData.version}
+                <span className="mono" style={{ fontSize: 10, opacity: 0.55, marginLeft: 2 }}>{versionData.sha}</span>
+              </>
             )}
           </span>
         )}

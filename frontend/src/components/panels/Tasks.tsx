@@ -14,9 +14,10 @@ interface TasksPanelProps {
   tasks: PanelTask[];
   onToggle: (t: PanelTask) => void;
   onAdd: (title: string) => void;
+  onSelect: (t: PanelTask) => void;
 }
 
-export function TasksPanel({ tasks, onToggle, onAdd }: TasksPanelProps) {
+export function TasksPanel({ tasks, onToggle, onAdd, onSelect }: TasksPanelProps) {
   const open = tasks.filter((t) => !t.done).length;
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -84,10 +85,17 @@ export function TasksPanel({ tasks, onToggle, onAdd }: TasksPanelProps) {
           <div
             key={t.id}
             className={`task ${t.done ? "done" : ""}`}
-            onClick={() => onToggle(t)}
-            style={{ opacity: t.tag === "gitlab" ? (t.done ? 0.5 : 0.85) : undefined }}
+            onClick={() => onSelect(t)}
+            style={{ opacity: t.tag === "gitlab" ? (t.done ? 0.5 : 0.85) : undefined, cursor: "pointer" }}
           >
-            <span className="checkbox"><icons.check /></span>
+            <span
+              className="checkbox"
+              role="checkbox"
+              aria-checked={t.done}
+              onClick={(e) => { e.stopPropagation(); onToggle(t); }}
+            >
+              <icons.check />
+            </span>
             <div className="task-body">
               <div className="task-label">{t.label}</div>
               <div className="task-meta">

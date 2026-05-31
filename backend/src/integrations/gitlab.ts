@@ -5,7 +5,10 @@ interface GitLabIssue {
   iid: number;
   project_id: number;
   title: string;
+  description: string | null;
   labels: string[];
+  due_date: string | null;
+  web_url: string;
   references?: { full?: string };
 }
 
@@ -14,6 +17,11 @@ interface GitLabMR {
   iid: number;
   project_id: number;
   title: string;
+  description: string | null;
+  labels: string[];
+  source_branch: string;
+  target_branch: string;
+  web_url: string;
   references?: { full?: string };
 }
 
@@ -23,8 +31,15 @@ export interface GitLabTask {
   status: "todo";
   priority: "low" | "medium" | "high";
   source: "gitlab";
-  description: string | null;
-  dueDate: null;
+  // detail fields for drawer
+  webUrl: string;
+  descriptionText: string | null;
+  labels: string[];
+  projectRef: string | null;    // e.g. "group/project#12"
+  iid: number;
+  kind: "issue" | "mr";
+  dueDate: string | null;
+  branchInfo: string | null;    // "feat/x → main" for MRs
   createdAt: string;
   updatedAt: string;
 }
@@ -54,7 +69,7 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
   const uid = config.gitlab.userId;
   const [issuesResult, mrsResult] = await Promise.allSettled([
     glFetch<GitLabIssue[]>(`/issues?assignee_id=${uid}&state=opened&per_page=50`),
-    glFetch<GitLabMR[]>(`/merge_requests?author_id=${uid}&state=opened&per_page=50`),
+    glFetch<GitLabMR[]>(`/merge_requests?assignee_id=${uid}&state=opened&per_page=50`),
   ]);
 
   const now = new Date().toISOString();
@@ -68,8 +83,14 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
         status: "todo",
         priority: labelsToPriority(i.labels),
         source: "gitlab",
-        description: i.references?.full ?? null,
-        dueDate: null,
+        webUrl: i.web_url,
+        descriptionText: i.description,
+        labels: i.labels,
+        projectRef: i.references?.full ?? null,
+        iid: i.iid,
+        kind: "issue",
+        dueDate: i.due_date,
+        branchInfo: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -80,12 +101,18 @@ export async function getGitLabTasks(): Promise<GitLabTask[]> {
     for (const mr of mrsResult.value) {
       tasks.push({
         id: `gl-mr-${mr.project_id}-${mr.iid}`,
-        title: `MR: ${mr.title}`,
+        title: mr.title,
         status: "todo",
-        priority: "medium",
+        priority: labelsToPriority(mr.labels),
         source: "gitlab",
-        description: mr.references?.full ?? null,
+        webUrl: mr.web_url,
+        descriptionText: mr.description,
+        labels: mr.labels,
+        projectRef: mr.references?.full ?? null,
+        iid: mr.iid,
+        kind: "mr",
         dueDate: null,
+        branchInfo: `${mr.source_branch} → ${mr.target_branch}`,
         createdAt: now,
         updatedAt: now,
       });

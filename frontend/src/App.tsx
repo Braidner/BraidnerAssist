@@ -7,6 +7,7 @@ import {
 } from "./lib/api.ts";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
+import { Drawer } from "./components/Drawer.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
 import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
@@ -33,6 +34,7 @@ export function App() {
   const [clock, setClock] = useState(() => new Date());
   const [backend, setBackend] = useState<Backend>("checking");
   const [tasks, setTasks] = useState<PanelTask[]>([]);
+  const [selectedTask, setSelectedTask] = useState<PanelTask | null>(null);
   const [hermes, setHermes] = useState<HermesData>({ status: "idle", message: null, log: [] });
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
@@ -84,6 +86,8 @@ export function App() {
     });
   };
 
+  const onSelectTask = (task: PanelTask) => setSelectedTask(task);
+
   // ── Render ────────────────────────────────────────────────────────
   if (!authed) {
     return (
@@ -97,6 +101,7 @@ export function App() {
 
   return (
     <div className="mc" data-theme={theme}>
+      <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
       <div className="mc-shell">
         <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} />
 
@@ -104,7 +109,7 @@ export function App() {
 
         <div className="cols-3">
           <div className="col">
-            <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} />
+            <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} />
             <Placeholder icon="calendar" title="Календарь" phase="Phase 3" />
           </div>
 

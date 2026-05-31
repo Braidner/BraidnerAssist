@@ -32,6 +32,15 @@ export interface PanelTask {
   prio: Prio;
   tag: string;
   hermes: boolean;
+  // GitLab detail fields (present when tag === "gitlab")
+  webUrl?: string;
+  descriptionText?: string | null;
+  labels?: string[];
+  projectRef?: string | null;
+  iid?: number;
+  kind?: "issue" | "mr";
+  dueDate?: string | null;
+  branchInfo?: string | null;
 }
 
 export interface PanelLogLine {
@@ -52,9 +61,18 @@ interface BackendTask {
   id: string;
   title: string;
   description: string | null;
-  status: string; // todo | in_progress | done
-  priority: string; // low | medium | high
+  status: string;
+  priority: string;
   source: string;
+  // GitLab-only extras
+  webUrl?: string;
+  descriptionText?: string | null;
+  labels?: string[];
+  projectRef?: string | null;
+  iid?: number;
+  kind?: "issue" | "mr";
+  dueDate?: string | null;
+  branchInfo?: string | null;
 }
 
 interface BackendAgentStatus {
@@ -89,6 +107,14 @@ export async function getTasks(): Promise<PanelTask[]> {
       prio: t.status === "done" ? "ok" : PRIO_MAP[t.priority] ?? "info",
       tag: t.source,
       hermes: t.source !== "local",
+      webUrl: t.webUrl,
+      descriptionText: t.descriptionText,
+      labels: t.labels,
+      projectRef: t.projectRef,
+      iid: t.iid,
+      kind: t.kind,
+      dueDate: t.dueDate,
+      branchInfo: t.branchInfo,
     }));
   } catch {
     return [];

@@ -97,6 +97,25 @@ export const icons = {
       <path d="M3.5 9.5h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   ),
+  close: (p: IconProps) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  ),
+  git: (p: IconProps) => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" {...p}>
+      <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="18" cy="6" r="2.5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="6" cy="18" r="2.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M8.5 6h5M6 8.5v7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ),
+  external: (p: IconProps) => (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 3h6v6M10 14L21 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 } as const;
 
 export type IconName = keyof typeof icons;

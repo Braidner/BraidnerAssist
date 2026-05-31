@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, getHermes, getServices, getWeather,
+  setUnauthorizedHandler,
   type PanelTask, type HermesData, type ServicesData, type WeatherData,
 } from "./lib/api.ts";
+import { getToken, clearToken } from "./lib/auth.ts";
+import { LoginForm } from "./components/LoginForm.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
 import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
@@ -18,6 +21,15 @@ type Backend = "up" | "down" | "checking";
 
 export function App() {
   const { theme, toggle } = useTheme();
+
+  // ── Auth ──────────────────────────────────────────────────────────
+  const [authed, setAuthed] = useState(() => Boolean(getToken()));
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => setAuthed(false));
+  }, []);
+
+  // ── UI state (always declared — Rules of Hooks) ───────────────────
   const [clock, setClock] = useState(() => new Date());
   const [backend, setBackend] = useState<Backend>("checking");
   const [tasks, setTasks] = useState<PanelTask[]>([]);
@@ -31,6 +43,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!authed) return;
+
     fetch("/healthz")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(() => setBackend("up"))
@@ -50,10 +64,11 @@ export function App() {
       clearInterval(weatherTimer);
       clearInterval(tasksTimer);
     };
-  }, []);
+  }, [authed]);
 
+  // ── Handlers ─────────────────────────────────────────────────────
   const onToggleTask = (task: PanelTask) => {
-    if (task.tag === "gitlab") return; // GitLab tasks are read-only in Phase 2
+    if (task.tag === "gitlab") return;
     const done = !task.done;
     setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done } : x)));
     toggleTask(task.id, done).then((ok) => {
@@ -61,41 +76,46 @@ export function App() {
     });
   };
 
+  const onLogout = () => { clearToken(); setAuthed(false); };
+
   const onAddTask = (title: string) => {
     createTask(title).then((task) => {
       if (task) setTasks((ts) => [task, ...ts]);
     });
   };
 
+  // ── Render ────────────────────────────────────────────────────────
+  if (!authed) {
+    return (
+      <div className="mc" data-theme={theme}>
+        <LoginForm onSuccess={() => setAuthed(true)} />
+      </div>
+    );
+  }
+
   const openTasks = tasks.filter((t) => !t.done).length;
 
   return (
     <div className="mc" data-theme={theme}>
       <div className="mc-shell">
-        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} />
+        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} />
 
         <StatStrip openTasks={openTasks} hermesActions={hermes.log.length} />
 
         <div className="cols-3">
-          {/* колонка 1 — задачи (реальные + GitLab) + календарь-плейсхолдер */}
           <div className="col">
             <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} />
             <Placeholder icon="calendar" title="Календарь" phase="Phase 3" />
           </div>
 
-          {/* колонка 2 — привычки + погода (реальная) + заметки */}
           <div className="col">
             <HabitsPanel />
             <WeatherPanel data={weather} />
             <NotesPanel />
           </div>
 
-          {/* колонка 3 — система (реальные сервисы) + home assistant-плейсхолдер + лог Hermes */}
           <div className="col">
-            <SystemStatusPanel
-              services={servicesData.services}
-              configured={servicesData.configured}
-            />
+            <SystemStatusPanel services={servicesData.services} configured={servicesData.configured} />
             <Placeholder icon="home" title="Home Assistant" phase="Phase 4" />
             <HermesLogPanel data={hermes} />
           </div>

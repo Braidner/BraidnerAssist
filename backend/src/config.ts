@@ -17,6 +17,13 @@ export const config = {
   nodeEnv: env("NODE_ENV") ?? "development",
   mcpToken: env("MCP_TOKEN"),
 
+  auth: {
+    user: env("AUTH_USER") ?? "braidner",
+    // bcrypt hash of default password "Pk0qflvby!"
+    passwordHash: env("AUTH_PASSWORD_HASH") ?? "$2b$10$e7soZessyEaSqsCVB3tAc.uHMPOqPAo7wQvBs765ozxzq0L3dfZG.",
+    jwtSecret: env("JWT_SECRET") ?? "mc-dev-secret-change-in-prod",
+  },
+
   gitlab: {
     url: env("GITLAB_URL"),
     token: env("GITLAB_TOKEN"),

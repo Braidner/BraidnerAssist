@@ -2,6 +2,27 @@
 // Каждый вызов изолирован — при ошибке возвращаем пустое/безопасное значение,
 // чтобы одна нерабочая интеграция не роняла весь дашборд.
 
+import { getToken, clearToken } from "./auth.ts";
+
+// Fetch with JWT; fires onUnauthorized callback on 401 (token expired/invalid).
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void) { onUnauthorized = fn; }
+
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string>),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  const res = await fetch(input, { ...init, headers });
+  if (res.status === 401) {
+    clearToken();
+    onUnauthorized?.();
+    throw new Error("unauthorized");
+  }
+  return res;
+}
+
 export type Prio = "bad" | "warn" | "ok" | "info";
 
 export interface PanelTask {
@@ -58,7 +79,7 @@ function timeOf(iso: string): string {
 
 export async function getTasks(): Promise<PanelTask[]> {
   try {
-    const res = await fetch("/api/tasks");
+    const res = await apiFetch("/api/tasks");
     if (!res.ok) return [];
     const tasks = (await res.json()) as BackendTask[];
     return tasks.map((t) => ({
@@ -76,7 +97,7 @@ export async function getTasks(): Promise<PanelTask[]> {
 
 export async function toggleTask(id: string, done: boolean): Promise<boolean> {
   try {
-    const res = await fetch(`/api/tasks/${id}`, {
+    const res = await apiFetch(`/api/tasks/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: done ? "done" : "todo" }),
@@ -89,7 +110,7 @@ export async function toggleTask(id: string, done: boolean): Promise<boolean> {
 
 export async function createTask(title: string): Promise<PanelTask | null> {
   try {
-    const res = await fetch("/api/tasks", {
+    const res = await apiFetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title }),
@@ -117,7 +138,7 @@ export interface ServicesData {
 
 export async function getServices(): Promise<ServicesData> {
   try {
-    const res = await fetch("/api/services");
+    const res = await apiFetch("/api/services");
     if (!res.ok) throw new Error();
     const data = (await res.json()) as { configured: boolean; services?: ServiceStatus[] };
     return { configured: data.configured, services: data.services ?? [] };
@@ -143,7 +164,7 @@ export interface WeatherData {
 
 export async function getWeather(): Promise<WeatherData> {
   try {
-    const res = await fetch("/api/weather");
+    const res = await apiFetch("/api/weather");
     if (!res.ok) throw new Error();
     const data = (await res.json()) as { configured: boolean } & Partial<WeatherData>;
     return { configured: data.configured, current: data.current ?? null, forecast: data.forecast ?? [] };
@@ -156,8 +177,8 @@ export async function getHermes(): Promise<HermesData> {
   const empty: HermesData = { status: "idle", message: null, log: [] };
   try {
     const [statusRes, logRes] = await Promise.all([
-      fetch("/api/hermes/status"),
-      fetch("/api/hermes/log"),
+      apiFetch("/api/hermes/status"),
+      apiFetch("/api/hermes/log"),
     ]);
     const status = statusRes.ok ? ((await statusRes.json()) as BackendAgentStatus) : {};
     const rawLog = logRes.ok ? ((await logRes.json()) as BackendAgentLog[]) : [];

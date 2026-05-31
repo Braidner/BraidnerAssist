@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config.js";
 import { apiRouter } from "./api/index.js";
+import { authRouter } from "./api/auth.js";
+import { jwtAuth } from "./middleware/jwtAuth.js";
 
 const app = express();
 app.use(cors());
@@ -21,7 +23,11 @@ app.get("/healthz", (_req, res) => {
   });
 });
 
-app.use("/api", apiRouter);
+// Public: login (no token required)
+app.use("/api/auth", authRouter);
+
+// All other /api routes require valid JWT
+app.use("/api", jwtAuth, apiRouter);
 
 app.listen(config.backendPort, () => {
   console.log(

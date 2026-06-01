@@ -4,10 +4,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createMcpServer } from "./server.js";
 import { config } from "../config.js";
 
-// One session map — supports a single connected Hermes agent
+// session map: id → transport (each session gets its own McpServer instance)
 const sessions = new Map<string, StreamableHTTPServerTransport>();
-
-const mcpServer = createMcpServer();
 
 function mcpAuth(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
   if (!config.mcpToken) return next(); // no token configured → open (dev only)
@@ -42,6 +40,8 @@ mcpRouter.post("/", async (req, res) => {
   let transport = sessionId ? sessions.get(sessionId) : undefined;
 
   if (!transport) {
+    // fresh server + transport per session — McpServer can only be connected once
+    const server = createMcpServer();
     transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
@@ -51,7 +51,7 @@ mcpRouter.post("/", async (req, res) => {
         sessions.delete(id);
       },
     });
-    await mcpServer.connect(transport);
+    await server.connect(transport);
   }
 
   await transport.handleRequest(req, res, req.body);

@@ -91,7 +91,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 2. **Homelab Services** — статус сервисов (ping/HTTP healthcheck), из `/data/services.json`.
 3. **Home Assistant** — автоматизации (list/toggle), реальные данные через REST HA API.
 4. **Weather** — Open-Meteo (без ключа), текущая + прогноз 3 дня.
-5. **Hermes Agent Monitor** — статус агента, лог действий, очередь команд.
+5. **Hermes Agent** — список сессий напрямую из Hermes Agent API (Nous Research,
+   `HERMES_URL`/`HERMES_API_KEY`). Из задачи (drawer) кнопка создаёт новую сессию и шлёт
+   туда номер+описание; клик по сессии открывает чат для продолжения диалога.
 
 ## UI / Дизайн-система (неоморфизм)
 
@@ -109,7 +111,7 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
   - Левая (`col-fill`): Tasks
   - Средняя (`col`): SystemStatus + HomeAssistant
   - Правая (`col-fill`): HermesLog
-- **Данные**: Tasks (local + GitLab), HermesLog, Services, Weather, HomeAssistant — реальные.
+- **Данные**: Tasks (local + GitLab), Hermes (сессии), Services, Weather, HomeAssistant — реальные.
 - **StatStrip**: 4 тайла (задачи / сервисы / погода / автоматизации HA); на экранах ≤760px —
   горизонтальный scroll-snap карусель со свайпом и точками-индикаторами.
 - Новые виджеты/панели делать в этой же системе (классы `.card .neu`, токены тем).

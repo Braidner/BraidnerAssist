@@ -1,11 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { icons } from "./icons.tsx";
-import type { PanelTask } from "../lib/api.ts";
+import { startHermesSession, type PanelTask } from "../lib/api.ts";
 
 interface DrawerProps {
   task: PanelTask | null;
   onClose: () => void;
+  onSessionStarted?: (id: string) => void;
 }
+
+type SendState = "idle" | "sending" | "sent" | "error";
+
+const SEND_LABEL: Record<SendState, string> = {
+  idle: "Отправить в Hermes",
+  sending: "Отправляю…",
+  sent: "Сессия создана",
+  error: "Ошибка — повторить",
+};
 
 const PRIO_LABEL: Record<string, string> = {
   bad: "Высокий",
@@ -21,7 +31,13 @@ const PRIO_COLOR: Record<string, string> = {
   info: "var(--info)",
 };
 
-export function Drawer({ task, onClose }: DrawerProps) {
+export function Drawer({ task, onClose, onSessionStarted }: DrawerProps) {
+  const [send, setSend] = useState<SendState>("idle");
+
+  useEffect(() => {
+    setSend("idle");
+  }, [task]);
+
   useEffect(() => {
     if (!task) return;
     function onKey(e: KeyboardEvent) {
@@ -30,6 +46,22 @@ export function Drawer({ task, onClose }: DrawerProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [task, onClose]);
+
+  const onSendToHermes = async () => {
+    if (!task || send === "sending") return;
+    setSend("sending");
+    try {
+      const { id } = await startHermesSession({
+        taskRef: task.projectRef ?? task.id,
+        title: task.label,
+        description: task.descriptionText ?? "",
+      });
+      setSend("sent");
+      onSessionStarted?.(id);
+    } catch {
+      setSend("error");
+    }
+  };
 
   return (
     <>
@@ -104,6 +136,15 @@ export function Drawer({ task, onClose }: DrawerProps) {
                 <icons.external style={{ width: 13, height: 13 }} />
               </a>
             )}
+
+            <button
+              className="drawer-open-btn drawer-send-btn neu-sm"
+              onClick={onSendToHermes}
+              disabled={send === "sending"}
+            >
+              {SEND_LABEL[send]}
+              <icons.bot style={{ width: 14, height: 14 }} />
+            </button>
           </div>
         )}
       </aside>

@@ -43,6 +43,15 @@ export const config = {
     },
   },
 
+  hermes: {
+    url: env("HERMES_URL") ?? "http://127.0.0.1:8000",
+    key: env("HERMES_API_KEY"),
+    model: env("HERMES_MODEL") ?? "default",
+    get configured() {
+      return Boolean(this.url);
+    },
+  },
+
   weather: {
     lat: env("WEATHER_LAT"),
     lon: env("WEATHER_LON"),

@@ -142,7 +142,8 @@ POST  /api/homeassistant/automations/:id/toggle
 POST  /api/homeassistant/scripts/:id/trigger
 GET/POST  /api/calendar/events
 GET   /api/weather
-GET   /api/hermes/status         GET /api/hermes/log    POST /api/hermes/command
+GET   /api/hermes/sessions       POST /api/hermes/session
+GET   /api/hermes/sessions/:id   POST /api/hermes/sessions/:id/chat
 ```
 
 ## Заметки / решения

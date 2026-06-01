@@ -16,6 +16,10 @@ services:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - ./data:/data
+    # Hermes Agent API крутится на хосте (hermes.lan) — открываем доступ к нему
+    # из контейнера. В .env задать HERMES_URL=http://host.docker.internal:8642.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   frontend:

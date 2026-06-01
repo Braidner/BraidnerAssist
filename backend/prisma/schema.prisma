@@ -49,6 +49,17 @@ model AgentStatus {
   updatedAt DateTime @updatedAt
 }
 
+// Сессии Hermes-агента: переписка с LLM, хранится локально (сервер не даёт GET по ID).
+model HermesSession {
+  id               String   @id @default(cuid())
+  title            String
+  latestResponseId String?  // ID последнего ответа от /v1/responses
+  messages         String   @default("[]") // JSON: [{role,text}]
+  status           String   @default("idle") // running | idle | error
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 // Локальные события календаря (если нет CalDAV).
 model CalendarEvent {
   id          String   @id @default(cuid())

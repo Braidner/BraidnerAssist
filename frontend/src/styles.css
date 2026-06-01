@@ -494,3 +494,87 @@ html, body, #root {
   transition: opacity 0.15s;
 }
 .drawer-open-btn:hover { opacity: 0.88; }
+
+/* ============================================================
+   Settings modal
+   ============================================================ */
+
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+
+.settings-panel {
+  width: min(540px, 100%);
+  padding: 24px 28px 22px;
+  display: flex; flex-direction: column; gap: 0;
+}
+
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.settings-title {
+  font-family: var(--font-ui); font-size: 15px; font-weight: 600;
+  color: var(--ink); display: flex; align-items: center;
+}
+
+.settings-section-label {
+  font-family: var(--font); font-size: 10.5px; letter-spacing: .08em;
+  color: var(--muted); text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.settings-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+
+.settings-row {
+  display: flex; gap: 8px; align-items: center;
+}
+
+.settings-input {
+  flex: 1; height: 36px; padding: 0 12px;
+  background: var(--surface-2);
+  border: none; border-radius: calc(var(--radius) * 0.6);
+  font-family: var(--font-ui); font-size: 13px; color: var(--ink);
+  outline: none;
+  box-shadow: inset 2px 2px 5px var(--sd), inset -2px -2px 5px var(--sl);
+  transition: box-shadow 0.15s;
+}
+.settings-input:focus {
+  box-shadow: inset 2px 2px 5px var(--sd), inset -2px -2px 5px var(--sl),
+              0 0 0 2px var(--accent);
+}
+.settings-input--url { flex: 2; font-family: var(--font); font-size: 12px; }
+
+.settings-del {
+  flex-shrink: 0; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: none; border-radius: 8px;
+  color: var(--muted); cursor: pointer; transition: color 0.15s;
+}
+.settings-del:hover { color: var(--bad); }
+
+.settings-add {
+  align-self: flex-start; margin-bottom: 14px;
+  display: flex; align-items: center;
+  font-family: var(--font-ui); font-size: 12.5px;
+}
+
+.settings-error {
+  font-family: var(--font-ui); font-size: 12.5px; color: var(--bad);
+  margin-bottom: 10px;
+}
+
+.settings-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
+
+.settings-save {
+  padding: 9px 22px;
+  font-family: var(--font-ui); font-size: 13.5px; font-weight: 600;
+  color: var(--accent); border: none; border-radius: calc(var(--radius) * 0.6);
+  cursor: pointer; transition: opacity 0.15s;
+}
+.settings-save:disabled { opacity: 0.5; cursor: default; }
+.settings-save:not(:disabled):hover { opacity: 0.85; }

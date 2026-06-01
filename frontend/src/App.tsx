@@ -6,6 +6,7 @@ import {
   setUnauthorizedHandler,
   type PanelTask, type HermesData, type ServicesData, type WeatherData, type VersionData, type HassData,
 } from "./lib/api.ts";
+import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
 import { Drawer } from "./components/Drawer.tsx";
@@ -38,6 +39,7 @@ export function App() {
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -117,9 +119,15 @@ export function App() {
 
   return (
     <div className="mc" data-theme={theme}>
+      {showSettings && (
+        <SettingsPanel
+          onClose={() => setShowSettings(false)}
+          onSave={() => { setShowSettings(false); getServices().then(setServicesData); }}
+        />
+      )}
       <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
       <div className="mc-shell">
-        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} versionData={versionData} />
+        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} onSettings={() => setShowSettings(true)} versionData={versionData} />
 
         <StatStrip openTasks={openTasks} weather={weather} services={servicesData} hass={hass} />
 

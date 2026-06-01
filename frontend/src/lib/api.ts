@@ -154,6 +154,11 @@ export async function createTask(title: string): Promise<PanelTask | null> {
 
 // ─── Services ────────────────────────────────────────────────────────
 
+export interface ServiceConfig {
+  name: string;
+  url: string;
+}
+
 export interface ServiceStatus {
   name: string;
   status: "ok" | "warn" | "bad";
@@ -163,6 +168,28 @@ export interface ServiceStatus {
 export interface ServicesData {
   configured: boolean;
   services: ServiceStatus[];
+}
+
+export async function getServicesConfig(): Promise<ServiceConfig[]> {
+  try {
+    const res = await apiFetch("/api/settings/services");
+    if (!res.ok) throw new Error();
+    return (await res.json()) as ServiceConfig[];
+  } catch {
+    return [];
+  }
+}
+
+export async function putServicesConfig(services: ServiceConfig[]): Promise<void> {
+  const res = await apiFetch("/api/settings/services", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(services),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error ?? "Save failed");
+  }
 }
 
 export async function getServices(): Promise<ServicesData> {

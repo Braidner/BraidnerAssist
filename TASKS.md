@@ -109,26 +109,25 @@
 - [x] Деплой: HASS_URL=http://homeassistant.lan:8123, HASS_TOKEN настроен на сервере
 - [x] Проверено: 8 автоматизаций тянутся из HA, toggle работает
 
-## Фаза 5 — MCP сервер + Hermes  ← В РАБОТЕ
+## Фаза 5 — MCP сервер + Hermes  ✅ ГОТОВО
 
-- [~] `@modelcontextprotocol/sdk` установлен
-- [ ] `backend/src/mcp/server.ts` — McpServer с инструментами
-- [ ] MCP tools: tasks (get/create/update/complete), agent (report_status/log_action/
-      get_queue/dequeue), ha (get_automations/toggle), services, weather
-- [ ] Streamable HTTP транспорт: `POST/GET/DELETE /mcp`, bearer MCP_TOKEN, Origin-check
-- [ ] Agent monitor: polling очереди команд в HermesLog панели
+- [x] `@modelcontextprotocol/sdk@1.29.0` + `zod@4.4.3` установлены
+- [x] `backend/src/mcp/server.ts` — `createMcpServer()` (новый экземпляр на сессию)
+- [x] MCP tools (12 штук):
+      — tasks: `get_tasks`, `create_task`, `update_task`, `complete_task`
+      — agent: `report_status`, `log_action`, `get_agent_queue`, `complete_agent_task`
+      — ha: `get_automations`, `toggle_automation`
+      — infra: `get_services`, `get_weather`
+- [x] Streamable HTTP транспорт: `POST/GET/DELETE /mcp`, bearer `MCP_TOKEN`, Origin-guard
+      (защита от DNS-rebinding: localhost / .lan / .local)
+- [x] Проверено: `tools/list` возвращает все 12 инструментов; сессия инициализируется
+- [x] Деплой: образ обновлён в GHCR, на hermes.lan перезапущен и проверен
 
-## Фаза 6 — Polish
+## Фаза 6 — Polish  ← В РАБОТЕ
 
-- [ ] Drag-and-drop виджетов (react-grid-layout)
-- [ ] Настройки (конфиг сервисов из UI)
-- [ ] PWA (доступ с телефона в сети)
-
-## Фаза 6 — Polish
-
-- [ ] Drag-and-drop виджетов (react-grid-layout)
-- [ ] Настройки (конфиг сервисов из UI)
-- [ ] PWA (доступ с телефона в сети)
+- [ ] PWA (manifest + service worker — офлайн, иконка, установка на телефон)
+- [ ] Настройки из UI (редактор списка сервисов вместо ручного services.json)
+- [ ] Drag-and-drop виджетов (react-grid-layout, persist order)
 
 ---
 

@@ -1,7 +1,7 @@
-import { readFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { config } from "../config.js";
 
-interface ServiceConfig {
+export interface ServiceConfig {
   name: string;
   url: string;
 }
@@ -57,4 +57,25 @@ export async function getServices(): Promise<{
 
   cache = { data: services, at: Date.now() };
   return { configured: true, services };
+}
+
+export function invalidateServicesCache(): void {
+  cache = null;
+}
+
+export async function readServicesConfig(): Promise<ServiceConfig[]> {
+  try {
+    const raw = await readFile(config.servicesFile, "utf-8");
+    return JSON.parse(raw) as ServiceConfig[];
+  } catch {
+    return [];
+  }
+}
+
+export async function writeServicesConfig(configs: ServiceConfig[]): Promise<void> {
+  for (const svc of configs) {
+    if (!svc.name?.trim()) throw new Error("Service name cannot be empty");
+    new URL(svc.url); // throws if invalid
+  }
+  await writeFile(config.servicesFile, JSON.stringify(configs, null, 2), "utf-8");
 }

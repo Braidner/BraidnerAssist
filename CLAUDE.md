@@ -123,7 +123,8 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
   StatStrip carousel (mobile), APP_TOKEN для iOS Shortcuts. ✅ ГОТОВО
 - **Фаза 4 — Home Assistant**: HA REST API, automations list/toggle, HomeAssistant панель,
   StatStrip 4й тайл — активные автоматизации. ✅ ГОТОВО
-- **Фаза 5 — MCP сервер + Hermes integration** ← В РАБОТЕ
-- Фаза 6 — Drag-and-drop, настройки из UI, PWA
+- **Фаза 5 — MCP сервер + Hermes integration**: Streamable HTTP `/mcp`, 12 инструментов
+  (tasks/agent/HA/services/weather), bearer MCP_TOKEN, Origin-guard. ✅ ГОТОВО
+- **Фаза 6 — Polish** ← В РАБОТЕ
 
 Подробный трекинг — в `TASKS.md`.

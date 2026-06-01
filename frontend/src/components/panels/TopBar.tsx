@@ -10,6 +10,7 @@ interface TopBarProps {
   theme: Theme;
   onToggleTheme: () => void;
   onLogout: () => void;
+  onSettings: () => void;
   versionData: VersionData | null;
 }
 
@@ -26,7 +27,7 @@ function fmtDate(d: Date): string {
   return `${DOW[d.getDay()]} · ${d.getDate()} ${MONTH[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, versionData }: TopBarProps) {
+export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSettings, versionData }: TopBarProps) {
   const linkDot = backend === "up" ? "ok" : backend === "down" ? "bad" : "idle";
   const linkText = backend === "up" ? "LINK OK" : backend === "down" ? "NO LINK" : "…";
 
@@ -63,6 +64,9 @@ export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, version
           <span className={`dot ${linkDot}`} />
           {linkText}
         </span>
+        <button className="pill" onClick={onSettings} title="Настройки">
+          <icons.gear style={{ width: 16, height: 16 }} />
+        </button>
         <button className="pill" onClick={onToggleTheme} title="Переключить тему">
           {theme === "dark" ? <icons.sun style={{ width: 16, height: 16 }} /> : <icons.moon style={{ width: 16, height: 16 }} />}
         </button>

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../db/client.js";
 import { tasksRouter } from "./tasks.js";
+import { settingsRouter } from "./settings.js";
 import { getWeather } from "../integrations/weather.js";
 import { getServices } from "../integrations/services.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
@@ -9,6 +10,7 @@ import { config } from "../config.js";
 export const apiRouter = Router();
 
 apiRouter.use("/tasks", tasksRouter);
+apiRouter.use("/settings", settingsRouter);
 
 apiRouter.get("/weather", async (_req, res) => {
   try {

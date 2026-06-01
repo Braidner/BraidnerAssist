@@ -44,31 +44,33 @@ export interface PanelTask {
   branchInfo?: string | null;
 }
 
-export interface HermesSession {
-  id: string;
-  title: string;
-  status: string;
+export interface PanelLogLine {
   t: string;
+  msg: string;
+  k: string;
+  tag: string;
 }
 
 export interface HermesData {
-  configured: boolean;
-  sessions: HermesSession[];
-}
-
-export interface HermesMessage {
-  role: "user" | "assistant";
-  text: string;
-}
-
-export interface HermesSessionDetail {
-  id: string;
-  title: string;
-  status: string;
-  messages: HermesMessage[];
+  status: "active" | "idle" | "error";
+  message: string | null;
+  log: PanelLogLine[];
 }
 
 // ─── backend shapes ────────────────────────────────────────────────
+interface BackendAgentStatus {
+  status?: string;
+  message?: string | null;
+}
+
+interface BackendAgentLog {
+  id: string;
+  action: string;
+  details: string | null;
+  result: string | null;
+  createdAt: string;
+}
+
 interface BackendTask {
   id: string;
   title: string;
@@ -283,69 +285,27 @@ export async function toggleHassAutomation(entityId: string): Promise<boolean> {
   }
 }
 
-interface BackendHermesSession {
-  id: string;
-  title: string;
-  status: string;
-  createdAt: string | null;
-}
-
 export async function getHermes(): Promise<HermesData> {
+  const empty: HermesData = { status: "idle", message: null, log: [] };
   try {
-    const res = await apiFetch("/api/hermes/sessions");
-    if (!res.ok) throw new Error();
-    const body = (await res.json()) as {
-      configured: boolean;
-      sessions: BackendHermesSession[];
-    };
+    const [statusRes, logRes] = await Promise.all([
+      apiFetch("/api/hermes/status"),
+      apiFetch("/api/hermes/log"),
+    ]);
+    const status = statusRes.ok ? ((await statusRes.json()) as BackendAgentStatus) : {};
+    const rawLog = logRes.ok ? ((await logRes.json()) as BackendAgentLog[]) : [];
     return {
-      configured: body.configured,
-      sessions: (body.sessions ?? []).map((s) => ({
-        id: s.id,
-        title: s.title,
-        status: s.status,
-        t: s.createdAt ? timeOf(s.createdAt) : "",
+      status: (status.status as HermesData["status"]) ?? "idle",
+      message: status.message ?? null,
+      log: rawLog.map((l) => ({
+        t: timeOf(l.createdAt),
+        msg: l.details ?? l.action,
+        k: l.action,
+        tag: l.result ?? "auto",
       })),
     };
   } catch {
-    return { configured: false, sessions: [] };
-  }
-}
-
-export async function startHermesSession(input: {
-  taskRef: string;
-  title: string;
-  description: string;
-}): Promise<{ id: string }> {
-  const res = await apiFetch("/api/hermes/session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error(`Hermes session failed: ${res.status}`);
-  return (await res.json()) as { id: string };
-}
-
-export async function getHermesSession(id: string): Promise<HermesSessionDetail> {
-  const res = await apiFetch(`/api/hermes/sessions/${id}`);
-  if (!res.ok) throw new Error(`Hermes session fetch failed: ${res.status}`);
-  return (await res.json()) as HermesSessionDetail;
-}
-
-export async function sendHermesMessage(id: string, input: string): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await apiFetch(`/api/hermes/sessions/${id}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ input }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { error?: string };
-      return { ok: false, error: body.error ?? `HTTP ${res.status}` };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return empty;
   }
 }
 

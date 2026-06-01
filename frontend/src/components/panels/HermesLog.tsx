@@ -1,47 +1,30 @@
 import { Card } from "../Card.tsx";
 import type { HermesData } from "../../lib/api.ts";
 
-function pulseClass(status: string): string {
-  const s = status.toLowerCase();
-  if (s === "running" || s === "active") return "";
-  if (s === "error" || s === "failed") return "error";
-  return "idle";
-}
-
-// Hermes · сессии — список сессий напрямую из Hermes Agent API.
-export function HermesLogPanel({
-  data,
-  onOpenSession,
-}: {
-  data: HermesData;
-  onOpenSession: (id: string) => void;
-}) {
+// Hermes · лог агента — реальный статус + последние действия (данные живут в App).
+export function HermesLogPanel({ data }: { data: HermesData }) {
   return (
     <Card
       icon="bot"
-      title="Hermes · сессии"
+      title="Hermes · лог агента"
       className="grow"
-      action={<span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>hermes-agent</span>}
+      action={<span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>claude · MCP</span>}
     >
-      <div className="scroll" style={{ flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}>
-        {!data.configured && (
-          <div className="empty">Hermes недоступен. Задай HERMES_URL в .env.</div>
-        )}
-        {data.configured && (data.sessions ?? []).length === 0 && (
-          <div className="empty">Сессий пока нет.</div>
-        )}
-        {(data.sessions ?? []).map((s) => (
-          <div
-            key={s.id}
-            className="log-line"
-            style={{ cursor: "pointer", alignItems: "center" }}
-            onClick={() => onOpenSession(s.id)}
-            title="Открыть чат сессии"
-          >
-            <span className={`pulse ${pulseClass(s.status)}`} />
+      <div className="hermes-status">
+        <span className={`pulse ${data.status === "active" ? "" : data.status}`} />
+        <span className="hermes-state">
+          статус: <b>{data.status}</b>
+          {data.message ? ` · ${data.message}` : ""}
+        </span>
+      </div>
+      <div className="scroll" style={{ marginTop: 8, flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}>
+        {data.log.length === 0 && <div className="empty">Лог пуст. Hermes ещё не записал действий.</div>}
+        {data.log.map((l, i) => (
+          <div key={i} className="log-line">
+            <span className="log-t">{l.t}</span>
             <div>
-              <div className="log-msg">{s.title}</div>
-              <span className="log-tag">{s.status}{s.t ? ` · ${s.t}` : ""}</span>
+              <div className="log-msg">{l.msg}</div>
+              <span className="k">{l.k}</span> <span className="log-tag">· {l.tag}</span>
             </div>
           </div>
         ))}

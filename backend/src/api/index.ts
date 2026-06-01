@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../db/client.js";
+import { config } from "../config.js";
 import { tasksRouter } from "./tasks.js";
 import { settingsRouter } from "./settings.js";
 import { getWeather } from "../integrations/weather.js";
 import { getServices } from "../integrations/services.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
-import { listSessions, startSession, getSession, sendTurn } from "../integrations/hermes.js";
-import { config } from "../config.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -89,45 +88,31 @@ apiRouter.post("/calendar/events", async (req, res) => {
   res.status(201).json(event);
 });
 
-// Hermes agent — данные напрямую из Hermes Agent API (Nous Research).
-apiRouter.get("/hermes/sessions", async (_req, res) => {
-  try {
-    res.json(await listSessions());
-  } catch (e) {
-    res.status(502).json({ configured: false, sessions: [], error: String(e) });
-  }
+// Hermes agent — статус и лог из SQLite (пишется агентом через MCP).
+apiRouter.get("/hermes/status", async (_req, res) => {
+  const status = await prisma.agentStatus.findUnique({ where: { id: 1 } });
+  res.json(status ?? { status: "idle", message: null, updatedAt: null });
 });
 
-apiRouter.post("/hermes/session", async (req, res) => {
-  if (!config.hermes.configured) return res.status(503).json({ configured: false });
-  const { taskRef, title, description } = req.body ?? {};
-  if (!title) return res.status(400).json({ error: "title is required" });
-  const input = `Задача ${taskRef ?? ""}: ${title}\n\n${description ?? ""}`.trim();
-  try {
-    res.status(201).json(await startSession(input));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
+apiRouter.get("/hermes/log", async (_req, res) => {
+  const entries = await prisma.agentLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+  res.json(entries);
 });
 
-apiRouter.get("/hermes/sessions/:id", async (req, res) => {
-  try {
-    res.json(await getSession(req.params.id));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-apiRouter.post("/hermes/sessions/:id/chat", async (req, res) => {
-  if (!config.hermes.configured) return res.status(503).json({ configured: false });
-  const { input } = req.body ?? {};
-  if (!input) return res.status(400).json({ error: "input is required" });
-  try {
-    await sendTurn(req.params.id, String(input));
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
+apiRouter.post("/hermes/command", async (req, res) => {
+  const { command, payload } = req.body ?? {};
+  if (!command) return res.status(400).json({ error: "command is required" });
+  const task = await prisma.agentTask.create({
+    data: {
+      command,
+      payload: payload ? JSON.stringify(payload) : null,
+      status: "queued",
+    },
+  });
+  res.status(201).json(task);
 });
 
 // Backend logs — in-memory ring buffer, newest first, max 200 entries.

@@ -495,38 +495,6 @@ html, body, #root {
 }
 .drawer-open-btn:hover { opacity: 0.88; }
 .drawer-open-btn:disabled { opacity: 0.45; cursor: default; }
-.drawer-send-btn {
-  margin-top: 12px;
-  background: var(--surface-2); color: var(--ink);
-}
-
-/* ── Hermes chat ───────────────────────────────────────────────── */
-.hermes-chat { padding-bottom: 18px; }
-.chat-feed {
-  flex: 1; min-height: 0; margin: 4px -6px 0 0; padding-right: 6px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.chat-msg {
-  max-width: 86%; padding: 9px 12px;
-  border-radius: calc(var(--radius) * 0.55);
-  font-family: var(--font-ui); font-size: 13px; line-height: 1.55;
-  white-space: pre-wrap; word-break: break-word;
-}
-.chat-msg.user {
-  align-self: flex-end; background: var(--accent); color: var(--accent-ink);
-}
-.chat-msg.assistant {
-  align-self: flex-start; background: var(--surface-2); color: var(--ink-soft);
-}
-.chat-input { margin-top: 14px; display: flex; flex-direction: column; gap: 0; }
-.chat-input textarea {
-  width: 100%; resize: none; padding: 11px 13px;
-  background: var(--surface-2); color: var(--ink);
-  border: 1px solid var(--hair); border-radius: calc(var(--radius) * 0.55);
-  font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
-  outline: none;
-}
-.chat-input textarea:focus { border-color: var(--accent); }
 
 /* ============================================================
    Settings modal
@@ -672,27 +640,3 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* ── Drawer send error ───────────────────────────────────────────────── */
-.drawer-send-error {
-  font-family: var(--font); font-size: 11px;
-  color: var(--bad);
-  padding: 4px 6px;
-  margin-top: -4px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--bad) 10%, transparent);
-  word-break: break-all;
-}
-
-/* ── Chat error ──────────────────────────────────────────────────────── */
-.chat-error {
-  font-family: var(--font); font-size: 11px;
-  color: var(--bad);
-  padding: 5px 8px;
-  margin-bottom: 6px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--bad) 10%, transparent);
-}
-.chat-input-row {
-  display: flex; gap: 8px; align-items: flex-end;
-}
-.chat-input-row textarea { flex: 1; }

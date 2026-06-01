@@ -11,7 +11,6 @@ import { LogsPanel } from "./components/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
 import { Drawer } from "./components/Drawer.tsx";
-import { HermesChat } from "./components/HermesChat.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
 import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
@@ -36,8 +35,7 @@ export function App() {
   const [backend, setBackend] = useState<Backend>("checking");
   const [tasks, setTasks] = useState<PanelTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<PanelTask | null>(null);
-  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
-  const [hermes, setHermes] = useState<HermesData>({ configured: false, sessions: [] });
+  const [hermes, setHermes] = useState<HermesData>({ status: "idle", message: null, log: [] });
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
@@ -69,7 +67,7 @@ export function App() {
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
-    const hermesTimer = setInterval(() => getHermes().then(setHermes), 30_000);
+    const hermesTimer = setInterval(() => getHermes().then(setHermes), 60_000);
 
     return () => {
       clearInterval(serviceTimer);
@@ -135,13 +133,7 @@ export function App() {
       <Drawer
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
-        onSessionStarted={(id) => {
-          getHermes().then(setHermes);
-          setSelectedTask(null);
-          setOpenSessionId(id);
-        }}
       />
-      <HermesChat sessionId={openSessionId} onClose={() => setOpenSessionId(null)} />
       <div className="mc-shell">
         <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} onSettings={() => setShowSettings(true)} onLogs={() => setShowLogs(true)} versionData={versionData} />
 
@@ -158,7 +150,7 @@ export function App() {
           </div>
 
           <div className="col-fill">
-            <HermesLogPanel data={hermes} onOpenSession={setOpenSessionId} />
+            <HermesLogPanel data={hermes} />
           </div>
         </div>
       </div>

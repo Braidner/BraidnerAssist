@@ -88,11 +88,10 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 ## Модули (виджеты)
 
 1. **Tasks Hub** — GitLab issues/MRs + локальные задачи (SQLite), CRUD, клик → drawer с деталями.
-2. **Health** — шаги + км через iOS Shortcuts → `POST /api/health/push`; агрегация в `HealthDay` (SQLite).
-3. **Homelab Services** — статус сервисов (ping/HTTP healthcheck), из `/data/services.json`.
-4. **Home Assistant** — автоматизации (toggle), скрипты (trigger), события (REST + WS).
-5. **Weather** — Open-Meteo (без ключа), текущая + прогноз 3 дня.
-6. **Hermes Agent Monitor** — статус агента, лог действий, очередь команд.
+2. **Homelab Services** — статус сервисов (ping/HTTP healthcheck), из `/data/services.json`.
+3. **Home Assistant** — автоматизации (list/toggle), реальные данные через REST HA API.
+4. **Weather** — Open-Meteo (без ключа), текущая + прогноз 3 дня.
+5. **Hermes Agent Monitor** — статус агента, лог действий, очередь команд.
 
 ## UI / Дизайн-система (неоморфизм)
 
@@ -105,14 +104,14 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
   Тема ставится на обёртку `.mc` (не на `:root`); переключатель в `theme.ts`.
 - **Примитивы теней**: `.neu` (выпуклый), `.neu-in` (вдавленный), `.neu-sm` (мелкий).
 - **Компоненты**: `frontend/src/components/` — `Card`, `Ring`, `icons` (SVG-набор) +
-  `panels/` (TopBar, StatStrip, Tasks, SystemStatus, Health, HermesLog, Placeholder).
-  Раскладка — **вариант C (three columns)**: полоса мини-статов + 3 колонки.
+  `panels/` (TopBar, StatStrip, Tasks, SystemStatus, HomeAssistant, HermesLog, Placeholder).
+  Раскладка — **вариант C (three columns)**: полоса мини-статов (carousel на mobile) + 3 колонки.
   - Левая (`col-fill`): Tasks
-  - Средняя (`col`): SystemStatus + Health + HA Placeholder
+  - Средняя (`col`): SystemStatus + HomeAssistant
   - Правая (`col-fill`): HermesLog
-- **Данные**: Tasks (local + GitLab), HermesLog, Services, Weather — реальные;
-  Health — реальные если данные переданы через iOS Shortcuts (`POST /api/health/push`);
-  HA — плейсхолдер Phase 4.
+- **Данные**: Tasks (local + GitLab), HermesLog, Services, Weather, HomeAssistant — реальные.
+- **StatStrip**: 4 тайла (задачи / сервисы / погода / автоматизации HA); на экранах ≤760px —
+  горизонтальный scroll-snap карусель со свайпом и точками-индикаторами.
 - Новые виджеты/панели делать в этой же системе (классы `.card .neu`, токены тем).
 
 ## Прогресс по фазам
@@ -120,11 +119,11 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 - **Фаза 1 — Скелет**: монорепо, Docker, Prisma+SQLite, базовый UI layout. ✅ ГОТОВО
 - **Фаза 2 — GitLab + Tasks CRUD + Services + Weather + UI**: неоморфный редизайн,
   GitLab drawer, SHA-версия в TopBar, viewport-lock раскладка. ✅ ГОТОВО
-- **Фаза 3 — Apple Health**: `HealthDay` в Prisma, `POST /api/health/push`,
-  панель «Активность» (Ring + недельные бары), реальные шаги в StatStrip. ✅ ГОТОВО
-  (Calendar удалён — не используется)
-- Фаза 4 — Home Assistant (автоматизации, WebSocket)
-- Фаза 5 — MCP сервер, Agent monitor, очередь команд
+- **Фаза 3 — Calendar + UI**: Calendar удалён (не используется); Health отложен.
+  StatStrip carousel (mobile), APP_TOKEN для iOS Shortcuts. ✅ ГОТОВО
+- **Фаза 4 — Home Assistant**: HA REST API, automations list/toggle, HomeAssistant панель,
+  StatStrip 4й тайл — активные автоматизации. ✅ ГОТОВО
+- **Фаза 5 — MCP сервер + Hermes integration** ← В РАБОТЕ
 - Фаза 6 — Drag-and-drop, настройки из UI, PWA
 
 Подробный трекинг — в `TASKS.md`.

@@ -5,6 +5,7 @@ import { apiRouter } from "./api/index.js";
 import { authRouter } from "./api/auth.js";
 import { versionRouter } from "./api/version.js";
 import { jwtAuth } from "./middleware/jwtAuth.js";
+import { mcpRouter } from "./mcp/handler.js";
 
 const app = express();
 app.use(cors());
@@ -30,6 +31,9 @@ app.use("/api/version", versionRouter);
 
 // All other /api routes require valid JWT
 app.use("/api", jwtAuth, apiRouter);
+
+// MCP Streamable HTTP — own auth + Origin guard inside mcpRouter
+app.use("/mcp", mcpRouter);
 
 app.listen(config.backendPort, () => {
   console.log(

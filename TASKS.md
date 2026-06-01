@@ -88,34 +88,41 @@
 - [x] Удалены панели: Habits, Notes, WeatherPanel, Calendar — не используются
 - [x] Финальная раскладка: кол.1=Tasks, кол.2=SystemStatus+Health+HA, кол.3=HermesLog
 
-## Фаза 3 — Apple Health  ✅ ГОТОВО
+## Фаза 3 — UI/UX improvements  ✅ ГОТОВО
 
-- [x] Prisma: модель `HealthDay` (date, steps, km, updatedAt) + миграция
-- [x] `backend/src/integrations/health.ts` — `pushDay()` (upsert), `getHealthSummary()` (7 дней, кеш 60с)
-- [x] `POST /api/health/push` — принимает `{date, steps, km}` от iOS Shortcuts
-- [x] `GET /api/health/summary` — возвращает `{configured, today, week[]}`
-- [x] Панель «Активность» — Ring (% от 10 000), шаги+км, недельные бары (.health-bars)
-      при `!configured` → Placeholder с инструкцией по настройке Shortcuts
-- [x] StatStrip: реальные шаги + км из `HealthSummary`; реальный счётчик сервисов
 - [x] Calendar — удалён полностью (пользователь не использует)
+- [x] Health integration — удалена (деferred); HealthDay миграция создана и откачена
+- [x] APP_TOKEN — статический bearer-токен для iOS Shortcuts / Hermes (не истекает)
+      добавлен в `jwtAuth.ts`, `config.ts`, `.env.example`
+- [x] StatStrip carousel — на ≤760px: scroll-snap, свайп, dots-индикаторы;
+      4й тайл переключён с шагов на HA automations count
+- [x] Version pill — при наличии апдейта показывает `v0.1.0 → v0.2.0` с amber glow
 
-> iOS Shortcut для автоматической отправки (22:00 daily):
-> Health «Get Step Count» + «Walking Distance» → POST http://hermes.lan:3001/api/health/push
-> Body: `{ "date": "YYYY-MM-DD", "steps": N, "km": X.X }`, Header: `Authorization: Bearer <APP_TOKEN>`
+## Фаза 4 — Home Assistant  ✅ ГОТОВО
 
-## Фаза 4 — Home Assistant  ← СЛЕДУЮЩАЯ
+- [x] `backend/src/integrations/homeassistant.ts` — `getAutomations()` (30с кеш),
+      `toggleAutomation(entityId)` (читает состояние → turn_on/turn_off)
+- [x] `GET /api/homeassistant/automations` — список автоматизаций с state/lastTriggered
+- [x] `POST /api/homeassistant/automations/toggle` — toggle по entityId в body
+- [x] `HomeAssistantPanel` — список с click-to-toggle строками; Placeholder при !configured
+- [x] StatStrip 4й тайл: `active/total` автоматизаций
+- [x] Деплой: HASS_URL=http://homeassistant.lan:8123, HASS_TOKEN настроен на сервере
+- [x] Проверено: 8 автоматизаций тянутся из HA, toggle работает
 
-- [ ] Автоматизации (list/toggle), скрипты (trigger)
-- [ ] WebSocket для real-time обновлений
+## Фаза 5 — MCP сервер + Hermes  ← В РАБОТЕ
 
-## Фаза 5 — Hermes Integration
+- [~] `@modelcontextprotocol/sdk` установлен
+- [ ] `backend/src/mcp/server.ts` — McpServer с инструментами
+- [ ] MCP tools: tasks (get/create/update/complete), agent (report_status/log_action/
+      get_queue/dequeue), ha (get_automations/toggle), services, weather
+- [ ] Streamable HTTP транспорт: `POST/GET/DELETE /mcp`, bearer MCP_TOKEN, Origin-check
+- [ ] Agent monitor: polling очереди команд в HermesLog панели
 
-- [ ] MCP сервер (stdio + Streamable HTTP, bearer + Origin-валидация)
-- [ ] MCP tools: get_tasks/create_task/update_task/complete_task,
-      report_status/log_action/get_agent_queue, get_automations/toggle_automation/
-      trigger_script, get_services_status, get_health_summary/get_today_events
-- [ ] Agent monitor виджет (статус, лог, очередь)
-- [ ] Очередь команд (POST /api/hermes/command)
+## Фаза 6 — Polish
+
+- [ ] Drag-and-drop виджетов (react-grid-layout)
+- [ ] Настройки (конфиг сервисов из UI)
+- [ ] PWA (доступ с телефона в сети)
 
 ## Фаза 6 — Polish
 

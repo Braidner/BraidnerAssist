@@ -14,7 +14,7 @@ const SEND_LABEL: Record<SendState, string> = {
   idle: "Отправить в Hermes",
   sending: "Отправляю…",
   sent: "Сессия создана",
-  error: "Ошибка — повторить",
+  error: "Повторить",
 };
 
 const PRIO_LABEL: Record<string, string> = {
@@ -33,9 +33,11 @@ const PRIO_COLOR: Record<string, string> = {
 
 export function Drawer({ task, onClose, onSessionStarted }: DrawerProps) {
   const [send, setSend] = useState<SendState>("idle");
+  const [sendErrDetail, setSendErrDetail] = useState<string | null>(null);
 
   useEffect(() => {
     setSend("idle");
+    setSendErrDetail(null);
   }, [task]);
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export function Drawer({ task, onClose, onSessionStarted }: DrawerProps) {
   const onSendToHermes = async () => {
     if (!task || send === "sending") return;
     setSend("sending");
+    setSendErrDetail(null);
     try {
       const { id } = await startHermesSession({
         taskRef: task.projectRef ?? task.id,
@@ -58,8 +61,9 @@ export function Drawer({ task, onClose, onSessionStarted }: DrawerProps) {
       });
       setSend("sent");
       onSessionStarted?.(id);
-    } catch {
+    } catch (e) {
       setSend("error");
+      setSendErrDetail(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -145,6 +149,9 @@ export function Drawer({ task, onClose, onSessionStarted }: DrawerProps) {
               {SEND_LABEL[send]}
               <icons.bot style={{ width: 14, height: 14 }} />
             </button>
+            {send === "error" && sendErrDetail && (
+              <div className="drawer-send-error">{sendErrDetail}</div>
+            )}
           </div>
         )}
       </aside>

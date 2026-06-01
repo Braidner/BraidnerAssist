@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { prisma } from "../db/client.js";
+import { log } from "../logger.js";
 
 export interface HermesSession {
   id: string;
@@ -23,6 +24,7 @@ export interface HermesSessionDetail {
   title: string;
   status: string;
   messages: HermesMessage[];
+  error?: string;
 }
 
 interface VllmResponse {
@@ -34,6 +36,8 @@ interface VllmResponse {
     content?: Array<{ type: string; text: string }>;
   }>;
 }
+
+const LLM_TIMEOUT_MS = 120_000; // 2 min — prevents silent hangs behind nginx
 
 function inferHeaders(): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -59,13 +63,36 @@ async function callLlm(input: string, previousId?: string): Promise<VllmResponse
   };
   if (previousId) body["previous_response_id"] = previousId;
 
-  const res = await fetch(`${config.hermes.url}/v1/responses`, {
-    method: "POST",
-    headers: inferHeaders(),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`LLM error ${res.status}`);
-  return (await res.json()) as VllmResponse;
+  log.info("hermes", `LLM call → model=${config.hermes.model}${previousId ? ` prev=${previousId}` : ""}`);
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), LLM_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${config.hermes.url}/v1/responses`, {
+      method: "POST",
+      headers: inferHeaders(),
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    const msg = e instanceof Error ? e.message : String(e);
+    log.error("hermes", `LLM fetch failed: ${msg}`);
+    throw new Error(`LLM unreachable: ${msg}`);
+  }
+  clearTimeout(timer);
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    log.error("hermes", `LLM HTTP ${res.status}`, text.slice(0, 300));
+    throw new Error(`LLM error ${res.status}${text ? `: ${text.slice(0, 120)}` : ""}`);
+  }
+
+  const data = (await res.json()) as VllmResponse;
+  log.info("hermes", `LLM OK → response_id=${data.id}`);
+  return data;
 }
 
 function parseMsgs(raw: string): HermesMessage[] {
@@ -97,6 +124,7 @@ export async function startSession(input: string): Promise<{ id: string }> {
   if (!config.hermes.configured) throw new Error("Hermes not configured");
 
   const titleSnippet = input.split("\n")[0].slice(0, 80);
+  log.info("hermes", `startSession: "${titleSnippet}"`);
 
   const session = await prisma.hermesSession.create({
     data: {
@@ -110,6 +138,8 @@ export async function startSession(input: string): Promise<{ id: string }> {
   try {
     resp = await callLlm(input);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log.error("hermes", `startSession failed: ${msg}`, `session=${session.id}`);
     await prisma.hermesSession.update({
       where: { id: session.id },
       data: { status: "error" },
@@ -132,6 +162,7 @@ export async function startSession(input: string): Promise<{ id: string }> {
     },
   });
 
+  log.info("hermes", `startSession done: session=${session.id}`);
   return { id: session.id };
 }
 
@@ -140,6 +171,8 @@ export async function sendTurn(sessionId: string, input: string): Promise<void> 
 
   const session = await prisma.hermesSession.findUniqueOrThrow({ where: { id: sessionId } });
   const messages = parseMsgs(session.messages);
+
+  log.info("hermes", `sendTurn: session=${sessionId}`);
 
   await prisma.hermesSession.update({
     where: { id: sessionId },
@@ -150,6 +183,8 @@ export async function sendTurn(sessionId: string, input: string): Promise<void> 
   try {
     resp = await callLlm(input, session.latestResponseId ?? undefined);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    log.error("hermes", `sendTurn failed: ${msg}`, `session=${sessionId}`);
     await prisma.hermesSession.update({
       where: { id: sessionId },
       data: { status: "error" },
@@ -172,6 +207,8 @@ export async function sendTurn(sessionId: string, input: string): Promise<void> 
       status: "idle",
     },
   });
+
+  log.info("hermes", `sendTurn done: session=${sessionId}`);
 }
 
 export async function getSession(id: string): Promise<HermesSessionDetail> {

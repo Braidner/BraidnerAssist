@@ -611,3 +611,88 @@ html, body, #root {
 }
 .settings-save:disabled { opacity: 0.5; cursor: default; }
 .settings-save:not(:disabled):hover { opacity: 0.85; }
+
+/* ── Logo button ─────────────────────────────────────────────────────── */
+.brand-btn {
+  background: none; border: none; padding: 0; margin: 0;
+  cursor: pointer; text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  border-radius: calc(var(--radius) * 0.5);
+  transition: opacity 0.15s;
+}
+.brand-btn:hover { opacity: 0.8; }
+
+/* ── Logs panel ──────────────────────────────────────────────────────── */
+.logs-panel { min-width: min(92vw, 680px); max-width: 780px; }
+
+.logs-filter {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.logs-pill {
+  font-family: var(--font); font-size: 11px;
+  padding: 3px 10px; border-radius: 20px;
+  background: var(--surface-2); border: none;
+  color: var(--muted); cursor: pointer;
+  box-shadow: 2px 2px 4px var(--sd), -2px -2px 4px var(--sl);
+  transition: color 0.15s, box-shadow 0.15s;
+}
+.logs-pill:hover { color: var(--ink); }
+.logs-pill.active {
+  color: var(--accent);
+  box-shadow: inset 2px 2px 4px var(--sd), inset -2px -2px 4px var(--sl);
+}
+
+.logs-feed { font-size: 12px; gap: 0; }
+
+.log-entry {
+  display: grid;
+  grid-template-columns: 34px 60px 70px 1fr;
+  gap: 0 8px;
+  align-items: baseline;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.log-entry:hover { background: var(--hair); }
+
+.log-level { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.log-time  { color: var(--muted); font-size: 11px; }
+.log-ctx   { color: var(--info); font-size: 11px; }
+.log-msg   { color: var(--ink-soft); font-family: var(--font-ui); font-size: 12px; word-break: break-all; }
+
+.log-detail {
+  grid-column: 1 / -1;
+  margin: 4px 0 2px;
+  padding: 6px 8px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-size: 11px; color: var(--muted);
+  white-space: pre-wrap; word-break: break-all;
+  overflow: hidden;
+}
+
+/* ── Drawer send error ───────────────────────────────────────────────── */
+.drawer-send-error {
+  font-family: var(--font); font-size: 11px;
+  color: var(--bad);
+  padding: 4px 6px;
+  margin-top: -4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+  word-break: break-all;
+}
+
+/* ── Chat error ──────────────────────────────────────────────────────── */
+.chat-error {
+  font-family: var(--font); font-size: 11px;
+  color: var(--bad);
+  padding: 5px 8px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+}
+.chat-input-row {
+  display: flex; gap: 8px; align-items: flex-end;
+}
+.chat-input-row textarea { flex: 1; }

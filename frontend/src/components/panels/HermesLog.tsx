@@ -27,10 +27,10 @@ export function HermesLogPanel({
         {!data.configured && (
           <div className="empty">Hermes недоступен. Задай HERMES_URL в .env.</div>
         )}
-        {data.configured && data.sessions.length === 0 && (
+        {data.configured && (data.sessions ?? []).length === 0 && (
           <div className="empty">Сессий пока нет.</div>
         )}
-        {data.sessions.map((s) => (
+        {(data.sessions ?? []).map((s) => (
           <div
             key={s.id}
             className="log-line"

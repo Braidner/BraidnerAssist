@@ -7,6 +7,7 @@ import {
   type PanelTask, type HermesData, type ServicesData, type WeatherData, type VersionData, type HassData,
 } from "./lib/api.ts";
 import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
+import { LogsPanel } from "./components/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
 import { Drawer } from "./components/Drawer.tsx";
@@ -42,6 +43,7 @@ export function App() {
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
@@ -129,6 +131,7 @@ export function App() {
           onSave={() => { setShowSettings(false); getServices().then(setServicesData); }}
         />
       )}
+      {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
       <Drawer
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
@@ -140,7 +143,7 @@ export function App() {
       />
       <HermesChat sessionId={openSessionId} onClose={() => setOpenSessionId(null)} />
       <div className="mc-shell">
-        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} onSettings={() => setShowSettings(true)} versionData={versionData} />
+        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} onSettings={() => setShowSettings(true)} onLogs={() => setShowLogs(true)} versionData={versionData} />
 
         <StatStrip openTasks={openTasks} weather={weather} services={servicesData} hass={hass} />
 

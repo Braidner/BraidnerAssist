@@ -12,6 +12,7 @@ export function HermesChat({ sessionId, onClose }: HermesChatProps) {
   const [error, setError] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -59,8 +60,9 @@ export function HermesChat({ sessionId, onClose }: HermesChatProps) {
     const text = input.trim();
     if (!text || !sessionId || sending) return;
     setSending(true);
-    const ok = await sendHermesMessage(sessionId, text);
-    if (ok) {
+    setSendError(null);
+    const result = await sendHermesMessage(sessionId, text);
+    if (result.ok) {
       setInput("");
       setDetail((d) =>
         d ? { ...d, status: "running", messages: [...d.messages, { role: "user", text }] } : d,
@@ -70,6 +72,8 @@ export function HermesChat({ sessionId, onClose }: HermesChatProps) {
       } catch {
         /* поллинг подтянет */
       }
+    } else {
+      setSendError(result.error ?? "Ошибка отправки");
     }
     setSending(false);
   };
@@ -110,25 +114,30 @@ export function HermesChat({ sessionId, onClose }: HermesChatProps) {
             </div>
 
             <div className="chat-input">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSend();
-                  }
-                }}
-                placeholder="Сообщение Hermes…"
-                rows={2}
-              />
-              <button
-                className="drawer-open-btn neu-sm"
-                onClick={onSend}
-                disabled={sending || !input.trim()}
-              >
-                {sending ? "…" : "Отправить"}
-              </button>
+              {sendError && (
+                <div className="chat-error">{sendError}</div>
+              )}
+              <div className="chat-input-row">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onSend();
+                    }
+                  }}
+                  placeholder="Сообщение Hermes…"
+                  rows={2}
+                />
+                <button
+                  className="drawer-open-btn neu-sm"
+                  onClick={onSend}
+                  disabled={sending || !input.trim()}
+                >
+                  {sending ? "…" : "Отправить"}
+                </button>
+              </div>
             </div>
           </div>
         )}

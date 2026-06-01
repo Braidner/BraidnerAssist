@@ -332,15 +332,42 @@ export async function getHermesSession(id: string): Promise<HermesSessionDetail>
   return (await res.json()) as HermesSessionDetail;
 }
 
-export async function sendHermesMessage(id: string, input: string): Promise<boolean> {
+export async function sendHermesMessage(id: string, input: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await apiFetch(`/api/hermes/sessions/${id}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ input }),
     });
-    return res.ok;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      return { ok: false, error: body.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+// ── Backend logs ──────────────────────────────────────────────────────────────
+
+export type LogLevel = "info" | "warn" | "error";
+
+export interface LogEntry {
+  t: string;
+  level: LogLevel;
+  ctx: string;
+  msg: string;
+  detail?: string;
+}
+
+export async function getLogs(): Promise<LogEntry[]> {
+  try {
+    const res = await apiFetch("/api/logs");
+    if (!res.ok) return [];
+    const body = (await res.json()) as { entries: LogEntry[] };
+    return body.entries ?? [];
   } catch {
-    return false;
+    return [];
   }
 }

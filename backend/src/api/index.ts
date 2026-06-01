@@ -7,8 +7,22 @@ import { getServices } from "../integrations/services.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { listSessions, startSession, getSession, sendTurn } from "../integrations/hermes.js";
 import { config } from "../config.js";
+import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
+
+// Request logger — captures slow/failed requests into the in-memory ring buffer.
+apiRouter.use((req, _res, next) => {
+  const t0 = Date.now();
+  _res.on("finish", () => {
+    const ms = Date.now() - t0;
+    const status = _res.statusCode;
+    const line = `${req.method} ${req.path} → ${status} (${ms}ms)`;
+    if (status >= 500) log.error("request", line);
+    else if (status >= 400 || ms > 5000) log.warn("request", line);
+  });
+  next();
+});
 
 apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/settings", settingsRouter);
@@ -114,4 +128,9 @@ apiRouter.post("/hermes/sessions/:id/chat", async (req, res) => {
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
+});
+
+// Backend logs — in-memory ring buffer, newest first, max 200 entries.
+apiRouter.get("/logs", (_req, res) => {
+  res.json({ entries: getEntries() });
 });

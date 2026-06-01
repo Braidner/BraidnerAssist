@@ -11,6 +11,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   onLogout: () => void;
   onSettings: () => void;
+  onLogs: () => void;
   versionData: VersionData | null;
 }
 
@@ -27,19 +28,19 @@ function fmtDate(d: Date): string {
   return `${DOW[d.getDay()]} · ${d.getDate()} ${MONTH[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSettings, versionData }: TopBarProps) {
+export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSettings, onLogs, versionData }: TopBarProps) {
   const linkDot = backend === "up" ? "ok" : backend === "down" ? "bad" : "idle";
   const linkText = backend === "up" ? "LINK OK" : backend === "down" ? "NO LINK" : "…";
 
   return (
     <div className="mc-topbar">
-      <div className="brand">
+      <button className="brand brand-btn" onClick={onLogs} title="Открыть логи бэкенда">
         <span className="brand-mark neu"><icons.target style={{ width: 26, height: 26 }} /></span>
         <div>
           <div className="brand-name">Mission Control</div>
           <div className="brand-sub mono">braidner · self-hosted · LAN-only</div>
         </div>
-      </div>
+      </button>
       <div className="topbar-right">
         {versionData && (
           <span

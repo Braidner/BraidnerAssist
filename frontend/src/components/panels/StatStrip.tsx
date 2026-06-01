@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import type { WeatherData, ServicesData, HassData } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
@@ -33,7 +34,7 @@ interface MiniStatProps {
 
 function MiniStat({ value, unit, sub, desc }: MiniStatProps) {
   return (
-    <div className="card neu" style={{ padding: "18px 20px", flex: 1, minWidth: 0, overflow: "hidden" }}>
+    <div className="card neu stat-card">
       <div className="stat-num" style={{ fontSize: 30, whiteSpace: "nowrap" }}>
         {value}
         {unit && <span style={{ fontSize: 14, color: "var(--muted)", marginLeft: 3 }}>{unit}</span>}
@@ -56,7 +57,7 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
   };
 
   return (
-    <div className="card neu" style={{ padding: "18px 20px", flex: 2, minWidth: 0, overflow: "hidden" }}>
+    <div className="card neu stat-card">
       {!current ? (
         <div style={colStyle}>
           <div className="stat-num" style={{ fontSize: 30 }}>—</div>
@@ -115,6 +116,27 @@ interface StatStripProps {
 }
 
 export function StatStrip({ openTasks, weather, services, hass }: StatStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const sl = el.scrollLeft;
+    let bestIdx = 0, minDist = Infinity;
+    (Array.from(el.children) as HTMLElement[]).forEach((child, i) => {
+      const dist = Math.abs(child.offsetLeft - sl);
+      if (dist < minDist) { minDist = dist; bestIdx = i; }
+    });
+    setActiveIdx(bestIdx);
+  };
+
+  const scrollToIdx = (i: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: (el.children[i] as HTMLElement).offsetLeft, behavior: "smooth" });
+  };
+
   const onlineCount = services.services.filter((s) => s.status === "ok").length;
   const totalCount = services.services.length;
   const svcValue = services.configured && totalCount > 0 ? `${onlineCount}/${totalCount}` : "—";
@@ -125,12 +147,33 @@ export function StatStrip({ openTasks, weather, services, hass }: StatStripProps
   const hassValue = hass.configured && autoTotal > 0 ? `${autoOnCount}/${autoTotal}` : "—";
   const hassSub = hass.configured && autoTotal > 0 ? "АВТОМАТИЗАЦИИ" : "HOME ASSISTANT";
 
+  const TILE_COUNT = 4;
+
   return (
-    <div className="stat-strip">
-      <MiniStat value={openTasks} unit="откр." sub="ЗАДАЧИ СЕГОДНЯ" />
-      <MiniStat value={svcValue} unit={services.configured && totalCount > 0 ? "up" : undefined} sub={svcSub} />
-      <WeatherStat weather={weather} />
-      <MiniStat value={hassValue} unit={hass.configured && autoTotal > 0 ? "вкл" : undefined} sub={hassSub} />
+    <div className="stat-strip-outer">
+      <div className="stat-strip" ref={scrollRef} onScroll={onScroll}>
+        <div className="stat-tile">
+          <MiniStat value={openTasks} unit="откр." sub="ЗАДАЧИ СЕГОДНЯ" />
+        </div>
+        <div className="stat-tile">
+          <MiniStat value={svcValue} unit={services.configured && totalCount > 0 ? "up" : undefined} sub={svcSub} />
+        </div>
+        <div className="stat-tile stat-tile--wide">
+          <WeatherStat weather={weather} />
+        </div>
+        <div className="stat-tile">
+          <MiniStat value={hassValue} unit={hass.configured && autoTotal > 0 ? "вкл" : undefined} sub={hassSub} />
+        </div>
+      </div>
+      <div className="stat-dots" aria-hidden="true">
+        {Array.from({ length: TILE_COUNT }, (_, i) => (
+          <button
+            key={i}
+            className={"stat-dot" + (i === activeIdx ? " active" : "")}
+            onClick={() => scrollToIdx(i)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

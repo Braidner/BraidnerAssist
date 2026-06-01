@@ -82,7 +82,16 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
 }
+/* StatStrip carousel */
+.stat-strip-outer { display: flex; flex-direction: column; gap: 8px; }
 .stat-strip { display: flex; gap: 18px; }
+.stat-tile { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stat-tile--wide { flex: 2; }
+.stat-tile > * { flex: 1; }
+.stat-card { padding: 18px 20px; overflow: hidden; }
+.stat-dots { display: none; justify-content: center; align-items: center; gap: 7px; padding: 2px 0; }
+.stat-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); border: none; padding: 0; cursor: pointer; transition: background 0.2s, transform 0.2s; }
+.stat-dot.active { background: var(--accent); transform: scale(1.4); }
 .cols-3 {
   flex: 1;
   min-height: 0;
@@ -108,8 +117,24 @@ html, body, #root {
 }
 @media (max-width: 760px) {
   .cols-3 { grid-template-columns: 1fr; }
-  .stat-strip { flex-wrap: wrap; }
   .mc-shell { padding: 18px; }
+  /* carousel mode */
+  .stat-strip {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    gap: 12px;
+    padding-bottom: 3px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stat-strip::-webkit-scrollbar { display: none; }
+  .stat-tile,
+  .stat-tile--wide {
+    flex: 0 0 calc(100% - 40px);
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  .stat-dots { display: flex; }
 }
 
 /* ============================================================

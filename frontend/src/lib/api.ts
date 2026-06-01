@@ -221,21 +221,40 @@ export async function getVersion(): Promise<VersionData> {
   }
 }
 
-// ─── Health ────────────────────────────────────────────────────────
+// ─── Home Assistant ──────────────────────────────────────────────────
 
-export interface HealthSummary {
-  configured: boolean;
-  today: { steps: number; km: number } | null;
-  week: Array<{ date: string; steps: number; km: number }>;
+export interface HassAutomation {
+  entityId: string;
+  name: string;
+  state: "on" | "off";
+  lastTriggered: string | null;
 }
 
-export async function getHealth(): Promise<HealthSummary> {
+export interface HassData {
+  configured: boolean;
+  automations: HassAutomation[];
+}
+
+export async function getHassAutomations(): Promise<HassData> {
   try {
-    const res = await apiFetch("/api/health/summary");
+    const res = await apiFetch("/api/homeassistant/automations");
     if (!res.ok) throw new Error();
-    return (await res.json()) as HealthSummary;
+    return (await res.json()) as HassData;
   } catch {
-    return { configured: false, today: null, week: [] };
+    return { configured: false, automations: [] };
+  }
+}
+
+export async function toggleHassAutomation(entityId: string): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/homeassistant/automations/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

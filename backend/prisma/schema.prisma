@@ -60,13 +60,3 @@ model CalendarEvent {
   source      String   @default("local") // local | caldav | ics
   createdAt   DateTime @default(now())
 }
-
-// Дневная агрегация данных Apple Health (шаги + дистанция).
-// Заполняется через iOS Shortcuts → POST /api/health/push.
-model HealthDay {
-  id        Int      @id @default(autoincrement())
-  date      String   @unique // "YYYY-MM-DD" в локальном времени
-  steps     Int
-  km        Float
-  updatedAt DateTime @updatedAt
-}

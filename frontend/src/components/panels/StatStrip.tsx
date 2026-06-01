@@ -1,4 +1,4 @@
-import type { WeatherData, ServicesData, HealthSummary } from "../../lib/api.ts";
+import type { WeatherData, ServicesData, HassData } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
   0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
@@ -111,26 +111,26 @@ interface StatStripProps {
   openTasks: number;
   weather: WeatherData;
   services: ServicesData;
-  health: HealthSummary;
+  hass: HassData;
 }
 
-export function StatStrip({ openTasks, weather, services, health }: StatStripProps) {
+export function StatStrip({ openTasks, weather, services, hass }: StatStripProps) {
   const onlineCount = services.services.filter((s) => s.status === "ok").length;
   const totalCount = services.services.length;
   const svcValue = services.configured && totalCount > 0 ? `${onlineCount}/${totalCount}` : "—";
   const svcSub = services.configured && totalCount > 0 ? "СЕРВИСЫ ОНЛАЙН" : "СЕРВИСЫ";
 
-  const stepsValue = health.today ? health.today.steps.toLocaleString("ru-RU") : "—";
-  const stepsSub = health.today
-    ? `${health.today.km.toFixed(1).replace(".", ",")} КМ · СЕГОДНЯ`
-    : "ШАГОВ · СЕГОДНЯ";
+  const autoOnCount = hass.automations.filter((a) => a.state === "on").length;
+  const autoTotal = hass.automations.length;
+  const hassValue = hass.configured && autoTotal > 0 ? `${autoOnCount}/${autoTotal}` : "—";
+  const hassSub = hass.configured && autoTotal > 0 ? "АВТОМАТИЗАЦИИ" : "HOME ASSISTANT";
 
   return (
     <div className="stat-strip">
       <MiniStat value={openTasks} unit="откр." sub="ЗАДАЧИ СЕГОДНЯ" />
       <MiniStat value={svcValue} unit={services.configured && totalCount > 0 ? "up" : undefined} sub={svcSub} />
       <WeatherStat weather={weather} />
-      <MiniStat value={stepsValue} sub={stepsSub} />
+      <MiniStat value={hassValue} unit={hass.configured && autoTotal > 0 ? "вкл" : undefined} sub={hassSub} />
     </div>
   );
 }

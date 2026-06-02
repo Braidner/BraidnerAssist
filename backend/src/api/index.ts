@@ -102,6 +102,31 @@ apiRouter.get("/hermes/log", async (_req, res) => {
   res.json(entries);
 });
 
+// Сводка задач, взятых Hermes в работу: статус, число логов, последняя активность.
+apiRouter.get("/hermes/tasks", async (_req, res) => {
+  const tasks = await prisma.task.findMany({
+    where: { claimedBy: "hermes" },
+    orderBy: { updatedAt: "desc" },
+  });
+  const grouped = await prisma.agentLog.groupBy({
+    by: ["taskId"],
+    where: { taskId: { in: tasks.map((t) => t.id) } },
+    _count: { _all: true },
+    _max: { createdAt: true },
+  });
+  const byId = new Map(grouped.map((g) => [g.taskId, g]));
+  res.json(
+    tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      claimedAt: t.claimedAt,
+      logCount: byId.get(t.id)?._count._all ?? 0,
+      lastActivity: byId.get(t.id)?._max.createdAt ?? t.claimedAt,
+    })),
+  );
+});
+
 apiRouter.post("/hermes/command", async (req, res) => {
   const { command, payload } = req.body ?? {};
   if (!command) return res.status(400).json({ error: "command is required" });

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "./theme.ts";
 import {
-  getTasks, toggleTask, createTask, getHermes, getServices, getWeather, getVersion,
+  getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getVersion,
   getHassAutomations, toggleHassAutomation,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type ServicesData, type WeatherData, type VersionData, type HassData,
+  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type VersionData, type HassData,
 } from "./lib/api.ts";
 import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
 import { LogsPanel } from "./components/LogsPanel.tsx";
@@ -36,6 +36,7 @@ export function App() {
   const [tasks, setTasks] = useState<PanelTask[]>([]);
   const [selectedTask, setSelectedTask] = useState<PanelTask | null>(null);
   const [hermes, setHermes] = useState<HermesData>({ status: "idle", message: null, log: [] });
+  const [hermesTasks, setHermesTasks] = useState<HermesTask[]>([]);
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
@@ -58,6 +59,7 @@ export function App() {
 
     getTasks().then(setTasks);
     getHermes().then(setHermes);
+    getHermesTasks().then(setHermesTasks);
     getServices().then(setServicesData);
     getWeather().then(setWeather);
     getHassAutomations().then(setHass);
@@ -67,7 +69,10 @@ export function App() {
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
-    const hermesTimer = setInterval(() => getHermes().then(setHermes), 60_000);
+    const hermesTimer = setInterval(() => {
+      getHermes().then(setHermes);
+      getHermesTasks().then(setHermesTasks);
+    }, 60_000);
 
     return () => {
       clearInterval(serviceTimer);
@@ -97,6 +102,15 @@ export function App() {
   };
 
   const onSelectTask = (task: PanelTask) => setSelectedTask(task);
+
+  const onDeleteTask = (task: PanelTask) => {
+    const prev = tasks;
+    setTasks((ts) => ts.filter((x) => x.id !== task.id));
+    if (selectedTask?.id === task.id) setSelectedTask(null);
+    deleteTask(task.id).then((ok) => {
+      if (!ok) setTasks(prev);
+    });
+  };
 
   const onToggleAutomation = (entityId: string) => {
     setHass((prev) => ({
@@ -141,7 +155,7 @@ export function App() {
 
         <div className="cols-3">
           <div className="col-fill">
-            <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} />
+            <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
           </div>
 
           <div className="col">
@@ -150,7 +164,7 @@ export function App() {
           </div>
 
           <div className="col-fill">
-            <HermesLogPanel data={hermes} />
+            <HermesLogPanel data={hermes} tasks={hermesTasks} />
           </div>
         </div>
       </div>

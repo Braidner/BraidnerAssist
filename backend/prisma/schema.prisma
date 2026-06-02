@@ -17,6 +17,8 @@ model Task {
   priority    String    @default("medium") // low | medium | high
   dueDate     DateTime?
   source      String    @default("local") // local (GitLab проксируется отдельно)
+  claimedBy   String?   // кто взял задачу в работу, напр. "hermes"
+  claimedAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -27,6 +29,7 @@ model AgentLog {
   action    String
   details   String?
   result    String?
+  taskId    String?  // привязка записи лога к конкретной задаче (Task.id)
   createdAt DateTime @default(now())
 }
 

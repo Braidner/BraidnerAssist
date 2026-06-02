@@ -6,29 +6,69 @@ export const tasksRouter = Router();
 
 export async function fetchAllTasks(filters: { source?: string; status?: string; priority?: string } = {}) {
   const { source, status, priority } = filters;
-  const where: Record<string, string> = {};
-  if (source) where.source = source;
-  if (status) where.status = status;
-  if (priority) where.priority = priority;
 
-  const [local, gitlab] = await Promise.all([
-    prisma.task.findMany({ where, orderBy: [{ status: "asc" }, { createdAt: "desc" }] }),
+  const [dbTasks, gitlab] = await Promise.all([
+    prisma.task.findMany({ orderBy: [{ status: "asc" }, { createdAt: "desc" }] }),
     !source || source === "gitlab" ? getGitLabTasks() : Promise.resolve([]),
   ]);
 
-  return [
-    ...local,
-    ...gitlab.filter((t) => {
-      if (status && t.status !== status) return false;
-      if (priority && t.priority !== priority) return false;
-      return true;
-    }),
-  ];
+  // Локальные строки с source="gitlab" — это оверлей агента (claim/status/логи)
+  // поверх живых GitLab-задач. Накладываем их на свежие данные, не дублируя.
+  const realLocal = dbTasks.filter((t) => t.source === "local");
+  const overlays = new Map(dbTasks.filter((t) => t.source === "gitlab").map((t) => [t.id, t]));
+
+  const mergedGitlab = gitlab.map((g) => {
+    const o = overlays.get(g.id);
+    return o
+      ? { ...g, status: o.status, claimedBy: o.claimedBy, claimedAt: o.claimedAt, updatedAt: o.updatedAt.toISOString() }
+      : g;
+  });
+
+  let all = [...realLocal, ...mergedGitlab];
+  if (source) all = all.filter((t) => t.source === source);
+  if (status) all = all.filter((t) => t.status === status);
+  if (priority) all = all.filter((t) => t.priority === priority);
+  return all;
+}
+
+// Оверлей агентского состояния поверх любой задачи (локальной или GitLab).
+// Для локальных id — обновляет строку; для GitLab id — создаёт строку-оверлей
+// (source="gitlab"), к которой привязываются claim/status и логи (AgentLog.taskId).
+export async function upsertAgentTaskState(
+  id: string,
+  data: { status?: string; claimedBy?: string | null; claimedAt?: Date | null },
+) {
+  const existing = await prisma.task.findUnique({ where: { id } });
+  if (existing) {
+    return prisma.task.update({ where: { id }, data });
+  }
+  const gl = (await getGitLabTasks()).find((t) => t.id === id);
+  return prisma.task.create({
+    data: {
+      id,
+      title: gl?.title ?? id,
+      source: "gitlab",
+      priority: gl?.priority ?? "medium",
+      status: data.status ?? "todo",
+      claimedBy: data.claimedBy ?? null,
+      claimedAt: data.claimedAt ?? null,
+    },
+  });
 }
 
 // GET /api/tasks?source=&status=&priority=
 tasksRouter.get("/", async (req, res) => {
   res.json(await fetchAllTasks(req.query as Record<string, string>));
+});
+
+// GET /api/tasks/:id/logs — записи лога Hermes по конкретной задаче
+tasksRouter.get("/:id/logs", async (req, res) => {
+  const entries = await prisma.agentLog.findMany({
+    where: { taskId: req.params.id },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+  res.json(entries);
 });
 
 // POST /api/tasks
@@ -73,11 +113,14 @@ tasksRouter.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/tasks/:id
+// DELETE /api/tasks/:id — удаляет задачу и привязанные к ней логи Hermes.
 tasksRouter.delete("/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    await prisma.task.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.agentLog.deleteMany({ where: { taskId: id } }),
+      prisma.task.delete({ where: { id } }),
+    ]);
     res.status(204).end();
   } catch {
     res.status(404).json({ error: "task not found" });

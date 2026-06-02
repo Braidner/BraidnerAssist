@@ -102,6 +102,12 @@ export const icons = {
       <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   ),
+  trash: (p: IconProps) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M4 7h16M10 11v6M14 11v6M5 7l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   git: (p: IconProps) => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" {...p}>
       <circle cx="6" cy="6" r="2.5" stroke="currentColor" strokeWidth="2" />

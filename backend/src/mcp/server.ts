@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { prisma } from "../db/client.js";
-import { fetchAllTasks } from "../api/tasks.js";
+import { fetchAllTasks, upsertAgentTaskState } from "../api/tasks.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
@@ -50,11 +50,25 @@ export function createMcpServer() {
   );
 
   server.tool(
-    "complete_task",
-    "Mark a local task as done",
+    "claim_task",
+    "Claim any task (local or GitLab): set it in_progress and mark it taken by Hermes",
     { id: z.string() },
     async ({ id }) => {
-      const task = await prisma.task.update({ where: { id }, data: { status: "done" } });
+      const task = await upsertAgentTaskState(id, {
+        status: "in_progress",
+        claimedBy: "hermes",
+        claimedAt: new Date(),
+      });
+      return ok(task);
+    },
+  );
+
+  server.tool(
+    "complete_task",
+    "Mark any task (local or GitLab) as done",
+    { id: z.string() },
+    async ({ id }) => {
+      const task = await upsertAgentTaskState(id, { status: "done" });
       return ok(task);
     },
   );
@@ -77,11 +91,16 @@ export function createMcpServer() {
 
   server.tool(
     "log_action",
-    "Write an action entry to the Hermes log visible on the dashboard",
-    { action: z.string(), details: z.string().optional(), result: z.string().optional() },
-    async ({ action, details, result }) => {
+    "Write an action entry to the Hermes log. Pass taskId to tie it to a specific task.",
+    {
+      action: z.string(),
+      details: z.string().optional(),
+      result: z.string().optional(),
+      taskId: z.string().optional(),
+    },
+    async ({ action, details, result, taskId }) => {
       const entry = await prisma.agentLog.create({
-        data: { action, details: details ?? null, result: result ?? null },
+        data: { action, details: details ?? null, result: result ?? null, taskId: taskId ?? null },
       });
       return ok(entry);
     },

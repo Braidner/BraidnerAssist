@@ -32,6 +32,7 @@ export interface PanelTask {
   prio: Prio;
   tag: string;
   hermes: boolean;
+  claimedBy?: string | null;
   updatedAt: string;
   // GitLab detail fields (present when tag === "gitlab")
   webUrl?: string;
@@ -78,6 +79,7 @@ interface BackendTask {
   status: string;
   priority: string;
   source: string;
+  claimedBy?: string | null;
   updatedAt?: string;
   // GitLab-only extras
   webUrl?: string;
@@ -109,6 +111,7 @@ export async function getTasks(): Promise<PanelTask[]> {
       prio: t.status === "done" ? "ok" : PRIO_MAP[t.priority] ?? "info",
       tag: t.source,
       hermes: t.source !== "local",
+      claimedBy: t.claimedBy,
       updatedAt: t.updatedAt ?? new Date().toISOString(),
       webUrl: t.webUrl,
       descriptionText: t.descriptionText,
@@ -131,6 +134,15 @@ export async function toggleTask(id: string, done: boolean): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: done ? "done" : "todo" }),
     });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteTask(id: string): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/api/tasks/${id}`, { method: "DELETE" });
     return res.ok;
   } catch {
     return false;
@@ -306,6 +318,42 @@ export async function getHermes(): Promise<HermesData> {
     };
   } catch {
     return empty;
+  }
+}
+
+// ── Hermes tasks (взятые в работу) ──────────────────────────────────────────────
+
+export interface HermesTask {
+  id: string;
+  title: string;
+  status: string;
+  claimedAt: string | null;
+  logCount: number;
+  lastActivity: string | null;
+}
+
+export async function getHermesTasks(): Promise<HermesTask[]> {
+  try {
+    const res = await apiFetch("/api/hermes/tasks");
+    return res.ok ? ((await res.json()) as HermesTask[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getTaskLogs(id: string): Promise<PanelLogLine[]> {
+  try {
+    const res = await apiFetch(`/api/tasks/${id}/logs`);
+    if (!res.ok) return [];
+    const raw = (await res.json()) as BackendAgentLog[];
+    return raw.map((l) => ({
+      t: timeOf(l.createdAt),
+      msg: l.details ?? l.action,
+      k: l.action,
+      tag: l.result ?? "auto",
+    }));
+  } catch {
+    return [];
   }
 }
 

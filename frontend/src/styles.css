@@ -101,9 +101,6 @@ html, body, #root {
 .stat-tile--proxmox { flex: 0 0 220px; }
 .stat-tile > * { flex: 1; }
 .stat-card { padding: 18px 20px; overflow: hidden; }
-.stat-dots { display: flex; justify-content: center; align-items: center; gap: 7px; padding: 2px 0; flex-wrap: wrap; }
-.stat-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); border: none; padding: 0; cursor: pointer; transition: background 0.2s, transform 0.2s; }
-.stat-dot.active { background: var(--accent); transform: scale(1.4); }
 .cols-3 {
   flex: 1;
   min-height: 0;
@@ -148,7 +145,6 @@ html, body, #root {
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
-  .stat-dots { display: flex; }
 }
 
 /* ============================================================

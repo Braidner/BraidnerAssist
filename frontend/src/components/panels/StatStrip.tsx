@@ -1,4 +1,3 @@
-import { useRef, useState } from "react";
 import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
@@ -164,27 +163,6 @@ interface StatStripProps {
 }
 
 export function StatStrip({ weather, proxmox, services }: StatStripProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  const onScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const sl = el.scrollLeft;
-    let bestIdx = 0, minDist = Infinity;
-    (Array.from(el.children) as HTMLElement[]).forEach((child, i) => {
-      const dist = Math.abs(child.offsetLeft - sl);
-      if (dist < minDist) { minDist = dist; bestIdx = i; }
-    });
-    setActiveIdx(bestIdx);
-  };
-
-  const scrollToIdx = (i: number) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ left: (el.children[i] as HTMLElement).offsetLeft, behavior: "smooth" });
-  };
-
   const res = proxmox.configured ? proxmox.resource : null;
 
   const tiles: React.ReactNode[] = [
@@ -225,17 +203,8 @@ export function StatStrip({ weather, proxmox, services }: StatStripProps) {
 
   return (
     <div className="stat-strip-outer">
-      <div className="stat-strip" ref={scrollRef} onScroll={onScroll}>
+      <div className="stat-strip">
         {tiles}
-      </div>
-      <div className="stat-dots" aria-hidden="true">
-        {tiles.map((_, i) => (
-          <button
-            key={i}
-            className={"stat-dot" + (i === activeIdx ? " active" : "")}
-            onClick={() => scrollToIdx(i)}
-          />
-        ))}
       </div>
     </div>
   );

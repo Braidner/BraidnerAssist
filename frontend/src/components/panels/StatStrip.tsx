@@ -115,9 +115,17 @@ function ProxmoxStat({ res, node }: { res: ProxmoxResource; node: string | null 
       <div className="stat-sub mono" style={{ marginTop: 0, opacity: 0.7, whiteSpace: "nowrap", letterSpacing: ".08em" }}>
         PROXMOX{node ? ` · ${node.toUpperCase()}` : ""}
       </div>
-      <Gauge label="CPU" num={`${res.cpuPct}%`} pct={res.cpuPct} />
-      <Gauge label="RAM" num={`${gb(res.memUsed)}/${gb(res.memTotal)} ГБ`} pct={res.memPct} />
-      <Gauge label="DISK" num={`${gb(res.diskUsed)}/${gb(res.diskTotal)} ГБ`} pct={res.diskPct} />
+      <div style={{ display: "flex", gap: 18 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Gauge label="CPU" num={`${res.cpuPct}%`} pct={res.cpuPct} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Gauge label="RAM" num={`${gb(res.memUsed)}/${gb(res.memTotal)} ГБ`} pct={res.memPct} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Gauge label="DISK" num={`${gb(res.diskUsed)}/${gb(res.diskTotal)} ГБ`} pct={res.diskPct} />
+        </div>
+      </div>
     </div>
   );
 }

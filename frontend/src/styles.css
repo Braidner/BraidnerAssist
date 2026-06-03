@@ -98,7 +98,7 @@ html, body, #root {
 .stat-strip::-webkit-scrollbar { display: none; }
 .stat-tile { flex: 0 0 160px; min-width: 0; display: flex; flex-direction: column; scroll-snap-align: start; }
 .stat-tile--wide { flex: 0 0 300px; }
-.stat-tile--proxmox { flex: 0 0 220px; }
+.stat-tile--proxmox { flex: 0 0 420px; }
 .stat-tile > * { flex: 1; }
 .stat-card { padding: 18px 20px; overflow: hidden; }
 .cols-3 {
@@ -358,7 +358,7 @@ html, body, #root {
 .gauge { display: flex; flex-direction: column; gap: 8px; }
 .gauge-top { display: flex; align-items: baseline; justify-content: space-between; }
 .gauge-label { font-family: var(--font); font-size: 11px; letter-spacing: .05em; color: var(--muted); text-transform: uppercase; }
-.gauge-num { font-family: var(--font); font-size: 17px; font-weight: 700; color: var(--ink); }
+.gauge-num { font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 
 /* ============================================================
    notes

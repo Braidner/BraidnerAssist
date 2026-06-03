@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { WeatherData, ServicesData, HassData } from "../../lib/api.ts";
+import type { WeatherData, ServicesData, ProxmoxData } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
   0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
@@ -25,25 +25,11 @@ function dayLabel(dateStr: string): string {
   return DOW[d.getDay()];
 }
 
-interface MiniStatProps {
-  value: string | number;
-  unit?: string;
-  sub: string;
-  desc?: string;
-}
-
-function MiniStat({ value, unit, sub, desc }: MiniStatProps) {
-  return (
-    <div className="card neu stat-card">
-      <div className="stat-num" style={{ fontSize: 30, whiteSpace: "nowrap" }}>
-        {value}
-        {unit && <span style={{ fontSize: 14, color: "var(--muted)", marginLeft: 3 }}>{unit}</span>}
-      </div>
-      <div className="stat-sub mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</div>
-      {desc && <div className="stat-sub mono" style={{ marginTop: 2, opacity: 0.7, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{desc}</div>}
-    </div>
-  );
-}
+const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
+  ok: "var(--ok)",
+  warn: "var(--warn)",
+  bad: "var(--bad)",
+};
 
 function WeatherStat({ weather }: { weather: WeatherData }) {
   const { current, forecast } = weather;
@@ -108,14 +94,61 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
   );
 }
 
-interface StatStripProps {
-  openTasks: number;
-  weather: WeatherData;
-  services: ServicesData;
-  hass: HassData;
+function GaugeStat({ label, pct }: { label: string; pct: number }) {
+  return (
+    <div className="card neu stat-card" style={{ justifyContent: "center" }}>
+      <div className="gauge">
+        <div className="gauge-top">
+          <span className="gauge-label">{label}</span>
+          <span className="gauge-num">{pct}%</span>
+        </div>
+        <div className="bar"><i style={{ width: pct + "%" }} /></div>
+      </div>
+    </div>
+  );
 }
 
-export function StatStrip({ openTasks, weather, services, hass }: StatStripProps) {
+function VMStat({ name, type, running, cpuPct, memPct }: {
+  name: string; type: "qemu" | "lxc"; running: boolean; cpuPct: number; memPct: number;
+}) {
+  const color = running ? "var(--ok)" : "var(--muted)";
+  return (
+    <div className="card neu stat-card" style={{ justifyContent: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="svc-dot" style={{ background: color, color }} />
+        <span className="stat-num" style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {name}
+        </span>
+      </div>
+      <div className="stat-sub mono" style={{ whiteSpace: "nowrap" }}>
+        {running ? `CPU ${cpuPct}% · RAM ${memPct}%` : "ОСТАНОВЛЕНА"}
+      </div>
+      <div className="stat-sub mono" style={{ marginTop: 2, opacity: 0.6 }}>{type.toUpperCase()}</div>
+    </div>
+  );
+}
+
+function ServiceStat({ name, status, tag }: { name: string; status: "ok" | "warn" | "bad"; tag: string }) {
+  return (
+    <div className="card neu stat-card" style={{ justifyContent: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="svc-dot" style={{ background: STAT_VAR[status], color: STAT_VAR[status] }} />
+        <span className="stat-num" style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {name}
+        </span>
+      </div>
+      <div className="stat-sub mono" style={{ whiteSpace: "nowrap" }}>{tag}</div>
+    </div>
+  );
+}
+
+interface StatStripProps {
+  weather: WeatherData;
+  proxmox: ProxmoxData;
+  services: ServicesData;
+}
+
+export function StatStrip({ weather, proxmox, services }: StatStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -137,36 +170,51 @@ export function StatStrip({ openTasks, weather, services, hass }: StatStripProps
     el.scrollTo({ left: (el.children[i] as HTMLElement).offsetLeft, behavior: "smooth" });
   };
 
-  const onlineCount = services.services.filter((s) => s.status === "ok").length;
-  const totalCount = services.services.length;
-  const svcValue = services.configured && totalCount > 0 ? `${onlineCount}/${totalCount}` : "—";
-  const svcSub = services.configured && totalCount > 0 ? "СЕРВИСЫ ОНЛАЙН" : "СЕРВИСЫ";
+  const res = proxmox.configured ? proxmox.resource : null;
 
-  const autoOnCount = hass.automations.filter((a) => a.state === "on").length;
-  const autoTotal = hass.automations.length;
-  const hassValue = hass.configured && autoTotal > 0 ? `${autoOnCount}/${autoTotal}` : "—";
-  const hassSub = hass.configured && autoTotal > 0 ? "АВТОМАТИЗАЦИИ" : "HOME ASSISTANT";
+  const tiles: React.ReactNode[] = [
+    <div className="stat-tile stat-tile--wide" key="weather">
+      <WeatherStat weather={weather} />
+    </div>,
+  ];
 
-  const TILE_COUNT = 4;
+  if (res) {
+    tiles.push(
+      <div className="stat-tile" key="cpu"><GaugeStat label="CPU" pct={res.cpuPct} /></div>,
+      <div className="stat-tile" key="ram"><GaugeStat label="RAM" pct={res.memPct} /></div>,
+      <div className="stat-tile" key="disk"><GaugeStat label="DISK" pct={res.diskPct} /></div>,
+    );
+  }
+
+  proxmox.vms.forEach((vm) => {
+    tiles.push(
+      <div className="stat-tile" key={`vm-${vm.type}-${vm.vmid}`}>
+        <VMStat
+          name={vm.name}
+          type={vm.type}
+          running={vm.status === "running"}
+          cpuPct={vm.cpuPct}
+          memPct={vm.memPct}
+        />
+      </div>,
+    );
+  });
+
+  services.services.forEach((s) => {
+    tiles.push(
+      <div className="stat-tile" key={`svc-${s.name}`}>
+        <ServiceStat name={s.name} status={s.status} tag={s.tag} />
+      </div>,
+    );
+  });
 
   return (
     <div className="stat-strip-outer">
       <div className="stat-strip" ref={scrollRef} onScroll={onScroll}>
-        <div className="stat-tile">
-          <MiniStat value={openTasks} unit="откр." sub="ЗАДАЧИ СЕГОДНЯ" />
-        </div>
-        <div className="stat-tile">
-          <MiniStat value={svcValue} unit={services.configured && totalCount > 0 ? "up" : undefined} sub={svcSub} />
-        </div>
-        <div className="stat-tile stat-tile--wide">
-          <WeatherStat weather={weather} />
-        </div>
-        <div className="stat-tile">
-          <MiniStat value={hassValue} unit={hass.configured && autoTotal > 0 ? "вкл" : undefined} sub={hassSub} />
-        </div>
+        {tiles}
       </div>
       <div className="stat-dots" aria-hidden="true">
-        {Array.from({ length: TILE_COUNT }, (_, i) => (
+        {tiles.map((_, i) => (
           <button
             key={i}
             className={"stat-dot" + (i === activeIdx ? " active" : "")}

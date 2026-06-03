@@ -51,6 +51,15 @@ export const config = {
     },
   },
 
+  proxmox: {
+    url: env("PROXMOX_URL"), // https://192.168.x.x:8006
+    token: env("PROXMOX_TOKEN"), // user@realm!tokenid=secret
+    node: env("PROXMOX_NODE"), // опционально; если пусто — берём первый online-нод
+    get configured() {
+      return Boolean(this.url && this.token);
+    },
+  },
+
   caldav: {
     url: env("CALDAV_URL"),
     username: env("CALDAV_USERNAME"),
@@ -70,6 +79,7 @@ export const config = {
     services: num("POLL_SERVICES", 60_000),
     weather: num("POLL_WEATHER", 1_800_000),
     tasks: num("POLL_TASKS", 300_000),
+    proxmox: num("POLL_PROXMOX", 30_000),
   },
 };
 

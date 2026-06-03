@@ -82,14 +82,22 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
 }
-/* StatStrip carousel */
+/* StatStrip — одна горизонтальная полоса мелких тайлов с прокруткой вбок */
 .stat-strip-outer { display: flex; flex-direction: column; gap: 8px; }
-.stat-strip { display: flex; gap: 18px; }
-.stat-tile { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.stat-tile--wide { flex: 2; }
+.stat-strip {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  padding-bottom: 3px;
+}
+.stat-strip::-webkit-scrollbar { display: none; }
+.stat-tile { flex: 0 0 168px; min-width: 0; display: flex; flex-direction: column; scroll-snap-align: start; }
+.stat-tile--wide { flex: 0 0 320px; }
 .stat-tile > * { flex: 1; }
 .stat-card { padding: 18px 20px; overflow: hidden; }
-.stat-dots { display: none; justify-content: center; align-items: center; gap: 7px; padding: 2px 0; }
+.stat-dots { display: flex; justify-content: center; align-items: center; gap: 7px; padding: 2px 0; flex-wrap: wrap; }
 .stat-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); border: none; padding: 0; cursor: pointer; transition: background 0.2s, transform 0.2s; }
 .stat-dot.active { background: var(--accent); transform: scale(1.4); }
 .cols-3 {

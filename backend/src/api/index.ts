@@ -5,6 +5,7 @@ import { tasksRouter } from "./tasks.js";
 import { settingsRouter } from "./settings.js";
 import { getWeather } from "../integrations/weather.js";
 import { getServices } from "../integrations/services.js";
+import { getProxmox } from "../integrations/proxmox.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { log, getEntries } from "../logger.js";
 
@@ -37,6 +38,14 @@ apiRouter.get("/weather", async (_req, res) => {
 apiRouter.get("/services", async (_req, res) => {
   try {
     res.json(await getServices());
+  } catch (e) {
+    res.status(502).json({ configured: false, error: String(e) });
+  }
+});
+
+apiRouter.get("/proxmox", async (_req, res) => {
+  try {
+    res.json(await getProxmox());
   } catch (e) {
     res.status(502).json({ configured: false, error: String(e) });
   }

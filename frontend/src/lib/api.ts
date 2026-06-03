@@ -241,6 +241,50 @@ export async function getWeather(): Promise<WeatherData> {
   }
 }
 
+// ─── Proxmox ──────────────────────────────────────────────────────────
+
+export interface ProxmoxResource {
+  cpuPct: number;
+  memUsed: number;
+  memTotal: number;
+  memPct: number;
+  diskUsed: number;
+  diskTotal: number;
+  diskPct: number;
+}
+
+export interface ProxmoxVM {
+  vmid: number;
+  name: string;
+  type: "qemu" | "lxc";
+  status: "running" | "stopped";
+  cpuPct: number;
+  memPct: number;
+}
+
+export interface ProxmoxData {
+  configured: boolean;
+  node: string | null;
+  resource: ProxmoxResource | null;
+  vms: ProxmoxVM[];
+}
+
+export async function getProxmox(): Promise<ProxmoxData> {
+  try {
+    const res = await apiFetch("/api/proxmox");
+    if (!res.ok) throw new Error();
+    const data = (await res.json()) as { configured: boolean } & Partial<ProxmoxData>;
+    return {
+      configured: data.configured,
+      node: data.node ?? null,
+      resource: data.resource ?? null,
+      vms: data.vms ?? [],
+    };
+  } catch {
+    return { configured: false, node: null, resource: null, vms: [] };
+  }
+}
+
 // ─── Version ────────────────────────────────────────────────────────
 
 export interface VersionData {

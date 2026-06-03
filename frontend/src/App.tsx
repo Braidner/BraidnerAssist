@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "./theme.ts";
 import {
-  getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getVersion,
+  getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
   getHassAutomations, toggleHassAutomation,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type VersionData, type HassData,
+  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData,
 } from "./lib/api.ts";
 import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
 import { LogsPanel } from "./components/LogsPanel.tsx";
@@ -14,7 +14,6 @@ import { Drawer } from "./components/Drawer.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
 import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
-import { SystemStatusPanel } from "./components/panels/SystemStatus.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
 
@@ -39,6 +38,7 @@ export function App() {
   const [hermesTasks, setHermesTasks] = useState<HermesTask[]>([]);
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
+  const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -62,11 +62,13 @@ export function App() {
     getHermesTasks().then(setHermesTasks);
     getServices().then(setServicesData);
     getWeather().then(setWeather);
+    getProxmox().then(setProxmox);
     getHassAutomations().then(setHass);
     getVersion().then(setVersionData);
 
     const serviceTimer = setInterval(() => getServices().then(setServicesData), 60_000);
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
+    const proxmoxTimer = setInterval(() => getProxmox().then(setProxmox), 30_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
     const hermesTimer = setInterval(() => {
@@ -77,6 +79,7 @@ export function App() {
     return () => {
       clearInterval(serviceTimer);
       clearInterval(weatherTimer);
+      clearInterval(proxmoxTimer);
       clearInterval(tasksTimer);
       clearInterval(hassTimer);
       clearInterval(hermesTimer);
@@ -133,8 +136,6 @@ export function App() {
     );
   }
 
-  const openTasks = tasks.filter((t) => !t.done).length;
-
   return (
     <div className="mc" data-theme={theme}>
       {showSettings && (
@@ -151,7 +152,7 @@ export function App() {
       <div className="mc-shell">
         <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} onSettings={() => setShowSettings(true)} onLogs={() => setShowLogs(true)} versionData={versionData} />
 
-        <StatStrip openTasks={openTasks} weather={weather} services={servicesData} hass={hass} />
+        <StatStrip weather={weather} proxmox={proxmox} services={servicesData} />
 
         <div className="cols-3">
           <div className="col-fill">
@@ -159,7 +160,6 @@ export function App() {
           </div>
 
           <div className="col">
-            <SystemStatusPanel services={servicesData.services} configured={servicesData.configured} />
             <HomeAssistantPanel data={hass} onToggle={onToggleAutomation} />
           </div>
 

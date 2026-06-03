@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { WeatherData, ServicesData, ProxmoxData } from "../../lib/api.ts";
+import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
   0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
@@ -94,16 +94,31 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
   );
 }
 
-function GaugeStat({ label, pct }: { label: string; pct: number }) {
+function gb(bytes: number): number {
+  return Math.round(bytes / 1024 ** 3);
+}
+
+function Gauge({ label, num, pct }: { label: string; num: string; pct: number }) {
   return (
-    <div className="card neu stat-card" style={{ justifyContent: "center" }}>
-      <div className="gauge">
-        <div className="gauge-top">
-          <span className="gauge-label">{label}</span>
-          <span className="gauge-num">{pct}%</span>
-        </div>
-        <div className="bar"><i style={{ width: pct + "%" }} /></div>
+    <div className="gauge">
+      <div className="gauge-top">
+        <span className="gauge-label">{label}</span>
+        <span className="gauge-num">{num}</span>
       </div>
+      <div className="bar"><i style={{ width: pct + "%" }} /></div>
+    </div>
+  );
+}
+
+function ProxmoxStat({ res, node }: { res: ProxmoxResource; node: string | null }) {
+  return (
+    <div className="card neu stat-card" style={{ justifyContent: "center", gap: 12 }}>
+      <div className="stat-sub mono" style={{ marginTop: 0, opacity: 0.7, whiteSpace: "nowrap", letterSpacing: ".08em" }}>
+        PROXMOX{node ? ` · ${node.toUpperCase()}` : ""}
+      </div>
+      <Gauge label="CPU" num={`${res.cpuPct}%`} pct={res.cpuPct} />
+      <Gauge label="RAM" num={`${gb(res.memUsed)}/${gb(res.memTotal)} ГБ`} pct={res.memPct} />
+      <Gauge label="DISK" num={`${gb(res.diskUsed)}/${gb(res.diskTotal)} ГБ`} pct={res.diskPct} />
     </div>
   );
 }
@@ -180,9 +195,9 @@ export function StatStrip({ weather, proxmox, services }: StatStripProps) {
 
   if (res) {
     tiles.push(
-      <div className="stat-tile" key="cpu"><GaugeStat label="CPU" pct={res.cpuPct} /></div>,
-      <div className="stat-tile" key="ram"><GaugeStat label="RAM" pct={res.memPct} /></div>,
-      <div className="stat-tile" key="disk"><GaugeStat label="DISK" pct={res.diskPct} /></div>,
+      <div className="stat-tile stat-tile--proxmox" key="proxmox">
+        <ProxmoxStat res={res} node={proxmox.node} />
+      </div>,
     );
   }
 

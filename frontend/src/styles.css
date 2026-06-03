@@ -82,19 +82,23 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
 }
-/* StatStrip — одна горизонтальная полоса мелких тайлов с прокруткой вбок */
-.stat-strip-outer { display: flex; flex-direction: column; gap: 8px; }
+/* StatStrip — одна горизонтальная полоса мелких тайлов с прокруткой вбок.
+   Внутренний padding + отрицательный margin дают неоморфным теням место,
+   не сбивая выравнивание полосы с колонками ниже. */
+.stat-strip-outer { display: flex; flex-direction: column; gap: 4px; }
 .stat-strip {
   display: flex;
   gap: 18px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
-  padding-bottom: 3px;
+  padding: 18px;
+  margin: -18px -18px 0;
 }
 .stat-strip::-webkit-scrollbar { display: none; }
-.stat-tile { flex: 0 0 168px; min-width: 0; display: flex; flex-direction: column; scroll-snap-align: start; }
-.stat-tile--wide { flex: 0 0 320px; }
+.stat-tile { flex: 0 0 160px; min-width: 0; display: flex; flex-direction: column; scroll-snap-align: start; }
+.stat-tile--wide { flex: 0 0 300px; }
+.stat-tile--proxmox { flex: 0 0 220px; }
 .stat-tile > * { flex: 1; }
 .stat-card { padding: 18px 20px; overflow: hidden; }
 .stat-dots { display: flex; justify-content: center; align-items: center; gap: 7px; padding: 2px 0; flex-wrap: wrap; }
@@ -132,13 +136,15 @@ html, body, #root {
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
     gap: 12px;
-    padding-bottom: 3px;
+    padding: 16px;
+    margin: -16px -16px 0;
     -webkit-overflow-scrolling: touch;
   }
   .stat-strip::-webkit-scrollbar { display: none; }
   .stat-tile,
-  .stat-tile--wide {
-    flex: 0 0 calc(100% - 40px);
+  .stat-tile--wide,
+  .stat-tile--proxmox {
+    flex: 0 0 calc(100% - 52px);
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }

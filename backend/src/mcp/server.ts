@@ -10,15 +10,32 @@ function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
 }
 
+const INSTRUCTIONS = `Mission Control — personal dashboard for tasks, homelab services, Home Assistant and weather. You are Hermes, the agent operating it.
+
+WORKING ON A TASK (works for BOTH local and GitLab tasks):
+1. get_tasks → pick a task and copy its "id" field. GitLab ids look like "gl-issue-<project>-<iid>" or "gl-mr-<project>-<iid>"; local ids are cuids. Use this exact id everywhere below.
+2. claim_task({ id }) → marks it in_progress and tags it as taken by Hermes. ALWAYS claim before working: for GitLab tasks this creates the local record that logs attach to, and it makes the task appear in the dashboard's "in work" list. GitLab itself is read-only; status/claim/logs live only in the local DB.
+3. log_action({ action, details?, result?, taskId }) → record each step of progress. You MUST pass taskId = the SAME id from step 1, otherwise the entry becomes a loose global log not tied to the task and won't show under it. Call this as many times as needed while working.
+4. complete_task({ id }) → marks it done when finished.
+
+Use report_status to reflect your overall state (active/idle/error) on the dashboard. Other tools cover Home Assistant, homelab services and weather.`;
+
 export function createMcpServer() {
-  const server = new McpServer({ name: "mission-control", version: "0.1.0" });
+  const server = new McpServer(
+    { name: "mission-control", version: "0.1.0" },
+    { instructions: INSTRUCTIONS },
+  );
 
   // ── Tasks ────────────────────────────────────────────────────────────
 
-  server.tool("get_tasks", "Get all tasks (local + GitLab)", async () => {
-    const tasks = await fetchAllTasks();
-    return ok(tasks);
-  });
+  server.tool(
+    "get_tasks",
+    "List all tasks (local + live GitLab issues/MRs). Each task has an 'id' field — copy it to claim_task, log_action(taskId) and complete_task. GitLab ids look like 'gl-issue-<project>-<iid>'. Start here when picking up work.",
+    async () => {
+      const tasks = await fetchAllTasks();
+      return ok(tasks);
+    },
+  );
 
   server.tool(
     "create_task",
@@ -51,7 +68,7 @@ export function createMcpServer() {
 
   server.tool(
     "claim_task",
-    "Claim any task (local or GitLab): set it in_progress and mark it taken by Hermes",
+    "STEP 1 of working a task. Claim any task by its id from get_tasks (local OR GitLab): sets it in_progress and tags it as taken by Hermes. For GitLab tasks this also creates the local record that log_action entries attach to, so always claim before logging. Returns the task with the id to reuse for log_action(taskId) and complete_task.",
     { id: z.string() },
     async ({ id }) => {
       const task = await upsertAgentTaskState(id, {
@@ -65,7 +82,7 @@ export function createMcpServer() {
 
   server.tool(
     "complete_task",
-    "Mark any task (local or GitLab) as done",
+    "FINAL STEP of working a task. Mark any task (local or GitLab) as done, using the same id you claimed.",
     { id: z.string() },
     async ({ id }) => {
       const task = await upsertAgentTaskState(id, { status: "done" });
@@ -91,7 +108,7 @@ export function createMcpServer() {
 
   server.tool(
     "log_action",
-    "Write an action entry to the Hermes log. Pass taskId to tie it to a specific task.",
+    "Record a step of progress while working a task (call repeatedly between claim_task and complete_task). Pass taskId = the task's id from get_tasks/claim_task so the entry shows under that task on the dashboard; omit taskId only for a global log not tied to any task. 'action' is a short verb label, 'details' is the human-readable note, 'result' is the outcome (e.g. 'ok'/'error').",
     {
       action: z.string(),
       details: z.string().optional(),

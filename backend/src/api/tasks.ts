@@ -36,7 +36,7 @@ export async function fetchAllTasks(filters: { source?: string; status?: string;
 // (source="gitlab"), к которой привязываются claim/status и логи (AgentLog.taskId).
 export async function upsertAgentTaskState(
   id: string,
-  data: { status?: string; claimedBy?: string | null; claimedAt?: Date | null },
+  data: { status?: string; priority?: string; claimedBy?: string | null; claimedAt?: Date | null },
 ) {
   const existing = await prisma.task.findUnique({ where: { id } });
   if (existing) {
@@ -48,7 +48,7 @@ export async function upsertAgentTaskState(
       id,
       title: gl?.title ?? id,
       source: "gitlab",
-      priority: gl?.priority ?? "medium",
+      priority: data.priority ?? gl?.priority ?? "medium",
       status: data.status ?? "todo",
       claimedBy: data.claimedBy ?? null,
       claimedAt: data.claimedAt ?? null,

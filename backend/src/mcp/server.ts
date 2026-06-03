@@ -51,17 +51,14 @@ export function createMcpServer() {
 
   server.tool(
     "update_task",
-    "Update task status or priority",
+    "Update status/priority of any task (local OR GitLab) by its id from get_tasks. Works for GitLab tasks too — creates the local overlay record if it doesn't exist yet, so it never fails with 'record not found'.",
     {
       id: z.string(),
       status: z.enum(["todo", "in_progress", "done"]).optional(),
       priority: z.enum(["low", "medium", "high"]).optional(),
     },
     async ({ id, status, priority }) => {
-      const task = await prisma.task.update({
-        where: { id },
-        data: { ...(status && { status }), ...(priority && { priority }) },
-      });
+      const task = await upsertAgentTaskState(id, { status, priority });
       return ok(task);
     },
   );

@@ -123,11 +123,27 @@
 - [x] Проверено: `tools/list` возвращает все 12 инструментов; сессия инициализируется
 - [x] Деплой: образ обновлён в GHCR, на hermes.lan перезапущен и проверен
 
-## Фаза 6 — Polish  ← В РАБОТЕ
+## Фаза 6 — Polish  ✅ ГОТОВО
 
-- [ ] PWA (manifest + service worker — офлайн, иконка, установка на телефон)
-- [ ] Настройки из UI (редактор списка сервисов вместо ручного services.json)
-- [ ] Drag-and-drop виджетов (react-grid-layout, persist order)
+- [x] PWA (vite-plugin-pwa: manifest + service worker, иконки, установка на телефон)
+- [x] Настройки из UI (Settings modal ⚙ в TopBar — редактор списка сервисов вместо ручного services.json)
+- [ ] Drag-and-drop виджетов (react-grid-layout, persist order) — отложено
+
+## Proxmox + StatStrip rework (2026-06-03)  ✅ ГОТОВО
+
+- [x] `backend/src/integrations/proxmox.ts` — `getProxmox()` (кеш POLL_PROXMOX 30с);
+      undici `Agent` с `rejectUnauthorized:false` для self-signed TLS; заголовок
+      `Authorization: PVEAPIToken=user@realm!id=secret`; авто-определение online-нода
+- [x] Конфиг-блок `proxmox` в `config.ts` (PROXMOX_URL/TOKEN/NODE), `.env.example` секция
+- [x] `GET /api/proxmox` — node + resource (cpu/ram/disk) + vms (qemu+lxc, cpu/ram, статус)
+- [x] Фронт: типы + `getProxmox()` в `lib/api.ts`
+- [x] StatStrip переработан в ОДНУ горизонтальную полосу мини-тайлов: погода (wide) +
+      один объединённый Proxmox-тайл (CPU/RAM/DISK гейджи в ряд, диск/RAM в ГБ) +
+      по тайлу на VM/LXC + по тайлу на сервис; точки-индикаторы убраны; неоморфные тени
+      не обрезаются (padding/отрицательный margin на `.stat-strip`)
+- [x] Панель `SystemStatus` удалена; средняя колонка = только HomeAssistant
+- [x] Деплой: PROXMOX_URL=https://192.168.1.90:8006, token id `root@pam!dash` на сервере
+- [x] Проверено: `npm run build` (front+back) ok; реальные данные Proxmox в превью
 
 ---
 
@@ -137,6 +153,7 @@
 GET/POST/PUT/DEL  /api/tasks[/:id]
 GET   /api/health/summary       POST /api/health/import
 GET   /api/services
+GET   /api/proxmox
 GET   /api/homeassistant/automations
 POST  /api/homeassistant/automations/:id/toggle
 POST  /api/homeassistant/scripts/:id/trigger

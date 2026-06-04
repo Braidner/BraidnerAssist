@@ -21,7 +21,7 @@ mission-control/
 │   ├── src/
 │   │   ├── api/           # REST endpoints
 │   │   ├── mcp/           # MCP server для Hermes
-│   │   ├── integrations/  # GitLab, HealthKit, HomeAssistant, Weather, Calendar
+│   │   ├── integrations/  # GitLab, HomeAssistant, Weather, Services, Proxmox
 │   │   ├── db/            # Prisma client
 │   │   └── index.ts
 │   └── prisma/schema.prisma
@@ -91,7 +91,10 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 2. **Homelab Services** — статус сервисов (ping/HTTP healthcheck), из `/data/services.json`.
 3. **Home Assistant** — автоматизации (list/toggle), реальные данные через REST HA API.
 4. **Weather** — Open-Meteo (без ключа), текущая + прогноз 3 дня.
-5. **Hermes Agent** — список сессий напрямую из Hermes Agent API (Nous Research,
+5. **Proxmox** — статус ноды (cpu/ram/disk) + виртуалки (QEMU+LXC, cpu/ram/статус) через
+   PVE REST API. API-токен `PVEAPIToken=user@realm!id=secret`, self-signed TLS (undici Agent).
+   Env: `PROXMOX_URL`/`PROXMOX_TOKEN`/`PROXMOX_NODE`. Отображается в StatStrip (не отдельная панель).
+6. **Hermes Agent** — список сессий напрямую из Hermes Agent API (Nous Research,
    `HERMES_URL`/`HERMES_API_KEY`). Из задачи (drawer) кнопка создаёт новую сессию и шлёт
    туда номер+описание; клик по сессии открывает чат для продолжения диалога.
 
@@ -106,14 +109,16 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
   Тема ставится на обёртку `.mc` (не на `:root`); переключатель в `theme.ts`.
 - **Примитивы теней**: `.neu` (выпуклый), `.neu-in` (вдавленный), `.neu-sm` (мелкий).
 - **Компоненты**: `frontend/src/components/` — `Card`, `Ring`, `icons` (SVG-набор) +
-  `panels/` (TopBar, StatStrip, Tasks, SystemStatus, HomeAssistant, HermesLog, Placeholder).
-  Раскладка — **вариант C (three columns)**: полоса мини-статов (carousel на mobile) + 3 колонки.
+  `panels/` (TopBar, StatStrip, Tasks, HomeAssistant, HermesLog, Placeholder).
+  Раскладка — **вариант C (three columns)**: полоса мини-статов + 3 колонки.
   - Левая (`col-fill`): Tasks
-  - Средняя (`col`): SystemStatus + HomeAssistant
+  - Средняя (`col`): HomeAssistant
   - Правая (`col-fill`): HermesLog
-- **Данные**: Tasks (local + GitLab), Hermes (сессии), Services, Weather, HomeAssistant — реальные.
-- **StatStrip**: 4 тайла (задачи / сервисы / погода / автоматизации HA); на экранах ≤760px —
-  горизонтальный scroll-snap карусель со свайпом и точками-индикаторами.
+- **Данные**: Tasks (local + GitLab), Hermes (сессии), Services, Weather, HomeAssistant, Proxmox — реальные.
+- **StatStrip**: одна горизонтальная полоса мини-тайлов с прокруткой — погода (широкий) +
+  один объединённый Proxmox-тайл (CPU/RAM/DISK гейджи в ряд, диск/RAM в ГБ) + по тайлу на
+  каждую VM/LXC (cpu/ram/статус) + по тайлу на каждый сервис. Панель «Статус системы»
+  (`SystemStatus`) удалена. На ≤760px — scroll-snap карусель со свайпом.
 - Новые виджеты/панели делать в этой же системе (классы `.card .neu`, токены тем).
 
 ## Прогресс по фазам
@@ -123,10 +128,12 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
   GitLab drawer, SHA-версия в TopBar, viewport-lock раскладка. ✅ ГОТОВО
 - **Фаза 3 — Calendar + UI**: Calendar удалён (не используется); Health отложен.
   StatStrip carousel (mobile), APP_TOKEN для iOS Shortcuts. ✅ ГОТОВО
-- **Фаза 4 — Home Assistant**: HA REST API, automations list/toggle, HomeAssistant панель,
-  StatStrip 4й тайл — активные автоматизации. ✅ ГОТОВО
+- **Фаза 4 — Home Assistant**: HA REST API, automations list/toggle, HomeAssistant панель. ✅ ГОТОВО
 - **Фаза 5 — MCP сервер + Hermes integration**: Streamable HTTP `/mcp`, 12 инструментов
   (tasks/agent/HA/services/weather), bearer MCP_TOKEN, Origin-guard. ✅ ГОТОВО
-- **Фаза 6 — Polish** ← В РАБОТЕ
+- **Фаза 6 — Polish**: PWA (manifest + service worker), Settings modal (редактор сервисов). ✅ ГОТОВО
+- **Proxmox + StatStrip rework**: интеграция Proxmox (нода + VMs/LXC), StatStrip переработан
+  в одну полосу мини-тайлов, панель SystemStatus удалена. ✅ ГОТОВО
+- **Отложено**: drag-and-drop виджетов (react-grid-layout).
 
 Подробный трекинг — в `TASKS.md`.

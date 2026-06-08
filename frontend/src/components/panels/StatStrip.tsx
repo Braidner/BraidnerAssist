@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
@@ -39,30 +39,10 @@ function Bar({ pct }: { pct: number }) {
   return <div className="track"><i style={{ width: Math.min(100, Math.max(0, pct)) + "%" }} /></div>;
 }
 
-/* drag-to-scroll carousel: edge-fade mask + auto-hiding progress rail */
+/* drag-to-scroll carousel with edge-fade mask (right side) */
 function Carousel({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const railRef = useRef<HTMLElement>(null);
   const drag = useRef({ down: false, x: 0, sl: 0 });
-
-  const sync = useCallback(() => {
-    const el = ref.current, rail = railRef.current;
-    if (!el || !rail) return;
-    const max = el.scrollWidth - el.clientWidth;
-    const carousel = el.closest(".carousel");
-    carousel?.classList.toggle("scrollable", max > 4);
-    const frac = max > 0 ? el.scrollLeft / max : 0;
-    const vis = el.clientWidth / el.scrollWidth;
-    rail.style.width = Math.max(14, vis * 100) + "%";
-    rail.style.transform = `translateX(${frac * (100 / Math.max(vis, 0.0001) - 100)}%)`;
-  }, []);
-
-  useEffect(() => {
-    sync();
-    const r = () => sync();
-    window.addEventListener("resize", r);
-    return () => window.removeEventListener("resize", r);
-  }, [sync, children]);
 
   const onDown = (e: React.PointerEvent) => {
     const el = ref.current; if (!el) return;
@@ -87,7 +67,6 @@ function Carousel({ children }: { children: ReactNode }) {
         <div
           className="car-track"
           ref={ref}
-          onScroll={sync}
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
@@ -96,7 +75,6 @@ function Carousel({ children }: { children: ReactNode }) {
           {children}
         </div>
       </div>
-      <div className="car-rail"><i ref={railRef} /></div>
     </div>
   );
 }

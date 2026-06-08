@@ -19,6 +19,29 @@ export const icons = {
       <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   ),
+  grid: (p: IconProps) => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" {...p}>
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.6" stroke="currentColor" strokeWidth="2" />
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.6" stroke="currentColor" strokeWidth="2" />
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.6" stroke="currentColor" strokeWidth="2" />
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.6" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  chart: (p: IconProps) => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M4 20V4M4 20h16M8 16v-4M12 16V8M16 16v-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  menu: (p: IconProps) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ),
+  logout: (p: IconProps) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" {...p}>
+      <path d="M14 4.5H6.5A1.5 1.5 0 005 6v12a1.5 1.5 0 001.5 1.5H14M17 8l4 4-4 4M21 12H9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   cpu: (p: IconProps) => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" {...p}>
       <rect x="7" y="7" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="2" />

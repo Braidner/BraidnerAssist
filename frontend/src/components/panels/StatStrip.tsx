@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
@@ -30,102 +31,129 @@ const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
   bad: "var(--bad)",
 };
 
-function WeatherStat({ weather }: { weather: WeatherData }) {
-  const { current, forecast } = weather;
-  const [d0, d1, d2] = forecast ?? [];
-
-  const colStyle: React.CSSProperties = {
-    flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center",
-  };
-  const divStyle: React.CSSProperties = {
-    borderLeft: "1px solid var(--hair)", paddingLeft: 14,
-  };
-
-  return (
-    <div className="card neu stat-card">
-      {!current ? (
-        <div style={colStyle}>
-          <div className="stat-num" style={{ fontSize: 30 }}>—</div>
-          <div className="stat-sub mono" style={{ whiteSpace: "nowrap" }}>ПОГОДА · НЕ НАСТРОЕНО</div>
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: 14, alignItems: "stretch" }}>
-          {/* today */}
-          <div style={colStyle}>
-            <div className="stat-num" style={{ fontSize: 30, whiteSpace: "nowrap" }}>
-              {current.temp}°
-              <span style={{ fontSize: 14, color: "var(--muted)", marginLeft: 3 }}>C</span>
-            </div>
-            <div className="stat-sub mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {d0 ? `${dayLabel(d0.date)} · ${wmoShort(current.code)}` : `СЕГОДНЯ · ${wmoShort(current.code)}`}
-            </div>
-            <div className="stat-sub mono" style={{ marginTop: 2, opacity: 0.7, whiteSpace: "nowrap" }}>
-              ВЕТЕР {current.wind} КМ/Ч
-            </div>
-          </div>
-          {/* tomorrow */}
-          {d1 && (
-            <div style={{ ...colStyle, ...divStyle }}>
-              <div className="stat-num" style={{ fontSize: 24, whiteSpace: "nowrap" }}>
-                {d1.max}°
-                <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 2 }}>/{d1.min}°</span>
-              </div>
-              <div className="stat-sub mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {dayLabel(d1.date)} · {wmoShort(d1.code)}
-              </div>
-            </div>
-          )}
-          {/* day after */}
-          {d2 && (
-            <div style={{ ...colStyle, ...divStyle }}>
-              <div className="stat-num" style={{ fontSize: 24, whiteSpace: "nowrap" }}>
-                {d2.max}°
-                <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 2 }}>/{d2.min}°</span>
-              </div>
-              <div className="stat-sub mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {dayLabel(d2.date)} · {wmoShort(d2.code)}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function gb(bytes: number): number {
   return Math.round(bytes / 1024 ** 3);
 }
 
-function Gauge({ label, num, pct }: { label: string; num: string; pct: number }) {
+function Bar({ pct }: { pct: number }) {
+  return <div className="track"><i style={{ width: Math.min(100, Math.max(0, pct)) + "%" }} /></div>;
+}
+
+/* drag-to-scroll carousel: edge-fade mask + auto-hiding progress rail */
+function Carousel({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLElement>(null);
+  const drag = useRef({ down: false, x: 0, sl: 0 });
+
+  const sync = useCallback(() => {
+    const el = ref.current, rail = railRef.current;
+    if (!el || !rail) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const carousel = el.closest(".carousel");
+    carousel?.classList.toggle("scrollable", max > 4);
+    const frac = max > 0 ? el.scrollLeft / max : 0;
+    const vis = el.clientWidth / el.scrollWidth;
+    rail.style.width = Math.max(14, vis * 100) + "%";
+    rail.style.transform = `translateX(${frac * (100 / Math.max(vis, 0.0001) - 100)}%)`;
+  }, []);
+
+  useEffect(() => {
+    sync();
+    const r = () => sync();
+    window.addEventListener("resize", r);
+    return () => window.removeEventListener("resize", r);
+  }, [sync, children]);
+
+  const onDown = (e: React.PointerEvent) => {
+    const el = ref.current; if (!el) return;
+    drag.current = { down: true, x: e.clientX, sl: el.scrollLeft };
+    el.classList.add("grabbing");
+    el.setPointerCapture?.(e.pointerId);
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag.current.down || !ref.current) return;
+    ref.current.scrollLeft = drag.current.sl - (e.clientX - drag.current.x);
+  };
+  const onUp = (e: React.PointerEvent) => {
+    const el = ref.current; if (!el) return;
+    drag.current.down = false;
+    el.classList.remove("grabbing");
+    try { el.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+  };
+
   return (
-    <div className="gauge">
-      <div className="gauge-top">
-        <span className="gauge-label">{label}</span>
-        <span className="gauge-num">{num}</span>
+    <div className="carousel anim">
+      <div className="car-vp">
+        <div
+          className="car-track"
+          ref={ref}
+          onScroll={sync}
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onPointerLeave={onUp}
+        >
+          {children}
+        </div>
       </div>
-      <div className="bar"><i style={{ width: pct + "%" }} /></div>
+      <div className="car-rail"><i ref={railRef} /></div>
+    </div>
+  );
+}
+
+function WeatherStat({ weather }: { weather: WeatherData }) {
+  const { current, forecast } = weather;
+  if (!current) {
+    return (
+      <div className="scard neu lift">
+        <div className="wx">
+          <div className="wx-now">
+            <span className="wx-temp">—</span>
+            <span className="wx-meta mono">ПОГОДА<br />НЕ НАСТРОЕНО</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  const days = (forecast ?? []).slice(0, 3);
+  return (
+    <div className="scard neu lift">
+      <div className="wx">
+        <div className="wx-now">
+          <span className="wx-temp">{current.temp}<sup>°C</sup></span>
+          <span className="wx-meta mono">{wmoShort(current.code)}<br />ВЕТЕР {current.wind} КМ/Ч</span>
+        </div>
+        <div className="wx-days">
+          {days.map((d) => (
+            <div className="wx-day" key={d.date}>
+              <div className="dd">{dayLabel(d.date)}</div>
+              <div className="dt">{d.max}°<small>/{d.min}°</small></div>
+              <div className="dsky">{wmoShort(d.code)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
 function ProxmoxStat({ res, node }: { res: ProxmoxResource; node: string | null }) {
   return (
-    <div className="card neu stat-card" style={{ justifyContent: "center", gap: 12 }}>
-      <div className="stat-sub mono" style={{ marginTop: 0, opacity: 0.7, whiteSpace: "nowrap", letterSpacing: ".08em" }}>
-        PROXMOX{node ? ` · ${node.toUpperCase()}` : ""}
-      </div>
-      <div style={{ display: "flex", gap: 18 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Gauge label="CPU" num={`${res.cpuPct}%`} pct={res.cpuPct} />
+    <div className="scard pcard neu lift">
+      <div className="pve">
+        <div className="pve-row">
+          <span className="pve-k">CPU</span><Bar pct={res.cpuPct} /><span className="pve-v">{res.cpuPct}%</span>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Gauge label="RAM" num={`${gb(res.memUsed)}/${gb(res.memTotal)} ГБ`} pct={res.memPct} />
+        <div className="pve-row">
+          <span className="pve-k">RAM</span><Bar pct={res.memPct} /><span className="pve-v">{gb(res.memUsed)}/{gb(res.memTotal)} ГБ</span>
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Gauge label="DISK" num={`${gb(res.diskUsed)}/${gb(res.diskTotal)} ГБ`} pct={res.diskPct} />
+        <div className="pve-row">
+          <span className="pve-k">DISK</span><Bar pct={res.diskPct} /><span className="pve-v">{gb(res.diskUsed)}/{gb(res.diskTotal)} ГБ</span>
         </div>
       </div>
+      {node && (
+        <div className="svc-kind" style={{ marginTop: 6 }}>PROXMOX · {node.toUpperCase()}</div>
+      )}
     </div>
   );
 }
@@ -135,31 +163,26 @@ function VMStat({ name, type, running, cpuPct, memPct }: {
 }) {
   const color = running ? "var(--ok)" : "var(--muted)";
   return (
-    <div className="card neu stat-card" style={{ justifyContent: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="svc-dot" style={{ background: color, color }} />
-        <span className="stat-num" style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {name}
-        </span>
+    <div className="svc-card neu lift">
+      <div className="svc-top">
+        <span className="dot-led" style={{ background: color, boxShadow: running ? `0 0 8px color-mix(in srgb, ${color} 70%, transparent)` : "none" }} />
+        <span className="svc-nm">{name}</span>
       </div>
-      <div className="stat-sub mono" style={{ whiteSpace: "nowrap" }}>
-        {running ? `CPU ${cpuPct}% · RAM ${memPct}%` : "ОСТАНОВЛЕНА"}
-      </div>
-      <div className="stat-sub mono" style={{ marginTop: 2, opacity: 0.6 }}>{type.toUpperCase()}</div>
+      <div className="svc-line">{running ? `CPU ${cpuPct}% · RAM ${memPct}%` : "ОСТАНОВЛЕНА"}</div>
+      <div className="svc-kind">{type.toUpperCase()}</div>
     </div>
   );
 }
 
 function ServiceStat({ name, status, tag }: { name: string; status: "ok" | "warn" | "bad"; tag: string }) {
+  const color = STAT_VAR[status];
   return (
-    <div className="card neu stat-card" style={{ justifyContent: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="svc-dot" style={{ background: STAT_VAR[status], color: STAT_VAR[status] }} />
-        <span className="stat-num" style={{ fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {name}
-        </span>
+    <div className="svc-card neu lift">
+      <div className="svc-top">
+        <span className="dot-led" style={{ background: color, boxShadow: `0 0 8px color-mix(in srgb, ${color} 70%, transparent)` }} />
+        <span className="svc-nm">{name}</span>
       </div>
-      <div className="stat-sub mono" style={{ whiteSpace: "nowrap" }}>{tag}</div>
+      <div className="svc-line">{tag}</div>
     </div>
   );
 }
@@ -173,47 +196,28 @@ interface StatStripProps {
 export function StatStrip({ weather, proxmox, services }: StatStripProps) {
   const res = proxmox.configured ? proxmox.resource : null;
 
-  const tiles: React.ReactNode[] = [
-    <div className="stat-tile stat-tile--wide" key="weather">
-      <WeatherStat weather={weather} />
-    </div>,
-  ];
+  const tiles: ReactNode[] = [<WeatherStat key="weather" weather={weather} />];
 
   if (res) {
-    tiles.push(
-      <div className="stat-tile stat-tile--proxmox" key="proxmox">
-        <ProxmoxStat res={res} node={proxmox.node} />
-      </div>,
-    );
+    tiles.push(<ProxmoxStat key="proxmox" res={res} node={proxmox.node} />);
   }
 
   proxmox.vms.forEach((vm) => {
     tiles.push(
-      <div className="stat-tile" key={`vm-${vm.type}-${vm.vmid}`}>
-        <VMStat
-          name={vm.name}
-          type={vm.type}
-          running={vm.status === "running"}
-          cpuPct={vm.cpuPct}
-          memPct={vm.memPct}
-        />
-      </div>,
+      <VMStat
+        key={`vm-${vm.type}-${vm.vmid}`}
+        name={vm.name}
+        type={vm.type}
+        running={vm.status === "running"}
+        cpuPct={vm.cpuPct}
+        memPct={vm.memPct}
+      />,
     );
   });
 
   services.services.forEach((s) => {
-    tiles.push(
-      <div className="stat-tile" key={`svc-${s.name}`}>
-        <ServiceStat name={s.name} status={s.status} tag={s.tag} />
-      </div>,
-    );
+    tiles.push(<ServiceStat key={`svc-${s.name}`} name={s.name} status={s.status} tag={s.tag} />);
   });
 
-  return (
-    <div className="stat-strip-outer">
-      <div className="stat-strip">
-        {tiles}
-      </div>
-    </div>
-  );
+  return <Carousel>{tiles}</Carousel>;
 }

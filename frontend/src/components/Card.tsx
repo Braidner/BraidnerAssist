@@ -9,13 +9,13 @@ interface CardProps {
   className?: string;
 }
 
-// Оболочка карточки: .card.neu + шапка с иконкой/заголовком/действием.
+// Оболочка панели: .panel.neu + шапка с иконкой/заголовком/действием.
 export function Card({ icon, title, action, children, className = "" }: CardProps) {
   const Ic = icon ? icons[icon] : null;
   return (
-    <div className={`card neu ${className}`}>
-      <div className="card-head">
-        <span className="card-title">
+    <div className={`panel neu anim ${className}`}>
+      <div className="panel-h">
+        <span className="panel-title">
           {Ic && <span className="ic"><Ic /></span>}
           {title}
         </span>

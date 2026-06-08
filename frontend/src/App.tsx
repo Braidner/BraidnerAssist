@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
@@ -11,11 +12,13 @@ import { LogsPanel } from "./components/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
 import { LoginForm } from "./components/LoginForm.tsx";
 import { Drawer } from "./components/Drawer.tsx";
+import { Sidebar } from "./components/Sidebar.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
 import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
+import { StubPage } from "./components/panels/StubPage.tsx";
 
 type Backend = "up" | "down" | "checking";
 
@@ -43,11 +46,16 @@ export function App() {
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [sbOpen, setSbOpen] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setClock(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("sb-locked", sbOpen);
+  }, [sbOpen]);
 
   useEffect(() => {
     if (!authed) return;
@@ -136,6 +144,17 @@ export function App() {
     );
   }
 
+  const overview = (
+    <>
+      <StatStrip weather={weather} proxmox={proxmox} services={servicesData} />
+      <div className="cols">
+        <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
+        <HomeAssistantPanel data={hass} onToggle={onToggleAutomation} />
+        <HermesLogPanel data={hermes} tasks={hermesTasks} />
+      </div>
+    </>
+  );
+
   return (
     <div className="mc" data-theme={theme}>
       {showSettings && (
@@ -145,28 +164,33 @@ export function App() {
         />
       )}
       {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
-      <Drawer
-        task={selectedTask}
-        onClose={() => setSelectedTask(null)}
-      />
-      <div className="mc-shell">
-        <TopBar clock={clock} backend={backend} theme={theme} onToggleTheme={toggle} onLogout={onLogout} onSettings={() => setShowSettings(true)} onLogs={() => setShowLogs(true)} versionData={versionData} />
+      <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
 
-        <StatStrip weather={weather} proxmox={proxmox} services={servicesData} />
+      <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
 
-        <div className="cols-3">
-          <div className="col-fill">
-            <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
-          </div>
+      <div className="main">
+        <TopBar
+          clock={clock}
+          backend={backend}
+          theme={theme}
+          onToggleTheme={toggle}
+          onLogout={onLogout}
+          onSettings={() => setShowSettings(true)}
+          onLogs={() => setShowLogs(true)}
+          onMenu={() => setSbOpen(true)}
+          versionData={versionData}
+        />
 
-          <div className="col">
-            <HomeAssistantPanel data={hass} onToggle={onToggleAutomation} />
-          </div>
-
-          <div className="col-fill">
-            <HermesLogPanel data={hermes} tasks={hermesTasks} />
-          </div>
-        </div>
+        <Routes>
+          <Route path="/" element={overview} />
+          <Route path="/tasks" element={<StubPage icon="list" title="Задачи" />} />
+          <Route path="/home-assistant" element={<StubPage icon="home" title="Home Assistant" />} />
+          <Route path="/hermes" element={<StubPage icon="bot" title="Hermes" />} />
+          <Route path="/system" element={<StubPage icon="server" title="Система" />} />
+          <Route path="/metrics" element={<StubPage icon="chart" title="Метрики" />} />
+          <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </div>
     </div>
   );

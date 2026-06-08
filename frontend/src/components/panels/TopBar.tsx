@@ -12,6 +12,7 @@ interface TopBarProps {
   onLogout: () => void;
   onSettings: () => void;
   onLogs: () => void;
+  onMenu: () => void;
   versionData: VersionData | null;
 }
 
@@ -28,23 +29,29 @@ function fmtDate(d: Date): string {
   return `${DOW[d.getDay()]} · ${d.getDate()} ${MONTH[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSettings, onLogs, versionData }: TopBarProps) {
+export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSettings, onLogs, onMenu, versionData }: TopBarProps) {
   const linkDot = backend === "up" ? "ok" : backend === "down" ? "bad" : "idle";
   const linkText = backend === "up" ? "LINK OK" : backend === "down" ? "NO LINK" : "…";
 
   return (
-    <div className="mc-topbar">
-      <button className="brand brand-btn" onClick={onLogs} title="Открыть логи бэкенда">
-        <span className="brand-mark neu"><icons.target style={{ width: 26, height: 26 }} /></span>
-        <div>
-          <div className="brand-name">Mission Control</div>
-          <div className="brand-sub mono">braidner · self-hosted · LAN-only</div>
-        </div>
-      </button>
-      <div className="topbar-right">
+    <div className="topbar anim">
+      <div className="tb-left">
+        <button className="menu-btn" onClick={onMenu} aria-label="Меню">
+          <icons.menu style={{ width: 22, height: 22 }} />
+        </button>
+        <button className="tb-brand" onClick={onLogs} title="Открыть логи бэкенда">
+          <span className="tb-mark"><icons.target style={{ width: 28, height: 28 }} /></span>
+          <div>
+            <div className="tb-name">Mission Control</div>
+            <div className="tb-sub mono">braidner · self-hosted · LAN-only</div>
+          </div>
+        </button>
+      </div>
+
+      <div className="tb-right">
         {versionData && (
           <span
-            className={`pill version-pill${versionData.hasUpdate ? " has-update" : ""}`}
+            className={`chip${versionData.hasUpdate ? " version-warn" : ""}`}
             title={`${versionData.version} · ${versionData.sha}`}
           >
             {versionData.hasUpdate ? (
@@ -61,26 +68,22 @@ export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSetti
             )}
           </span>
         )}
-        <span className="pill" title="Статус связи с backend">
-          <span className={`dot ${linkDot}`} />
+        <span className="chip" title="Статус связи с backend">
+          <span className={`dot-led ${linkDot}`} />
           {linkText}
         </span>
-        <button className="pill" onClick={onSettings} title="Настройки">
-          <icons.gear style={{ width: 16, height: 16 }} />
+        <button className="iconbtn" onClick={onSettings} title="Настройки">
+          <icons.gear style={{ width: 20, height: 20 }} />
         </button>
-        <button className="pill" onClick={onToggleTheme} title="Переключить тему">
-          {theme === "dark" ? <icons.sun style={{ width: 16, height: 16 }} /> : <icons.moon style={{ width: 16, height: 16 }} />}
+        <button className="iconbtn" onClick={onToggleTheme} title="Переключить тему">
+          {theme === "dark" ? <icons.sun style={{ width: 20, height: 20 }} /> : <icons.moon style={{ width: 20, height: 20 }} />}
         </button>
-        <button className="pill" onClick={onLogout} title="Выйти" style={{ color: "var(--muted)" }}>
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
+        <button className="iconbtn" onClick={onLogout} title="Выйти">
+          <icons.logout style={{ width: 18, height: 18 }} />
         </button>
-        <div className="clock">
-          <div className="clock-time">{fmtTime(clock)}</div>
-          <div className="clock-date mono">{fmtDate(clock)}</div>
+        <div className="tb-clock">
+          <div className="tb-time">{fmtTime(clock)}</div>
+          <div className="tb-date mono">{fmtDate(clock)}</div>
         </div>
       </div>
     </div>

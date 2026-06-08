@@ -39,44 +39,28 @@ export function TasksPanel({ tasks, onToggle, onAdd, onSelect, onDelete }: Tasks
     <Card
       icon="list"
       title="Задачи"
-      action={
-        <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
-          {open} активн.
-        </span>
-      }
+      action={<span className="panel-count">{open} активн.</span>}
     >
-      {/* persistent quick-add input */}
-      <form onSubmit={submit} className="note-input" style={{ marginBottom: 16 }}>
-        <input
-          ref={inputRef}
-          placeholder="$ новая задача…"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <button className="icon-btn" type="submit" aria-label="Добавить">
-          <icons.plus style={{ width: 16, height: 16 }} />
+      <form onSubmit={submit} className="task-input">
+        <div className="fld neu-in">
+          <input
+            ref={inputRef}
+            placeholder="$ новая задача…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+        </div>
+        <button className="addbtn" type="submit" aria-label="Добавить">
+          <icons.plus style={{ width: 20, height: 20 }} />
         </button>
       </form>
 
-      <div className="logs-filter" style={{ marginBottom: 10 }}>
-        <button
-          className={`pill logs-pill${!showDone ? " active" : ""}`}
-          onClick={() => setShowDone(false)}
-        >
-          Активные
-        </button>
-        <button
-          className={`pill logs-pill${showDone ? " active" : ""}`}
-          onClick={() => setShowDone(true)}
-        >
-          Все
-        </button>
+      <div className="filters">
+        <button className={`fchip ${!showDone ? "on" : ""}`} onClick={() => setShowDone(false)}>Активные</button>
+        <button className={`fchip ${showDone ? "on" : ""}`} onClick={() => setShowDone(true)}>Все</button>
       </div>
 
-      <div
-        className="scroll"
-        style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}
-      >
+      <div className="tlist scroll" style={{ flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}>
         {visible.length === 0 && (
           <div className="empty">
             {tasks.length === 0
@@ -87,35 +71,38 @@ export function TasksPanel({ tasks, onToggle, onAdd, onSelect, onDelete }: Tasks
         {visible.map((t) => (
           <div
             key={t.id}
-            className={`task ${t.done ? "done" : ""}`}
+            className={`titem ${t.done ? "done" : ""}`}
             onClick={() => onSelect(t)}
-            style={{ opacity: t.tag === "gitlab" ? (t.done ? 0.5 : 0.85) : undefined, cursor: "pointer" }}
+            style={{ opacity: t.tag === "gitlab" ? (t.done ? 0.5 : 0.85) : undefined }}
           >
             <span
-              className="checkbox"
+              className="cbx"
               role="checkbox"
               aria-checked={t.done}
               onClick={(e) => { e.stopPropagation(); onToggle(t); }}
             >
               <icons.check />
             </span>
-            <div className="task-body">
-              <div className="task-label">{t.label}</div>
-              <div className="task-meta">
+            <div className="tbody">
+              <div className="tlabel">{t.label}</div>
+              <div className="tmeta">
                 <span className="prio" style={{ background: PRIO_VAR[t.prio] }} />
-                <span className="tag">{t.tag}</span>
+                <span className="tag">
+                  {t.tag === "gitlab" && <span className="gd" style={{ background: "var(--pink)" }} />}
+                  {t.tag}
+                </span>
                 {t.claimedBy === "hermes" && (
-                  <span className="hermes-flag">
+                  <span className="hflag">
                     <icons.bot style={{ width: 11, height: 11 }} />
                     Hermes
                   </span>
                 )}
-                <span className="task-updated">{fmtUpdated(t.updatedAt)}</span>
+                <span className="twhen">{fmtUpdated(t.updatedAt)}</span>
               </div>
             </div>
             {t.tag === "local" && (
               <button
-                className="task-del"
+                className="tdel"
                 title="Удалить задачу"
                 aria-label="Удалить задачу"
                 onClick={(e) => {

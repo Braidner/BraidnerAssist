@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { icons } from "./icons.tsx";
-import type { PanelTask } from "../lib/api.ts";
+import { sendHermesCommand, type PanelTask } from "../lib/api.ts";
 
 interface DrawerProps {
   task: PanelTask | null;
@@ -22,6 +22,12 @@ const PRIO_COLOR: Record<string, string> = {
 };
 
 export function Drawer({ task, onClose }: DrawerProps) {
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  // сбросить состояние при смене задачи
+  useEffect(() => { setSent(false); setSending(false); }, [task?.id]);
+
   useEffect(() => {
     if (!task) return;
     function onKey(e: KeyboardEvent) {
@@ -30,6 +36,18 @@ export function Drawer({ task, onClose }: DrawerProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [task, onClose]);
+
+  async function handleSendHermes() {
+    if (!task || sending || sent) return;
+    setSending(true);
+    const ok = await sendHermesCommand("work_task", {
+      taskId: task.id,
+      title: task.label,
+      description: task.descriptionText ?? null,
+    });
+    setSending(false);
+    if (ok) setSent(true);
+  }
 
   return (
     <>
@@ -93,17 +111,27 @@ export function Drawer({ task, onClose }: DrawerProps) {
               <div className="drawer-desc empty">Описание отсутствует.</div>
             )}
 
-            {task.webUrl && (
-              <a
+            <div className="drawer-actions">
+              <button
                 className="drawer-open-btn neu-sm"
-                href={task.webUrl}
-                target="_blank"
-                rel="noreferrer"
+                onClick={handleSendHermes}
+                disabled={sending || sent}
               >
-                Открыть в GitLab
-                <icons.external style={{ width: 13, height: 13 }} />
-              </a>
-            )}
+                <icons.bot style={{ width: 13, height: 13 }} />
+                {sent ? "Отправлено" : sending ? "…" : "Передать Hermes"}
+              </button>
+              {task.webUrl && (
+                <a
+                  className="drawer-open-btn neu-sm"
+                  href={task.webUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Открыть в GitLab
+                  <icons.external style={{ width: 13, height: 13 }} />
+                </a>
+              )}
+            </div>
           </div>
         )}
       </aside>

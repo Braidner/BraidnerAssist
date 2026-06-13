@@ -18,6 +18,8 @@ import { StatStrip } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
+import { HermesPage } from "./components/panels/HermesPage.tsx";
+import { SystemPage } from "./components/panels/SystemPage.tsx";
 import { StubPage } from "./components/panels/StubPage.tsx";
 
 type Backend = "up" | "down" | "checking";
@@ -183,10 +185,18 @@ export function App() {
 
         <Routes>
           <Route path="/" element={overview} />
-          <Route path="/tasks" element={<StubPage icon="list" title="Задачи" />} />
-          <Route path="/home-assistant" element={<StubPage icon="home" title="Home Assistant" />} />
-          <Route path="/hermes" element={<StubPage icon="bot" title="Hermes" />} />
-          <Route path="/system" element={<StubPage icon="server" title="Система" />} />
+          <Route path="/tasks" element={
+            <div className="page">
+              <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
+            </div>
+          } />
+          <Route path="/home-assistant" element={
+            <div className="page">
+              <HomeAssistantPanel data={hass} onToggle={onToggleAutomation} />
+            </div>
+          } />
+          <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
+          <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} />} />
           <Route path="/metrics" element={<StubPage icon="chart" title="Метрики" />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />

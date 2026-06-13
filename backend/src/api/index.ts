@@ -149,6 +149,15 @@ apiRouter.post("/hermes/command", async (req, res) => {
   res.status(201).json(task);
 });
 
+// Список команд из очереди, новые первыми.
+apiRouter.get("/hermes/commands", async (_req, res) => {
+  const tasks = await prisma.agentTask.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+  res.json(tasks);
+});
+
 // Backend logs — in-memory ring buffer, newest first, max 200 entries.
 apiRouter.get("/logs", (_req, res) => {
   res.json({ entries: getEntries() });

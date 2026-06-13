@@ -283,6 +283,34 @@ body.sb-locked { overflow: hidden; }
 .placeholder-body .ph-text { font-size: 13px; color: var(--ink-soft); }
 .placeholder-body .ph-phase { font-family: var(--font); font-size: 11px; color: var(--muted); letter-spacing: .04em; }
 
+/* ============================================================ deep pages (full-width routes) */
+.page { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+.page-cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; align-items: start; }
+.page-col-main { display: flex; flex-direction: column; gap: 20px; }
+.page-col-side { display: flex; flex-direction: column; gap: 20px; }
+@media (max-width: 900px) { .page-cols { grid-template-columns: 1fr; } }
+
+/* gauges row (SystemPage) */
+.sys-gauges { display: flex; gap: 28px; flex-wrap: wrap; padding: 8px 0 4px; }
+.sys-gauge { display: flex; align-items: center; gap: 14px; }
+.sys-gauge-lbl { display: flex; flex-direction: column; gap: 4px; }
+.sys-gauge-name { font-family: var(--font); font-size: 10px; color: var(--muted); letter-spacing: .1em; }
+.sys-gauge-val { font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--ink); }
+
+/* VM/LXC list */
+.sys-vm-list { display: flex; flex-direction: column; gap: 8px; }
+.sys-vm-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--hair); }
+.sys-vm-name { font-size: 13.5px; color: var(--ink); font-weight: 500; }
+.sys-vm-type { font-size: 10px; color: var(--faint); letter-spacing: .08em; }
+.sys-vm-stat { font-size: 12px; color: var(--ink-soft); }
+
+/* Services table */
+.sys-svc-table { display: flex; flex-direction: column; gap: 0; }
+.sys-svc-row { display: grid; grid-template-columns: 12px 1fr auto auto; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--hair); }
+.sys-svc-name { font-size: 13.5px; color: var(--ink); font-weight: 500; }
+.sys-svc-tag { font-size: 11px; color: var(--muted); }
+.sys-svc-st { font-size: 11px; letter-spacing: .04em; }
+
 /* stub page (route placeholder) */
 .stub { flex: 1; min-height: 60vh; display: flex; align-items: center; justify-content: center; }
 .stub-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 48px; }
@@ -428,6 +456,8 @@ body.sb-locked { overflow: hidden; }
   border-radius: calc(var(--radius) * 0.7); text-decoration: none; transition: opacity 0.15s; }
 .drawer-open-btn:hover { opacity: 0.88; }
 .drawer-open-btn:disabled { opacity: 0.45; cursor: default; }
+.drawer-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.drawer-actions .drawer-open-btn { margin-top: 0; }
 
 /* ============================================================ Settings / modals */
 .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }

@@ -385,6 +385,38 @@ export async function getHermesTasks(): Promise<HermesTask[]> {
   }
 }
 
+// ── Hermes command queue ──────────────────────────────────────────────────────
+
+export interface HermesCommand {
+  id: string;
+  command: string;
+  status: string;
+  result: string | null;
+  createdAt: string;
+}
+
+export async function sendHermesCommand(command: string, payload?: unknown): Promise<HermesCommand | null> {
+  try {
+    const res = await apiFetch("/api/hermes/command", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command, payload }),
+    });
+    return res.ok ? ((await res.json()) as HermesCommand) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getHermesCommands(): Promise<HermesCommand[]> {
+  try {
+    const res = await apiFetch("/api/hermes/commands");
+    return res.ok ? ((await res.json()) as HermesCommand[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getTaskLogs(id: string): Promise<PanelLogLine[]> {
   try {
     const res = await apiFetch(`/api/tasks/${id}/logs`);

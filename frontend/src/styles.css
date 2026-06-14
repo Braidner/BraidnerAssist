@@ -509,6 +509,35 @@ body.sb-locked { overflow: hidden; }
 .player-title { font-family: var(--font-ui); font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-close { flex-shrink: 0; padding: 4px 10px; font-size: 13px; cursor: pointer; }
 
+/* ── Очередь загрузок ── */
+.dl-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.dl-row { display: flex; flex-direction: column; gap: 8px; padding: 12px 13px; border-radius: calc(var(--radius) * 0.55); background: var(--raise);
+  box-shadow: inset 1px 1px 2px var(--sd), inset -1px -1px 2px var(--sl); }
+.dl-head { display: flex; align-items: flex-start; gap: 8px; }
+.dl-title { flex: 1; min-width: 0; font-family: var(--font-ui); font-size: 13px; line-height: 1.35; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dl-source { flex-shrink: 0; font-family: var(--font); font-size: 10px; color: var(--muted); background: var(--surface-2); border-radius: 5px; padding: 2px 7px; }
+.dl-progress { display: flex; align-items: center; gap: 9px; }
+.dl-pct { font-family: var(--font); font-size: 11px; color: var(--muted); min-width: 36px; text-align: right; }
+.dl-foot { display: flex; align-items: center; gap: 10px; }
+.dl-meta { flex: 1; font-family: var(--font); font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl-actions { display: flex; gap: 5px; flex-shrink: 0; }
+.dl-actions .neu-sm { font-size: 12px; padding: 3px 9px; line-height: 1; }
+
+/* ── Поиск релизов (в дравере) ── */
+.sr-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+.sr-row { display: flex; flex-direction: column; gap: 7px; padding: 11px 12px; border-radius: calc(var(--radius) * 0.55); background: var(--raise);
+  box-shadow: inset 1px 1px 2px var(--sd), inset -1px -1px 2px var(--sl); }
+.sr-title { font-family: var(--font-ui); font-size: 12.5px; line-height: 1.35; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sr-foot { display: flex; align-items: center; gap: 10px; }
+.sr-meta { flex: 1; font-family: var(--font); font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-seeds { color: var(--ok); }
+.sr-row .neu-sm { flex-shrink: 0; font-size: 11px; padding: 4px 12px; }
+.add-field { display: flex; gap: 7px; align-items: stretch; }
+.add-field .neu-sm { flex-shrink: 0; padding: 0 14px; font-size: 14px; }
+.add-label { font-family: var(--font); font-size: 11px; color: var(--muted); margin: 18px 0 7px; }
+
 /* ============================================================ Logs panel */
 .logs-panel { min-width: min(92vw, 680px); max-width: 780px; background: var(--raise); border-radius: var(--radius); padding: 24px 26px; }
 .logs-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }

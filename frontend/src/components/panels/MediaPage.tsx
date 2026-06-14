@@ -1,6 +1,6 @@
 // Страница /media — Jellyfin (что играет + библиотека + встроенный плеер),
 // очередь загрузок (Sonarr/Radarr/qBittorrent с управлением) и добавление торрентов
-// (прямой magnet + поиск через Prowlarr).
+// (прямой magnet + поиск через Prowlarr — в выезжающем дравере у загрузок).
 
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
@@ -93,13 +93,106 @@ function Player({ url, title, onClose }: { url: string; title: string; onClose: 
   );
 }
 
-export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
-  const [library, setLibrary] = useState<LibraryItem[]>([]);
-  const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
+// Дравер «Добавить торрент»: прямой magnet/URL + поиск Prowlarr с выдачей релизов.
+function AddTorrentDrawer({
+  open, onClose, onAdd, busy,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (url: string, key: string) => Promise<void>;
+  busy: string | null;
+}) {
   const [magnet, setMagnet] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const onSearch = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setResults(await searchReleases(q));
+    setSearching(false);
+  };
+
+  return (
+    <>
+      <div className={`drawer-overlay ${open ? "open" : ""}`} onClick={onClose} />
+      <aside className={`drawer ${open ? "open" : ""}`}>
+        <div className="drawer-inner">
+          <div className="drawer-head">
+            <span className="drawer-kind">Добавить загрузку</span>
+            <button className="neu-sm player-close" onClick={onClose}>✕</button>
+          </div>
+
+          <div className="add-label">Прямая ссылка (magnet или .torrent)</div>
+          <div className="add-field">
+            <input
+              className="neu-in mc-input"
+              placeholder="magnet:… или https://….torrent"
+              value={magnet}
+              onChange={(e) => setMagnet(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) onAdd(magnet.trim(), "magnet").then(() => setMagnet("")); }}
+            />
+            <button className="neu-sm" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))}>
+              {busy === "magnet" ? "…" : "+"}
+            </button>
+          </div>
+
+          <div className="add-label">Поиск релизов (Prowlarr)</div>
+          <div className="add-field">
+            <input
+              className="neu-in mc-input"
+              placeholder="Название фильма или сериала…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
+            />
+            <button className="neu-sm" disabled={!query.trim() || searching} onClick={onSearch}>
+              {searching ? "…" : "🔍"}
+            </button>
+          </div>
+
+          {results.length > 0 && (
+            <div className="sr-list">
+              {results.map((r) => (
+                <div key={r.guid} className="sr-row">
+                  <span className="sr-title" title={r.title}>{r.title}</span>
+                  <div className="sr-foot">
+                    <span className="sr-meta">
+                      {fmtSize(r.size)} · <span className="sr-seeds">{r.seeders} seed</span> · {r.indexer}
+                    </span>
+                    <button
+                      className="neu-sm"
+                      disabled={!r.url || busy === r.guid}
+                      onClick={() => r.url && onAdd(r.url, r.guid)}
+                    >
+                      {busy === r.guid ? "…" : "Скачать"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!searching && query.trim() && results.length === 0 && (
+            <div className="empty" style={{ marginTop: 14 }}>Ничего не найдено.</div>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
+  const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -125,19 +218,11 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     if (url) setPlayer({ url, title: item.seriesName ? `${item.seriesName} — ${item.name}` : item.name });
   };
 
-  const onSearch = async () => {
-    const q = query.trim();
-    if (!q) return;
-    setSearching(true);
-    setResults(await searchReleases(q));
-    setSearching(false);
-  };
-
   const onAdd = async (url: string, key: string) => {
     setBusy(key);
     const ok = await addTorrent(url);
     setBusy(null);
-    if (ok) { setMagnet(""); onMediaUpdate(); }
+    if (ok) onMediaUpdate();
   };
 
   const onTorrent = async (hash: string, action: "pause" | "resume" | "delete") => {
@@ -150,6 +235,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   return (
     <div className="page">
       {player && <Player url={player.url} title={player.title} onClose={() => setPlayer(null)} />}
+      <AddTorrentDrawer open={addOpen} onClose={() => setAddOpen(false)} onAdd={onAdd} busy={busy} />
 
       <div className="page-cols">
         <div className="page-col-main">
@@ -212,85 +298,56 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
         </div>
 
         <div className="page-col-side">
-          {/* Добавить торрент */}
-          <Card icon="cloud" title="Добавить">
-            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-              <input
-                className="neu-in mc-input"
-                placeholder="magnet:… или .torrent URL"
-                value={magnet}
-                onChange={(e) => setMagnet(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) onAdd(magnet.trim(), "magnet"); }}
-              />
-              <button className="neu-sm" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet")}>
-                {busy === "magnet" ? "…" : "+"}
-              </button>
-            </div>
-
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              <input
-                className="neu-in mc-input"
-                placeholder="Поиск в Prowlarr…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
-              />
-              <button className="neu-sm" disabled={!query.trim() || searching} onClick={onSearch}>
-                {searching ? "…" : "🔍"}
-              </button>
-            </div>
-
-            {results.length > 0 && (
-              <div className="sys-vm-list" style={{ marginTop: 10, maxHeight: 280, overflowY: "auto" }}>
-                {results.map((r) => (
-                  <div key={r.guid} className="sys-vm-row" style={{ gap: 6, flexWrap: "wrap" }}>
-                    <span className="sys-vm-name" style={{ minWidth: 140, flex: 1, fontSize: 12 }}>{r.title}</span>
-                    <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>
-                      {fmtSize(r.size)} · {r.seeders}s · {r.indexer}
-                    </span>
-                    <button
-                      className="neu-sm"
-                      style={{ fontSize: 11, padding: "2px 8px" }}
-                      disabled={!r.url || busy === r.guid}
-                      onClick={() => r.url && onAdd(r.url, r.guid)}
-                    >
-                      {busy === r.guid ? "…" : "Скачать"}
-                    </button>
-                  </div>
-                ))}
+          {/* Очередь загрузок + кнопка открытия дравера «Добавить» */}
+          <Card
+            icon="cloud"
+            title="Загрузки"
+            action={
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="panel-count">{media.downloads.length}</span>
+                <button className="neu-sm" style={{ fontSize: 12, padding: "4px 12px" }} onClick={() => setAddOpen(true)}>
+                  + Добавить
+                </button>
               </div>
-            )}
-          </Card>
-
-          {/* Очередь загрузок */}
-          <Card icon="cloud" title="Загрузки" action={<span className="panel-count">{media.downloads.length}</span>}>
+            }
+          >
             {media.downloads.length === 0 ? (
-              <div className="empty">Очередь пуста.</div>
+              <div className="empty">Очередь пуста. Нажми «Добавить», чтобы найти и скачать.</div>
             ) : (
-              <div className="sys-vm-list" style={{ marginTop: 8 }}>
+              <div className="dl-list">
                 {media.downloads.map((d) => {
                   const isQb = d.source === "qbittorrent";
-                  const meta = [fmtSpeed(d.dlspeed), fmtEta(d.eta), d.seeds != null ? `${d.seeds}s` : "", fmtSize(d.size)]
-                    .filter(Boolean).join(" · ");
+                  const paused = d.state.toLowerCase().includes("paused");
+                  const meta = [
+                    isQb && !paused ? fmtSpeed(d.dlspeed) : "",
+                    fmtEta(d.eta),
+                    d.seeds != null ? `${d.seeds} seed` : "",
+                    fmtSize(d.size),
+                    paused ? "на паузе" : "",
+                  ].filter(Boolean).join(" · ");
                   return (
-                    <div key={d.hash} className="sys-vm-row" style={{ gap: 8, flexWrap: "wrap" }}>
-                      <span className="sys-vm-name" style={{ minWidth: 140, flex: 1 }}>{d.title}</span>
-                      <span className="sys-vm-type mono" style={{ color: "var(--muted)", fontSize: 11 }}>{SOURCE_LABEL[d.source]}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 140, flex: 1 }}>
-                        <ProgressBar pct={d.progress} />
-                        <span className="mono" style={{ fontSize: 11, color: "var(--muted)", minWidth: 34, textAlign: "right" }}>{d.progress}%</span>
+                    <div key={d.hash} className="dl-row">
+                      <div className="dl-head">
+                        <span className="dl-title" title={d.title}>{d.title}</span>
+                        <span className="dl-source">{SOURCE_LABEL[d.source]}</span>
                       </div>
-                      {meta && <span className="mono" style={{ fontSize: 10, color: "var(--muted)", width: "100%" }}>{meta}</span>}
-                      {isQb && (
-                        <div style={{ display: "flex", gap: 4 }}>
-                          {d.state.includes("paused") ? (
-                            <button className="neu-sm" style={{ fontSize: 11, padding: "2px 8px" }} disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
-                          ) : (
-                            <button className="neu-sm" style={{ fontSize: 11, padding: "2px 8px" }} disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
-                          )}
-                          <button className="neu-sm" style={{ fontSize: 11, padding: "2px 8px" }} disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
-                        </div>
-                      )}
+                      <div className="dl-progress">
+                        <ProgressBar pct={d.progress} />
+                        <span className="dl-pct">{d.progress}%</span>
+                      </div>
+                      <div className="dl-foot">
+                        <span className="dl-meta">{meta || "—"}</span>
+                        {isQb && (
+                          <div className="dl-actions">
+                            {paused ? (
+                              <button className="neu-sm" title="Возобновить" disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
+                            ) : (
+                              <button className="neu-sm" title="Пауза" disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
+                            )}
+                            <button className="neu-sm" title="Удалить" disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

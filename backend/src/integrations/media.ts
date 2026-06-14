@@ -3,6 +3,7 @@
 // через Promise.allSettled — падение одного не ломает остальные. Не настроено → "Not configured".
 
 import { config } from "../config.js";
+import { request } from "undici";
 
 export interface NowPlaying {
   title: string;
@@ -294,17 +295,101 @@ async function qbittorrentDownloads(): Promise<DownloadItem[]> {
   }));
 }
 
+// Резолв http(s)-источника: Prowlarr раздаёт downloadUrl на host.docker.internal,
+// который qBittorrent (в изолированной docker-сети) не видит. Поэтому .torrent тащит
+// бэкенд (он до Prowlarr достаёт), а в qBittorrent уже грузим байты файлом. Часть
+// индексеров редиректит на magnet — ловим это вручную (maxRedirections:0).
+async function resolveTorrent(
+  src: string,
+  depth = 0,
+): Promise<{ magnet?: string; bytes?: Buffer }> {
+  if (src.startsWith("magnet:")) return { magnet: src };
+  if (depth > 5) throw new Error("Слишком много редиректов при резолве торрента");
+  const res = await request(src, {
+    method: "GET",
+    maxRedirections: 0,
+    headers: { "User-Agent": "MissionControl/1.0" },
+    headersTimeout: 15_000,
+    bodyTimeout: 15_000,
+  });
+  // Редирект — может вести на magnet: или на другой http(s).
+  if (res.statusCode >= 300 && res.statusCode < 400) {
+    const loc = res.headers.location;
+    const target = Array.isArray(loc) ? loc[0] : loc;
+    if (!target) throw new Error(`Редирект без Location (${res.statusCode})`);
+    res.body.destroy();
+    return resolveTorrent(target, depth + 1);
+  }
+  if (res.statusCode >= 400) {
+    res.body.destroy();
+    throw new Error(`Источник торрента ответил ${res.statusCode}`);
+  }
+  const buf = Buffer.from(await res.body.arrayBuffer());
+  // Иногда отдают текст с magnet-ссылкой вместо .torrent.
+  const head = buf.subarray(0, 64).toString("utf8").trim();
+  if (head.startsWith("magnet:")) {
+    return { magnet: buf.toString("utf8").trim().split(/\s/)[0] };
+  }
+  return { bytes: buf };
+}
+
+// Разбираем ответ qBittorrent /torrents/add: новые версии (5.x) отдают JSON
+// {added_torrent_ids, failure_count}, старые — текст "Ok."/"Fails.".
+async function assertQbAdded(res: Response): Promise<void> {
+  if (!res.ok) throw new Error(`qBittorrent add ${res.status}`);
+  const text = (await res.text()).trim();
+  if (text.startsWith("{")) {
+    let json: { added_torrent_ids?: unknown[]; failure_count?: number } | null = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+    if (
+      json &&
+      (json.failure_count ?? 0) > 0 &&
+      (json.added_torrent_ids?.length ?? 0) === 0
+    ) {
+      throw new Error("qBittorrent не смог добавить торрент (источник недоступен)");
+    }
+  } else if (/^fails/i.test(text)) {
+    throw new Error("qBittorrent отклонил торрент");
+  }
+}
+
 // Добавить торрент в qBittorrent (magnet или http(s) .torrent URL).
 export async function qbAdd(urlOrMagnet: string): Promise<void> {
   if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
   const sid = await qbLogin();
-  const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/add`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
-    body: new URLSearchParams({ urls: urlOrMagnet }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`qBittorrent add ${res.status}`);
+  const addUrl = `${config.media.qbittorrent.url}/api/v2/torrents/add`;
+
+  const resolved = await resolveTorrent(urlOrMagnet);
+
+  let res: Response;
+  if (resolved.magnet) {
+    res = await fetch(addUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
+      body: new URLSearchParams({ urls: resolved.magnet }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } else {
+    // Загружаем .torrent файлом — qBittorrent сам достучится до пиров.
+    // Content-Type не задаём вручную: fetch выставит multipart boundary.
+    const fd = new FormData();
+    fd.append(
+      "torrents",
+      new Blob([resolved.bytes!], { type: "application/x-bittorrent" }),
+      "file.torrent",
+    );
+    res = await fetch(addUrl, {
+      method: "POST",
+      headers: { ...(sid ? { Cookie: sid } : {}) },
+      body: fd,
+      signal: AbortSignal.timeout(15_000),
+    });
+  }
+  await assertQbAdded(res);
   cache = null;
 }
 
@@ -348,15 +433,27 @@ export async function prowlarrSearch(query: string): Promise<SearchResult[]> {
   if (!cfg.configured) return [];
   const url = new URL(`${cfg.url}/api/v1/search`);
   url.searchParams.set("query", query);
-  url.searchParams.set("limit", "30");
+  url.searchParams.set("limit", "100");
   const res = await fetch(url, {
     headers: { "X-Api-Key": cfg.apiKey! },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`Prowlarr search ${res.status}`);
   const releases = (await res.json()) as ProwlarrRelease[];
+  // Часть индексеров (напр. torrent-pirat) игнорирует запрос и заваливает выдачу
+  // нерелевантным шумом с высокими сидами. Фильтруем по токенам запроса: каждое
+  // значимое слово (≥4 символа, не число) должно встречаться в названии релиза.
+  const tokens = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length >= 4 && !/^\d+$/.test(t));
   return releases
     .filter((r) => r.protocol === "torrent")
+    .filter(
+      (r) =>
+        tokens.length === 0 ||
+        tokens.every((t) => (r.title ?? "").toLowerCase().includes(t)),
+    )
     .sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0))
     .slice(0, 25)
     .map((r) => ({

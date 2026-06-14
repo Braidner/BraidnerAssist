@@ -393,27 +393,42 @@ export async function qbAdd(urlOrMagnet: string): Promise<void> {
   cache = null;
 }
 
-const QB_ACTIONS = new Set(["pause", "resume", "delete"]);
+// qBittorrent 5.x (WebAPI ≥2.11) переименовал pause/resume → stop/start, старые ручки
+// удалены (404). Держим список кандидатов: новая ручка первой, старая как fallback —
+// одинаково работает и на 4.x, и на 5.x.
+const QB_ENDPOINTS: Record<string, string[]> = {
+  pause: ["stop", "pause"],
+  resume: ["start", "resume"],
+  delete: ["delete"],
+};
 
 // Управление торрентом по хешу.
 export async function qbAction(hash: string, action: string): Promise<void> {
   if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
-  if (!QB_ACTIONS.has(action)) throw new Error(`Недопустимое действие: ${action}`);
+  const candidates = QB_ENDPOINTS[action];
+  if (!candidates) throw new Error(`Недопустимое действие: ${action}`);
   const sid = await qbLogin();
-  const endpoint =
-    action === "delete" ? "delete" : action === "pause" ? "pause" : "resume";
   const body =
     action === "delete"
       ? new URLSearchParams({ hashes: hash, deleteFiles: "false" })
       : new URLSearchParams({ hashes: hash });
-  const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
-    body,
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!res.ok) throw new Error(`qBittorrent ${action} ${res.status}`);
-  cache = null;
+
+  let lastStatus = 0;
+  for (const endpoint of candidates) {
+    const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
+      body,
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (res.ok) {
+      cache = null;
+      return;
+    }
+    lastStatus = res.status;
+    if (res.status !== 404) break; // 404 → ручка отсутствует, пробуем следующую
+  }
+  throw new Error(`qBittorrent ${action} ${lastStatus}`);
 }
 
 // ── Prowlarr — поиск релизов ─────────────────────────────────────────────

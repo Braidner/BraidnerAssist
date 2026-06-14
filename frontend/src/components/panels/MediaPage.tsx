@@ -317,7 +317,8 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
               <div className="dl-list">
                 {media.downloads.map((d) => {
                   const isQb = d.source === "qbittorrent";
-                  const paused = d.state.toLowerCase().includes("paused");
+                  // qBittorrent 5.x: pausedDL/UP → stoppedDL/UP.
+                  const paused = /paused|stopped/i.test(d.state);
                   const meta = [
                     isQb && !paused ? fmtSpeed(d.dlspeed) : "",
                     fmtEta(d.eta),

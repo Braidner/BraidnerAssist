@@ -79,6 +79,50 @@ export const config = {
     get configured() { return Boolean(this.ntfyUrl); },
   },
 
+  // AdGuard Home — DNS-статистика (запросы/блокировки). Basic auth.
+  adguard: {
+    url: env("ADGUARD_URL"), // напр. http://host.docker.internal:8053
+    username: env("ADGUARD_USER"),
+    password: env("ADGUARD_PASSWORD"),
+    get configured() {
+      return Boolean(this.url && this.username && this.password);
+    },
+  },
+
+  // Медиа-стек: Jellyfin (что играет) + Sonarr/Radarr/qBittorrent (очередь загрузок).
+  // Каждый источник опционален; панель "configured" если задан хотя бы один.
+  media: {
+    jellyfin: {
+      url: env("JELLYFIN_URL"),
+      apiKey: env("JELLYFIN_API_KEY"),
+      get configured() { return Boolean(this.url && this.apiKey); },
+    },
+    sonarr: {
+      url: env("SONARR_URL"),
+      apiKey: env("SONARR_API_KEY"),
+      get configured() { return Boolean(this.url && this.apiKey); },
+    },
+    radarr: {
+      url: env("RADARR_URL"),
+      apiKey: env("RADARR_API_KEY"),
+      get configured() { return Boolean(this.url && this.apiKey); },
+    },
+    qbittorrent: {
+      url: env("QBITTORRENT_URL"),
+      username: env("QBITTORRENT_USER"),
+      password: env("QBITTORRENT_PASSWORD"),
+      get configured() { return Boolean(this.url && this.username && this.password); },
+    },
+    get configured() {
+      return (
+        this.jellyfin.configured ||
+        this.sonarr.configured ||
+        this.radarr.configured ||
+        this.qbittorrent.configured
+      );
+    },
+  },
+
   servicesFile: env("SERVICES_FILE") ?? "/data/services.json",
 
   health: {

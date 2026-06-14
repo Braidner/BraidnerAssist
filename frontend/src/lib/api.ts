@@ -516,3 +516,71 @@ export async function getMetrics(): Promise<UptimeSeries[]> {
     return [];
   }
 }
+
+// ─── AdGuard DNS ─────────────────────────────────────────────────────
+
+export interface AdguardTop {
+  domain: string;
+  count: number;
+}
+
+export interface AdguardData {
+  configured: boolean;
+  dnsQueries: number;
+  blocked: number;
+  blockedPercent: number;
+  avgProcessingMs: number;
+  topBlocked: AdguardTop[];
+}
+
+const EMPTY_ADGUARD: AdguardData = {
+  configured: false,
+  dnsQueries: 0,
+  blocked: 0,
+  blockedPercent: 0,
+  avgProcessingMs: 0,
+  topBlocked: [],
+};
+
+export async function getAdguard(): Promise<AdguardData> {
+  try {
+    const res = await apiFetch("/api/adguard");
+    if (!res.ok) return EMPTY_ADGUARD;
+    return (await res.json()) as AdguardData;
+  } catch {
+    return EMPTY_ADGUARD;
+  }
+}
+
+// ─── Media stack ─────────────────────────────────────────────────────
+
+export interface NowPlaying {
+  title: string;
+  user: string;
+  client: string;
+  type: string;
+  positionPct: number | null;
+}
+
+export interface DownloadItem {
+  title: string;
+  source: "sonarr" | "radarr" | "qbittorrent";
+  progress: number;
+  state: string;
+}
+
+export interface MediaData {
+  configured: boolean;
+  nowPlaying: NowPlaying[];
+  downloads: DownloadItem[];
+}
+
+export async function getMedia(): Promise<MediaData> {
+  try {
+    const res = await apiFetch("/api/media");
+    if (!res.ok) return { configured: false, nowPlaying: [], downloads: [] };
+    return (await res.json()) as MediaData;
+  } catch {
+    return { configured: false, nowPlaying: [], downloads: [] };
+  }
+}

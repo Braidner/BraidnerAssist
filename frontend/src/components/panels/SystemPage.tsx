@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card } from "../Card.tsx";
 import { Ring } from "../Ring.tsx";
 import { Placeholder } from "./Placeholder.tsx";
-import type { ProxmoxData, ServicesData, DockerData, DockerContainer } from "../../lib/api.ts";
+import type { ProxmoxData, ServicesData, DockerData, DockerContainer, AdguardData } from "../../lib/api.ts";
 import { dockerAction, getDocker } from "../../lib/api.ts";
 
 const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
@@ -108,17 +108,68 @@ function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: 
   );
 }
 
-// /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов, Docker.
+function AdguardCard({ adguard }: { adguard: AdguardData }) {
+  if (!adguard.configured) {
+    return <Placeholder icon="drop" title="AdGuard" phase="ADGUARD_URL не задан" />;
+  }
+  return (
+    <Card
+      icon="drop"
+      title="AdGuard DNS"
+      action={<span className="panel-count mono">{adguard.blockedPercent}% blocked</span>}
+    >
+      <div className="sys-gauges" style={{ marginTop: 4 }}>
+        <div className="sys-gauge">
+          <Ring pct={adguard.blockedPercent} size={96} />
+          <div className="sys-gauge-lbl">
+            <div className="sys-gauge-name">BLOCKED</div>
+            <div className="sys-gauge-val mono">{adguard.blocked.toLocaleString("ru-RU")}</div>
+          </div>
+        </div>
+        <div className="sys-gauge" style={{ justifyContent: "center" }}>
+          <div className="sys-gauge-lbl">
+            <div className="sys-gauge-name">ЗАПРОСЫ</div>
+            <div className="sys-gauge-val mono">{adguard.dnsQueries.toLocaleString("ru-RU")}</div>
+          </div>
+        </div>
+        <div className="sys-gauge" style={{ justifyContent: "center" }}>
+          <div className="sys-gauge-lbl">
+            <div className="sys-gauge-name">ЛАТЕНТНОСТЬ</div>
+            <div className="sys-gauge-val mono">{adguard.avgProcessingMs}ms</div>
+          </div>
+        </div>
+      </div>
+
+      {adguard.topBlocked.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div className="panel-title" style={{ marginBottom: 8 }}>Топ заблокированных</div>
+          <div className="sys-svc-table">
+            {adguard.topBlocked.map((d) => (
+              <div key={d.domain} className="sys-svc-row">
+                <span className="sys-svc-name">{d.domain}</span>
+                <span className="sys-svc-tag mono" style={{ marginLeft: "auto" }}>{d.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов, Docker, AdGuard.
 export function SystemPage({
   proxmox,
   servicesData,
   docker,
   onDockerUpdate,
+  adguard,
 }: {
   proxmox: ProxmoxData;
   servicesData: ServicesData;
   docker: DockerData;
   onDockerUpdate: (d: DockerData) => void;
+  adguard: AdguardData;
 }) {
   return (
     <div className="page">
@@ -237,6 +288,9 @@ export function SystemPage({
 
           {/* Docker */}
           <DockerCard docker={docker} onRefresh={onDockerUpdate} />
+
+          {/* AdGuard DNS */}
+          <AdguardCard adguard={adguard} />
         </div>
       </div>
     </div>

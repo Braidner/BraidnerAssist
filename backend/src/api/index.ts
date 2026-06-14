@@ -8,6 +8,8 @@ import { getServices } from "../integrations/services.js";
 import { getProxmox } from "../integrations/proxmox.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { getContainers, containerAction } from "../integrations/docker.js";
+import { getAdguard } from "../integrations/adguard.js";
+import { getMedia } from "../integrations/media.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -227,6 +229,24 @@ apiRouter.post("/docker/containers/:id/:action", async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ error: String(e) });
+  }
+});
+
+// AdGuard Home — DNS-статистика.
+apiRouter.get("/adguard", async (_req, res) => {
+  try {
+    res.json(await getAdguard());
+  } catch (e) {
+    res.status(502).json({ configured: false, error: String(e) });
+  }
+});
+
+// Медиа-стек — что играет + очередь загрузок.
+apiRouter.get("/media", async (_req, res) => {
+  try {
+    res.json(await getMedia());
+  } catch (e) {
+    res.status(502).json({ configured: false, error: String(e) });
   }
 });
 

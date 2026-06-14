@@ -14,6 +14,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/hermes", icon: "bot", label: "Hermes" },
   { to: "/system", icon: "server", label: "Система" },
   { to: "/metrics", icon: "chart", label: "Метрики" },
+  { to: "/media", icon: "pulse", label: "Медиа" },
   { to: "/notes", icon: "note", label: "Заметки" },
 ];
 

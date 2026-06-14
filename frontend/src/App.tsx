@@ -3,9 +3,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
-  getHassAutomations, toggleHassAutomation, getDocker, getMetrics,
+  getHassAutomations, toggleHassAutomation, getDocker, getMetrics, getAdguard, getMedia,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type UptimeSeries,
+  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type UptimeSeries, type AdguardData, type MediaData,
 } from "./lib/api.ts";
 import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
 import { LogsPanel } from "./components/LogsPanel.tsx";
@@ -21,7 +21,9 @@ import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
 import { HermesPage } from "./components/panels/HermesPage.tsx";
 import { SystemPage } from "./components/panels/SystemPage.tsx";
 import { MetricsPage } from "./components/panels/MetricsPage.tsx";
+import { MediaPage } from "./components/panels/MediaPage.tsx";
 import { StubPage } from "./components/panels/StubPage.tsx";
+import { CommandPalette } from "./components/CommandPalette.tsx";
 
 type Backend = "up" | "down" | "checking";
 
@@ -47,6 +49,8 @@ export function App() {
   const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
   const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
   const [metrics, setMetrics] = useState<UptimeSeries[]>([]);
+  const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
+  const [media, setMedia] = useState<MediaData>({ configured: false, nowPlaying: [], downloads: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -78,6 +82,8 @@ export function App() {
     getProxmox().then(setProxmox);
     getDocker().then(setDocker);
     getMetrics().then(setMetrics);
+    getAdguard().then(setAdguard);
+    getMedia().then(setMedia);
     getHassAutomations().then(setHass);
     getVersion().then(setVersionData);
 
@@ -86,6 +92,8 @@ export function App() {
     const proxmoxTimer = setInterval(() => getProxmox().then(setProxmox), 30_000);
     const dockerTimer = setInterval(() => getDocker().then(setDocker), 30_000);
     const metricsTimer = setInterval(() => getMetrics().then(setMetrics), 60_000);
+    const adguardTimer = setInterval(() => getAdguard().then(setAdguard), 30_000);
+    const mediaTimer = setInterval(() => getMedia().then(setMedia), 15_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
     const hermesTimer = setInterval(() => {
@@ -99,6 +107,8 @@ export function App() {
       clearInterval(proxmoxTimer);
       clearInterval(dockerTimer);
       clearInterval(metricsTimer);
+      clearInterval(adguardTimer);
+      clearInterval(mediaTimer);
       clearInterval(tasksTimer);
       clearInterval(hassTimer);
       clearInterval(hermesTimer);
@@ -175,6 +185,7 @@ export function App() {
         />
       )}
       {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
+      <CommandPalette />
       <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
 
       <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
@@ -205,8 +216,9 @@ export function App() {
             </div>
           } />
           <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
-          <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} />} />
+          <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
           <Route path="/metrics" element={<MetricsPage metrics={metrics} />} />
+          <Route path="/media" element={<MediaPage media={media} />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

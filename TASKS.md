@@ -197,7 +197,9 @@
 - [x] MCP: `add_torrent`, `get_media_status`, `get_dns_stats` + INSTRUCTIONS
 - [x] Frontend: `hls.js`, новые api-функции, `MediaPage.tsx` (грид библиотеки → HLS-плеер,
       magnet-инпут, Prowlarr-поиск, управление очередью), Cmd-K действия (рестарт/DNS/задача)
-- [ ] Деплой на hermes.lan + `PROWLARR_*` в server `.env`; верификация плеера/прокси
+- [x] Деплой на hermes.lan + `PROWLARR_*` в server `.env`; верификация: healthz 200, новые роуты
+      401-guarded, Prowlarr 200 из backend-контейнера, Jellyfin /Items 200 (библиотека пуста —
+      контента ещё нет), frontend :3000 → 200, backend стартовал чисто
 
 ---
 

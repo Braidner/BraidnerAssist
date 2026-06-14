@@ -94,9 +94,21 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 5. **Proxmox** — статус ноды (cpu/ram/disk) + виртуалки (QEMU+LXC, cpu/ram/статус) через
    PVE REST API. API-токен `PVEAPIToken=user@realm!id=secret`, self-signed TLS (undici Agent).
    Env: `PROXMOX_URL`/`PROXMOX_TOKEN`/`PROXMOX_NODE`. Отображается в StatStrip (не отдельная панель).
-6. **Hermes Agent** — список сессий напрямую из Hermes Agent API (Nous Research,
-   `HERMES_URL`/`HERMES_API_KEY`). Из задачи (drawer) кнопка создаёт новую сессию и шлёт
-   туда номер+описание; клик по сессии открывает чат для продолжения диалога.
+6. **Hermes Agent** — **локальная MCP→SQLite модель** (НЕ Nous session API; `HERMES_URL`/
+   `HERMES_API_KEY` в коде НЕ используются). Hermes пишет статус/лог/задачи в SQLite через
+   MCP-инструменты (`report_status`, `log_action`, `claim_task`, `complete_task`…), а UI читает
+   их по REST (`/api/hermes/status|log|tasks|commands`). Командная очередь замкнута end-to-end:
+   `POST /api/hermes/command` (+ кнопка «Передать Hermes» в drawer) → `AgentTask(queued)` →
+   MCP `get_agent_queue`. Deep-страница `/hermes` (`HermesPage.tsx`): статус + фид + консоль.
+7. **Service uptime → `/metrics`** — сэмплер (`backend/src/sampler.ts`) раз в `POLL_SERVICES`
+   пишет пинги сервисов в SQLite (`ServiceCheck`, прунинг >7 дней); `GET /api/metrics/uptime`
+   агрегирует uptime 24ч/7д + латентность; `MetricsPage.tsx` рисует спарклайны.
+8. **Docker** (opt-in `DOCKER_SOCKET`) — `integrations/docker.ts` через unix-сокет (undici
+   `Client` с `socketPath`). `GET /api/docker/containers` + `POST /api/docker/containers/:id/:action`
+   (whitelist start|stop|restart) + MCP `restart_container` (Hermes сам чинит сервис). Карточка
+   на `/system`. Доступ к docker.sock = root-эквивалент — монтировать осознанно (rw, LAN-only).
+9. **Нотификации** (opt-in `NTFY_URL`) — `integrations/notify.ts` шлёт ntfy-пуш при переходе
+   агента в `error` (хук в MCP `report_status`). Env не задан → no-op.
 
 ## UI / Дизайн-система (неоморфизм)
 
@@ -134,6 +146,10 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 - **Фаза 6 — Polish**: PWA (manifest + service worker), Settings modal (редактор сервисов). ✅ ГОТОВО
 - **Proxmox + StatStrip rework**: интеграция Proxmox (нода + VMs/LXC), StatStrip переработан
   в одну полосу мини-тайлов, панель SystemStatus удалена. ✅ ГОТОВО
+- **Hermes-очередь + deep-страницы** (782ba2d): командная очередь end-to-end, deep-страницы
+  `/hermes`, `/system`, `/tasks`, `/home-assistant`. ✅ ГОТОВО
+- **Batch v2 — Docker + uptime + ntfy** (2b1bbc1): история аптайма на `/metrics` (`ServiceCheck`
+  + сэмплер), Docker-контроль на `/system` (opt-in), ntfy-нотификации Hermes (opt-in). ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout).
 
 Подробный трекинг — в `TASKS.md`.

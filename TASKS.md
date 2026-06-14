@@ -145,6 +145,30 @@
 - [x] Деплой: PROXMOX_URL=https://192.168.1.90:8006, token id `root@pam!dash` на сервере
 - [x] Проверено: `npm run build` (front+back) ok; реальные данные Proxmox в превью
 
+## Hermes command queue + deep pages (2026-06-13, commit 782ba2d)  ✅ ГОТОВО
+
+- [x] P1 — командная очередь Hermes замкнута end-to-end: `GET /api/hermes/commands`,
+      `sendHermesCommand`/`getHermesCommands` в `lib/api.ts`, кнопка «Передать Hermes» в Drawer
+- [x] P2 — `/hermes` deep-страница (`HermesPage.tsx`): статус-шапка + глобальный фид + командная консоль
+- [x] P3 — `/tasks` и `/home-assistant` full-width из готовых панелей
+- [x] P4 — `/system` deep-страница (`SystemPage.tsx`): Proxmox-гейджи + VM/LXC + таблица сервисов
+- [x] Доки: память синхронизирована — Hermes на main = локальная MCP→SQLite модель (НЕ Nous session API)
+
+## Batch v2 — Docker + uptime + ntfy (2026-06-14, commit 2b1bbc1)  ✅ ГОТОВО
+
+- [x] #2 История аптайма → `/metrics`: модель `ServiceCheck` (+миграция `service_check`),
+      сэмплер `backend/src/sampler.ts` (запись пингов в SQLite, прунинг >7 дней),
+      `GET /api/metrics/uptime` (uptime 24ч/7д + спарклайн), `MetricsPage.tsx` (заменил StubPage)
+- [x] #1 Docker-контроль на `/system`: `integrations/docker.ts` (undici unix-socket, opt-in
+      `DOCKER_SOCKET`), `GET /api/docker/containers` + `POST /api/docker/containers/:id/:action`
+      (whitelist start|stop|restart), MCP-инструмент `restart_container`, Docker-карточка в SystemPage
+- [x] #10 Нотификации Hermes: `integrations/notify.ts` (ntfy, opt-in `NTFY_URL`); хук в MCP
+      `report_status` — пуш при переходе агента в `error`; no-op при незаданном env
+- [x] compose: закомментированное opt-in монтирование docker.sock с пометкой о безопасности
+- [x] Деплой: миграция `service_check` применена на hermes.lan; backend healthz 200,
+      `/api/metrics/uptime` 401 (роут жив), frontend :3000 → 200
+- [ ] Включить opt-in на сервере (по желанию): `DOCKER_SOCKET` + rw-монтирование сокета, `NTFY_URL`
+
 ---
 
 ## REST API (план)

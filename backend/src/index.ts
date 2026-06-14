@@ -6,6 +6,7 @@ import { authRouter } from "./api/auth.js";
 import { versionRouter } from "./api/version.js";
 import { jwtAuth } from "./middleware/jwtAuth.js";
 import { mcpRouter } from "./mcp/handler.js";
+import { startSampler } from "./sampler.js";
 
 const app = express();
 app.use(cors());
@@ -39,4 +40,5 @@ app.listen(config.backendPort, () => {
   console.log(
     `[mission-control] backend listening on :${config.backendPort} (${config.nodeEnv})`,
   );
+  startSampler();
 });

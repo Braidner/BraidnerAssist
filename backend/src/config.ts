@@ -69,6 +69,16 @@ export const config = {
     },
   },
 
+  docker: {
+    socket: env("DOCKER_SOCKET"), // напр. /var/run/docker.sock
+    get configured() { return Boolean(this.socket); },
+  },
+
+  notify: {
+    ntfyUrl: env("NTFY_URL"), // напр. https://ntfy.sh/<your-secret-topic>
+    get configured() { return Boolean(this.ntfyUrl); },
+  },
+
   servicesFile: env("SERVICES_FILE") ?? "/data/services.json",
 
   health: {

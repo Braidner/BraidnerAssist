@@ -3,9 +3,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
-  getHassAutomations, toggleHassAutomation,
+  getHassAutomations, toggleHassAutomation, getDocker, getMetrics,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData,
+  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type UptimeSeries,
 } from "./lib/api.ts";
 import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
 import { LogsPanel } from "./components/LogsPanel.tsx";
@@ -20,6 +20,7 @@ import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
 import { HermesPage } from "./components/panels/HermesPage.tsx";
 import { SystemPage } from "./components/panels/SystemPage.tsx";
+import { MetricsPage } from "./components/panels/MetricsPage.tsx";
 import { StubPage } from "./components/panels/StubPage.tsx";
 
 type Backend = "up" | "down" | "checking";
@@ -44,6 +45,8 @@ export function App() {
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
   const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
+  const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
+  const [metrics, setMetrics] = useState<UptimeSeries[]>([]);
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -73,12 +76,16 @@ export function App() {
     getServices().then(setServicesData);
     getWeather().then(setWeather);
     getProxmox().then(setProxmox);
+    getDocker().then(setDocker);
+    getMetrics().then(setMetrics);
     getHassAutomations().then(setHass);
     getVersion().then(setVersionData);
 
     const serviceTimer = setInterval(() => getServices().then(setServicesData), 60_000);
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
     const proxmoxTimer = setInterval(() => getProxmox().then(setProxmox), 30_000);
+    const dockerTimer = setInterval(() => getDocker().then(setDocker), 30_000);
+    const metricsTimer = setInterval(() => getMetrics().then(setMetrics), 60_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
     const hermesTimer = setInterval(() => {
@@ -90,6 +97,8 @@ export function App() {
       clearInterval(serviceTimer);
       clearInterval(weatherTimer);
       clearInterval(proxmoxTimer);
+      clearInterval(dockerTimer);
+      clearInterval(metricsTimer);
       clearInterval(tasksTimer);
       clearInterval(hassTimer);
       clearInterval(hermesTimer);
@@ -196,8 +205,8 @@ export function App() {
             </div>
           } />
           <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
-          <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} />} />
-          <Route path="/metrics" element={<StubPage icon="chart" title="Метрики" />} />
+          <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} />} />
+          <Route path="/metrics" element={<MetricsPage metrics={metrics} />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -455,3 +455,64 @@ export async function getLogs(): Promise<LogEntry[]> {
     return [];
   }
 }
+
+// ─── Docker ─────────────────────────────────────────────────────────
+
+export interface DockerContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+}
+
+export interface DockerData {
+  configured: boolean;
+  containers: DockerContainer[];
+}
+
+export async function getDocker(): Promise<DockerData> {
+  try {
+    const res = await apiFetch("/api/docker/containers");
+    if (!res.ok) throw new Error();
+    return (await res.json()) as DockerData;
+  } catch {
+    return { configured: false, containers: [] };
+  }
+}
+
+export async function dockerAction(id: string, action: string): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/api/docker/containers/${encodeURIComponent(id)}/${action}`, {
+      method: "POST",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Metrics / Uptime ────────────────────────────────────────────────
+
+export interface UptimeSample {
+  status: string;
+  latencyMs: number | null;
+}
+
+export interface UptimeSeries {
+  name: string;
+  uptime24h: number | null;
+  uptime7d: number | null;
+  avgLatency: number | null;
+  samples: UptimeSample[];
+}
+
+export async function getMetrics(): Promise<UptimeSeries[]> {
+  try {
+    const res = await apiFetch("/api/metrics/uptime");
+    if (!res.ok) return [];
+    return (await res.json()) as UptimeSeries[];
+  } catch {
+    return [];
+  }
+}

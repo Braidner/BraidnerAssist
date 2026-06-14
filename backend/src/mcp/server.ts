@@ -5,6 +5,8 @@ import { fetchAllTasks, upsertAgentTaskState } from "../api/tasks.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
+import { containerAction } from "../integrations/docker.js";
+import { notify } from "../integrations/notify.js";
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -18,7 +20,9 @@ WORKING ON A TASK (works for BOTH local and GitLab tasks):
 3. log_action({ action, details?, result?, taskId }) → record each step of progress. You MUST pass taskId = the SAME id from step 1, otherwise the entry becomes a loose global log not tied to the task and won't show under it. Call this as many times as needed while working.
 4. complete_task({ id }) → marks it done when finished.
 
-Use report_status to reflect your overall state (active/idle/error) on the dashboard. Other tools cover Home Assistant, homelab services and weather.`;
+Use report_status to reflect your overall state (active/idle/error) on the dashboard. Other tools cover Home Assistant, homelab services and weather.
+
+SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -94,11 +98,24 @@ export function createMcpServer() {
     "Update Hermes agent status shown on the dashboard",
     { status: z.enum(["active", "idle", "error"]), message: z.string().optional() },
     async ({ status, message }) => {
+      // Читаем текущий статус для определения перехода
+      const prev = await prisma.agentStatus.findUnique({ where: { id: 1 } });
+
       const s = await prisma.agentStatus.upsert({
         where: { id: 1 },
         create: { id: 1, status, message: message ?? null },
         update: { status, message: message ?? null },
       });
+
+      // Нотификация при переходе в error (fire-and-forget)
+      if (status === "error" && prev?.status !== "error") {
+        void notify(
+          "Hermes: ошибка",
+          message ?? "агент сообщил об ошибке",
+          "high",
+        );
+      }
+
       return ok(s);
     },
   );
@@ -179,6 +196,18 @@ export function createMcpServer() {
     const data = await getWeather();
     return ok(data);
   });
+
+  // ── Docker ───────────────────────────────────────────────────────────
+
+  server.tool(
+    "restart_container",
+    "Restart a Docker container by its short ID or name. Use for self-healing when a service is down.",
+    { id: z.string().describe("Container short ID (12 chars) or name") },
+    async ({ id }) => {
+      await containerAction(id, "restart");
+      return ok({ ok: true, id, action: "restart" });
+    },
+  );
 
   return server;
 }

@@ -4,10 +4,15 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: file:/data/mission-control.db
+      # Docker Engine API (opt-in): раскомментировать и задать DOCKER_SOCKET в .env.
+      # ВНИМАНИЕ: docker.sock = root-эквивалент на хосте — осознанный риск.
+      # DOCKER_SOCKET: /var/run/docker.sock
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - ./data:/data            # SQLite + Apple Health export
+      # Раскомментировать при использовании Docker-интеграции (rw для start/stop/restart):
+      # - /var/run/docker.sock:/var/run/docker.sock:rw
     restart: unless-stopped
 
   frontend:

@@ -10,6 +10,7 @@ export interface ServiceResult {
   name: string;
   status: "ok" | "warn" | "bad";
   tag: string;
+  latencyMs: number | null;
 }
 
 let cache: { data: ServiceResult[]; at: number } | null = null;
@@ -23,9 +24,10 @@ async function checkService(svc: ServiceConfig): Promise<ServiceResult> {
       name: svc.name,
       status: res.ok ? "ok" : "warn",
       tag: `${latency}ms`,
+      latencyMs: latency,
     };
   } catch {
-    return { name: svc.name, status: "bad", tag: "timeout" };
+    return { name: svc.name, status: "bad", tag: "timeout", latencyMs: null };
   }
 }
 
@@ -52,7 +54,7 @@ export async function getServices(): Promise<{
   const services = results.map((r) =>
     r.status === "fulfilled"
       ? r.value
-      : { name: "unknown", status: "bad" as const, tag: "error" },
+      : { name: "unknown", status: "bad" as const, tag: "error", latencyMs: null },
   );
 
   cache = { data: services, at: Date.now() };

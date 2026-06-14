@@ -63,6 +63,17 @@ model HermesSession {
   updatedAt        DateTime @updatedAt
 }
 
+// История аптайма сервисов (пишется сэмплером каждые POLL_SERVICES мс).
+model ServiceCheck {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   // ok | warn | bad
+  latencyMs Int?     // null при timeout/error
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+}
+
 // Локальные события календаря (если нет CalDAV).
 model CalendarEvent {
   id          String   @id @default(cuid())

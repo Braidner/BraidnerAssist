@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Card } from "../Card.tsx";
 import { Ring } from "../Ring.tsx";
 import { Placeholder } from "./Placeholder.tsx";
-import type { ProxmoxData, ServicesData } from "../../lib/api.ts";
+import type { ProxmoxData, ServicesData, DockerData, DockerContainer } from "../../lib/api.ts";
+import { dockerAction, getDocker } from "../../lib/api.ts";
 
 const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
   ok: "var(--ok)",
@@ -13,8 +15,111 @@ function gb(bytes: number): number {
   return Math.round(bytes / 1024 ** 3);
 }
 
-// /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов.
-export function SystemPage({ proxmox, servicesData }: { proxmox: ProxmoxData; servicesData: ServicesData }) {
+function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: DockerData) => void }) {
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+
+  if (!docker.configured) {
+    return <Placeholder icon="server" title="Docker" phase="DOCKER_SOCKET не задан" />;
+  }
+
+  const act = async (c: DockerContainer, action: string) => {
+    // Оптимистичное обновление состояния
+    const newState = action === "stop" ? "exited" : "running";
+    onRefresh({
+      ...docker,
+      containers: docker.containers.map((x) =>
+        x.id === c.id ? { ...x, state: newState, status: action === "stop" ? "Exited" : "Up" } : x,
+      ),
+    });
+    setPending((p) => ({ ...p, [c.id]: true }));
+    const ok = await dockerAction(c.id, action);
+    setPending((p) => ({ ...p, [c.id]: false }));
+    if (!ok) {
+      // При ошибке рефетчим реальные данные
+      getDocker().then(onRefresh);
+    }
+  };
+
+  return (
+    <Card
+      icon="server"
+      title="Docker"
+      action={<span className="panel-count">{docker.containers.length} контейнеров</span>}
+    >
+      {docker.containers.length === 0 ? (
+        <div className="empty">Нет контейнеров.</div>
+      ) : (
+        <div className="sys-vm-list" style={{ marginTop: 8 }}>
+          {docker.containers.map((c) => {
+            const running = c.state === "running";
+            const color = running ? "var(--ok)" : "var(--muted)";
+            const busy = Boolean(pending[c.id]);
+            return (
+              <div key={c.id} className="sys-vm-row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <span
+                  className="dot-led"
+                  style={{
+                    background: color,
+                    boxShadow: running
+                      ? `0 0 8px color-mix(in srgb, ${color} 70%, transparent)`
+                      : "none",
+                  }}
+                />
+                <span className="sys-vm-name" style={{ minWidth: 120 }}>{c.name}</span>
+                <span className="sys-vm-type mono" style={{ color: "var(--muted)", fontSize: 11 }}>
+                  {c.state.toUpperCase()}
+                </span>
+                <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                  {!running && (
+                    <button
+                      className="neu-sm"
+                      disabled={busy}
+                      style={{ padding: "2px 8px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}
+                      onClick={() => act(c, "start")}
+                    >
+                      Запустить
+                    </button>
+                  )}
+                  {running && (
+                    <button
+                      className="neu-sm"
+                      disabled={busy}
+                      style={{ padding: "2px 8px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}
+                      onClick={() => act(c, "stop")}
+                    >
+                      Стоп
+                    </button>
+                  )}
+                  <button
+                    className="neu-sm"
+                    disabled={busy}
+                    style={{ padding: "2px 8px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}
+                    onClick={() => act(c, "restart")}
+                  >
+                    Рестарт
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов, Docker.
+export function SystemPage({
+  proxmox,
+  servicesData,
+  docker,
+  onDockerUpdate,
+}: {
+  proxmox: ProxmoxData;
+  servicesData: ServicesData;
+  docker: DockerData;
+  onDockerUpdate: (d: DockerData) => void;
+}) {
   return (
     <div className="page">
       <div className="page-cols">
@@ -129,6 +234,9 @@ export function SystemPage({ proxmox, servicesData }: { proxmox: ProxmoxData; se
               )}
             </Card>
           )}
+
+          {/* Docker */}
+          <DockerCard docker={docker} onRefresh={onDockerUpdate} />
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { getWeather } from "../integrations/weather.js";
 import { getServices } from "../integrations/services.js";
 import { getProxmox } from "../integrations/proxmox.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
+import { getContainers, containerAction } from "../integrations/docker.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -156,6 +157,77 @@ apiRouter.get("/hermes/commands", async (_req, res) => {
     take: 20,
   });
   res.json(tasks);
+});
+
+// Метрики аптайма сервисов — агрегация из ServiceCheck по каждому сервису.
+apiRouter.get("/metrics/uptime", async (_req, res) => {
+  try {
+    const now = new Date();
+    const ago24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const ago7d  = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Все строки за последние 7 дней
+    const all7d = await prisma.serviceCheck.findMany({
+      where: { createdAt: { gte: ago7d } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Группируем по имени
+    const byName = new Map<string, typeof all7d>();
+    for (const row of all7d) {
+      const arr = byName.get(row.name) ?? [];
+      arr.push(row);
+      byName.set(row.name, arr);
+    }
+
+    const result = Array.from(byName.entries()).map(([name, rows]) => {
+      const rows24h = rows.filter((r) => r.createdAt >= ago24h);
+      const uptime24h = rows24h.length > 0
+        ? Math.round((rows24h.filter((r) => r.status !== "bad").length / rows24h.length) * 100)
+        : null;
+      const uptime7d = rows.length > 0
+        ? Math.round((rows.filter((r) => r.status !== "bad").length / rows.length) * 100)
+        : null;
+      const latRows = rows.filter((r) => r.latencyMs !== null);
+      const avgLatency = latRows.length > 0
+        ? Math.round(latRows.reduce((s, r) => s + (r.latencyMs ?? 0), 0) / latRows.length)
+        : null;
+      // Последние ~60 сэмплов для спарклайна
+      const samples = rows.slice(-60).map((r) => ({
+        status: r.status,
+        latencyMs: r.latencyMs,
+      }));
+      return { name, uptime24h, uptime7d, avgLatency, samples };
+    });
+
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+// Docker — список контейнеров.
+apiRouter.get("/docker/containers", async (_req, res) => {
+  try {
+    res.json(await getContainers());
+  } catch (e) {
+    res.status(502).json({ configured: false, error: String(e) });
+  }
+});
+
+// Docker — действие над контейнером (start|stop|restart).
+apiRouter.post("/docker/containers/:id/:action", async (req, res) => {
+  if (!config.docker.configured) return res.status(503).json({ configured: false });
+  const { id, action } = req.params;
+  if (!["start", "stop", "restart"].includes(action)) {
+    return res.status(400).json({ error: "Недопустимое действие. Разрешены: start, stop, restart" });
+  }
+  try {
+    await containerAction(id, action);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
 });
 
 // Backend logs — in-memory ring buffer, newest first, max 200 entries.

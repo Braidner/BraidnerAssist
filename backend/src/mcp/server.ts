@@ -7,6 +7,8 @@ import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
+import { getMedia, qbAdd } from "../integrations/media.js";
+import { getAdguard } from "../integrations/adguard.js";
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -22,7 +24,9 @@ WORKING ON A TASK (works for BOTH local and GitLab tasks):
 
 Use report_status to reflect your overall state (active/idle/error) on the dashboard. Other tools cover Home Assistant, homelab services and weather.
 
-SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.`;
+SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
+
+MEDIA & DNS: add_torrent({ magnet }) queues a download in qBittorrent (magnet or .torrent URL); get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -206,6 +210,36 @@ export function createMcpServer() {
     async ({ id }) => {
       await containerAction(id, "restart");
       return ok({ ok: true, id, action: "restart" });
+    },
+  );
+
+  // ── Media / DNS ──────────────────────────────────────────────────────
+
+  server.tool(
+    "add_torrent",
+    "Add a torrent to qBittorrent by magnet link or .torrent URL. Once it finishes, it lands in the shared media folder and appears in Jellyfin after a library scan.",
+    { magnet: z.string().describe("magnet: link or http(s) .torrent URL") },
+    async ({ magnet }) => {
+      await qbAdd(magnet);
+      return ok({ ok: true });
+    },
+  );
+
+  server.tool(
+    "get_media_status",
+    "Get media stack status: what's playing now in Jellyfin and the current download queue (Sonarr/Radarr/qBittorrent with progress, speed, ETA, seeds).",
+    async () => {
+      const data = await getMedia();
+      return ok(data);
+    },
+  );
+
+  server.tool(
+    "get_dns_stats",
+    "Get AdGuard Home DNS statistics: total queries, blocked count and percent, average processing latency, and top blocked domains.",
+    async () => {
+      const data = await getAdguard();
+      return ok(data);
     },
   );
 

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Readable } from "node:stream";
 import { prisma } from "../db/client.js";
 import { config } from "../config.js";
 import { tasksRouter } from "./tasks.js";
@@ -8,8 +9,17 @@ import { getServices } from "../integrations/services.js";
 import { getProxmox } from "../integrations/proxmox.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { getContainers, containerAction } from "../integrations/docker.js";
-import { getAdguard } from "../integrations/adguard.js";
-import { getMedia } from "../integrations/media.js";
+import { getAdguard, setAdguardProtection } from "../integrations/adguard.js";
+import {
+  getMedia,
+  getLibrary,
+  getPlaybackPath,
+  jellyfinRefresh,
+  jellyfinProxy,
+  qbAdd,
+  qbAction,
+  prowlarrSearch,
+} from "../integrations/media.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -247,6 +257,119 @@ apiRouter.get("/media", async (_req, res) => {
     res.json(await getMedia());
   } catch (e) {
     res.status(502).json({ configured: false, error: String(e) });
+  }
+});
+
+// Библиотека Jellyfin — недавно добавленные элементы.
+apiRouter.get("/media/library", async (_req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getLibrary());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Путь воспроизведения (HLS) для элемента — под наш прокси, без api_key.
+apiRouter.get("/media/play/:id", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json({ url: await getPlaybackPath(req.params.id) });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Скан библиотеки Jellyfin (после докачки торрента).
+apiRouter.post("/media/scan", async (_req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    await jellyfinRefresh();
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Поиск релизов через Prowlarr.
+apiRouter.get("/media/search", async (req, res) => {
+  if (!config.media.prowlarr.configured) return res.status(503).json({ configured: false });
+  const q = String(req.query.q ?? "").trim();
+  if (!q) return res.status(400).json({ error: "q required" });
+  try {
+    res.json(await prowlarrSearch(q));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Добавить торрент (magnet или .torrent URL) в qBittorrent.
+apiRouter.post("/media/torrent", async (req, res) => {
+  if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
+  const url = String(req.body?.url ?? req.body?.magnet ?? "").trim();
+  if (!url) return res.status(400).json({ error: "url/magnet required" });
+  try {
+    await qbAdd(url);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Управление торрентом (pause|resume|delete).
+apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
+  if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
+  const { hash, action } = req.params;
+  if (!["pause", "resume", "delete"].includes(action)) {
+    return res.status(400).json({ error: "Недопустимое действие. Разрешены: pause, resume, delete" });
+  }
+  try {
+    await qbAction(hash, action);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Реверс-прокси к Jellyfin для плеера: токен инжектится на бэкенде, в браузер не утекает.
+apiRouter.all("/media/jellyfin/*", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  const subpath = (req.params as Record<string, string>)[0] ?? "";
+  const query = new URLSearchParams(req.query as Record<string, string>);
+  try {
+    const upstream = await jellyfinProxy(subpath, query);
+    const ctype = upstream.headers.get("content-type") ?? "application/octet-stream";
+    res.status(upstream.status);
+
+    // m3u8-плейлисты переписываем, вырезая встроенный api_key.
+    const isPlaylist = subpath.endsWith(".m3u8") || ctype.includes("mpegurl");
+    if (isPlaylist) {
+      const text = await upstream.text();
+      const cleaned = text.replace(/([?&])api_key=[^&\s]*/gi, "$1").replace(/[?&]$/gm, "");
+      res.setHeader("content-type", ctype);
+      return res.send(cleaned);
+    }
+
+    res.setHeader("content-type", ctype);
+    const clen = upstream.headers.get("content-length");
+    if (clen) res.setHeader("content-length", clen);
+    if (!upstream.body) return res.end();
+    Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// AdGuard — переключатель защиты (пауза/возобновление DNS-фильтрации).
+apiRouter.post("/adguard/protection", async (req, res) => {
+  if (!config.adguard.configured) return res.status(503).json({ configured: false });
+  const enabled = Boolean(req.body?.enabled);
+  const durationMs = Number(req.body?.durationMs ?? 0) || 0;
+  try {
+    await setAdguardProtection(enabled, durationMs);
+    res.json({ ok: true, enabled });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
   }
 });
 

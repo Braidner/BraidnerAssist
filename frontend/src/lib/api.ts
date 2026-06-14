@@ -552,6 +552,20 @@ export async function getAdguard(): Promise<AdguardData> {
   }
 }
 
+// Включить/выключить DNS-фильтрацию AdGuard. durationMs=0 → бессрочно.
+export async function adguardProtection(enabled: boolean, durationMs = 0): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/adguard/protection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled, durationMs }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Media stack ─────────────────────────────────────────────────────
 
 export interface NowPlaying {
@@ -563,10 +577,15 @@ export interface NowPlaying {
 }
 
 export interface DownloadItem {
+  hash: string;
   title: string;
   source: "sonarr" | "radarr" | "qbittorrent";
   progress: number;
   state: string;
+  dlspeed?: number;
+  eta?: number | null;
+  seeds?: number;
+  size?: number;
 }
 
 export interface MediaData {
@@ -582,5 +601,87 @@ export async function getMedia(): Promise<MediaData> {
     return (await res.json()) as MediaData;
   } catch {
     return { configured: false, nowPlaying: [], downloads: [] };
+  }
+}
+
+export interface LibraryItem {
+  id: string;
+  name: string;
+  type: string;
+  seriesName: string | null;
+  year: number | null;
+}
+
+export async function getMediaLibrary(): Promise<LibraryItem[]> {
+  try {
+    const res = await apiFetch("/api/media/library");
+    if (!res.ok) return [];
+    return (await res.json()) as LibraryItem[];
+  } catch {
+    return [];
+  }
+}
+
+// Получить HLS-путь (под бэкенд-прокси) для воспроизведения элемента.
+export async function getMediaPlayUrl(id: string): Promise<string | null> {
+  try {
+    const res = await apiFetch(`/api/media/play/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { url?: string };
+    return body.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export interface SearchResult {
+  guid: string;
+  title: string;
+  size: number;
+  seeders: number;
+  indexer: string;
+  url: string | null;
+}
+
+export async function searchReleases(q: string): Promise<SearchResult[]> {
+  try {
+    const res = await apiFetch(`/api/media/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    return (await res.json()) as SearchResult[];
+  } catch {
+    return [];
+  }
+}
+
+export async function addTorrent(url: string): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/torrent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function torrentAction(hash: string, action: "pause" | "resume" | "delete"): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/api/media/torrent/${encodeURIComponent(hash)}/${action}`, {
+      method: "POST",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function refreshJellyfin(): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/scan", { method: "POST" });
+    return res.ok;
+  } catch {
+    return false;
   }
 }

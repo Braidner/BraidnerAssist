@@ -114,11 +114,22 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     латентность + топ заблокированных. Карточка на `/system` (Ring по % блокировок).
 11. **Медиа-стек** (opt-in, любой из источников) — `integrations/media.ts` агрегирует Jellyfin
     `/Sessions` (что играет) + Sonarr/Radarr `/api/v3/queue` + qBittorrent `/api/v2/torrents/info`
-    (очередь загрузок) через `Promise.allSettled`. `GET /api/media`, страница `/media`
-    (`MediaPage.tsx`) + пункт в Sidebar. Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`.
-12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K, переход между
-    страницами (источник — `NAV_ITEMS`) + отправка свободной команды Hermes через
-    `sendHermesCommand`. Смонтирована глобально в `App.tsx`.
+    (очередь) + Prowlarr `/api/v1/search` (поиск релизов) через `Promise.allSettled`.
+    `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
+    **Встроенный плеер**: библиотека Jellyfin (`GET /media/library`) → клик → HTML5 video
+    с HLS (`hls.js`); путь воспроизведения форсит HLS-транскод (пустые DirectPlayProfiles в
+    DeviceProfile, `GET /media/play/:id`). Стрим идёт через бэкенд-реверс-прокси
+    `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
+    `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
+    **Загрузки**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий с Prowlarr
+    grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
+    (Prowlarr), `POST /media/scan` (`/Library/Refresh`). Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/
+    `QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_torrent`/`get_media_status` (Hermes).
+12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
+    (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
+    создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление
+    DNS-фильтрации AdGuard (`adguardProtection` → `POST /api/adguard/protection`). Данные
+    (контейнеры, adguard) приходят пропсами из `App.tsx`. MCP `get_dns_stats` для Hermes.
 
 ## Homelab-стек на hermes.lan (отдельный Docker compose)
 
@@ -171,6 +182,12 @@ qBittorrent. Сервисы публикуются на хосте; backend-ко
 - **Batch v3 — AdGuard + Media + Cmd-K** (472ada5): развёрнут homelab-стек на `/srv/stack`
   (1ТБ диск); AdGuard DNS-карточка на `/system`, страница `/media` (Jellyfin/Sonarr/Radarr/
   qBittorrent), командная палитра Cmd-K. Все три задеплоены и проверены на hermes.lan. ✅ ГОТОВО
-- **Отложено**: drag-and-drop виджетов (react-grid-layout).
+- **Batch v4 — Media++ (плеер + торренты + Prowlarr)**: встроенный HLS-плеер (hls.js +
+  бэкенд-прокси, токен не утекает), библиотека Jellyfin, добавление торрентов (magnet +
+  поиск Prowlarr), управление очередью qBittorrent (pause/resume/delete + speed/ETA/seeds),
+  Cmd-K действия (рестарт контейнера, пауза DNS, создать задачу), MCP `add_torrent`/
+  `get_media_status`/`get_dns_stats`. Env: добавлен `PROWLARR_*`.
+- **Отложено**: drag-and-drop виджетов (react-grid-layout); Sonarr/Radarr interactive search
+  (авто-раскладка файлов в библиотеки Jellyfin) — кандидат на отдельную партию.
 
 Подробный трекинг — в `TASKS.md`.

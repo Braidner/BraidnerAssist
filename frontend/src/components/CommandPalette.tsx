@@ -1,11 +1,12 @@
-// Cmd/Ctrl+K — палитра команд: переход между страницами + отправка команды Hermes.
-// Открывается по Cmd/Ctrl+K или Escape для закрытия. Источник навигации — NAV_ITEMS.
+// Cmd/Ctrl+K — палитра команд: переход между страницами, отправка команды Hermes,
+// создание задачи и быстрые действия (рестарт контейнера, пауза DNS-фильтрации).
+// Открывается по Cmd/Ctrl+K, Escape — закрыть. Источник навигации — NAV_ITEMS.
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
 import { icons } from "./icons.tsx";
-import { sendHermesCommand } from "../lib/api.ts";
+import { sendHermesCommand, dockerAction, adguardProtection, type DockerContainer, type AdguardData } from "../lib/api.ts";
 
 interface Action {
   id: string;
@@ -14,12 +15,18 @@ interface Action {
   run: () => void;
 }
 
-export function CommandPalette() {
+interface Props {
+  containers: DockerContainer[];
+  adguard: AdguardData;
+  onAddTask: (title: string) => void;
+}
+
+export function CommandPalette({ containers, adguard, onAddTask }: Props) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
-  const [sent, setSent] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Глобальный хоткей Cmd/Ctrl+K.
@@ -41,12 +48,13 @@ export function CommandPalette() {
     if (open) {
       setQuery("");
       setSel(0);
-      setSent(false);
+      setFeedback(null);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
 
   const close = () => setOpen(false);
+  const done = (msg: string) => { setFeedback(msg); setTimeout(close, 800); };
 
   const navActions: Action[] = useMemo(
     () =>
@@ -54,37 +62,70 @@ export function CommandPalette() {
         id: `nav:${item.to}`,
         label: item.label,
         hint: "Перейти",
-        run: () => {
-          navigate(item.to);
-          close();
-        },
+        run: () => { navigate(item.to); close(); },
       })),
     [navigate],
   );
 
-  const trimmed = query.trim();
+  // Действия с Docker-контейнерами (рестарт).
+  const dockerActions: Action[] = useMemo(
+    () =>
+      containers.map((c) => ({
+        id: `docker:${c.id}`,
+        label: `Перезапустить ${c.name}`,
+        hint: "Docker",
+        run: async () => { await dockerAction(c.id, "restart"); done(`Перезапущен ${c.name} ✓`); },
+      })),
+    [containers],
+  );
 
-  // Если введён текст — первым пунктом предлагаем отправить его как команду Hermes.
-  const hermesAction: Action[] = trimmed
+  // Действия с AdGuard DNS (пауза/возобновление фильтрации).
+  const dnsActions: Action[] = useMemo(() => {
+    if (!adguard.configured) return [];
+    return [
+      {
+        id: "dns:pause",
+        label: "Приостановить DNS-фильтрацию (10 мин)",
+        hint: "AdGuard",
+        run: async () => { await adguardProtection(false, 600_000); done("DNS-фильтрация на паузе ✓"); },
+      },
+      {
+        id: "dns:resume",
+        label: "Включить DNS-фильтрацию",
+        hint: "AdGuard",
+        run: async () => { await adguardProtection(true); done("DNS-фильтрация включена ✓"); },
+      },
+    ];
+  }, [adguard.configured]);
+
+  const trimmed = query.trim();
+  const lc = trimmed.toLowerCase();
+
+  // С введённым текстом первыми идут «команда Hermes» и «создать задачу».
+  const textActions: Action[] = trimmed
     ? [
         {
           id: "hermes:send",
           label: `Передать Hermes: «${trimmed}»`,
           hint: "Команда",
-          run: async () => {
-            await sendHermesCommand(trimmed);
-            setSent(true);
-            setTimeout(close, 700);
-          },
+          run: async () => { await sendHermesCommand(trimmed); done("Отправлено Hermes ✓"); },
+        },
+        {
+          id: "task:add",
+          label: `Создать задачу: «${trimmed}»`,
+          hint: "Задача",
+          run: () => { onAddTask(trimmed); done("Задача создана ✓"); },
         },
       ]
     : [];
 
-  const filteredNav = trimmed
-    ? navActions.filter((a) => a.label.toLowerCase().includes(trimmed.toLowerCase()))
-    : navActions;
-
-  const actions = [...hermesAction, ...filteredNav];
+  const match = (a: Action) => !trimmed || a.label.toLowerCase().includes(lc);
+  const actions = [
+    ...textActions,
+    ...dnsActions.filter(match),
+    ...dockerActions.filter(match),
+    ...navActions.filter(match),
+  ];
   const clampedSel = Math.min(sel, Math.max(actions.length - 1, 0));
 
   const onInputKey = (e: React.KeyboardEvent) => {
@@ -110,7 +151,7 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             className="cmdk-input"
-            placeholder="Команда или страница…"
+            placeholder="Команда, задача или страница…"
             value={query}
             onChange={(e) => { setQuery(e.target.value); setSel(0); }}
             onKeyDown={onInputKey}
@@ -118,8 +159,8 @@ export function CommandPalette() {
           <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>esc</span>
         </div>
 
-        {sent ? (
-          <div className="cmdk-sent">Отправлено Hermes ✓</div>
+        {feedback ? (
+          <div className="cmdk-sent">{feedback}</div>
         ) : (
           <div className="cmdk-list">
             {actions.length === 0 ? (

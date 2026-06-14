@@ -184,6 +184,23 @@
 
 ---
 
+## Batch v4 — Media++ (плеер + торренты + Prowlarr)
+
+- [x] Backend `media.ts`: библиотека (`getLibrary`), HLS-путь (`getPlaybackPath` — пустые
+      DirectPlayProfiles форсят транскод), реверс-прокси (`jellyfinProxy`), скан (`jellyfinRefresh`),
+      `qbAdd`/`qbAction` (pause|resume|delete), `prowlarrSearch`; enriched `DownloadItem`
+- [x] Backend `config.ts`: блок `media.prowlarr` (`PROWLARR_URL`/`PROWLARR_API_KEY`)
+- [x] Backend `adguard.ts`: `setAdguardProtection` (`POST /control/protection`)
+- [x] REST `api/index.ts`: `ALL /media/jellyfin/*` (прокси + переписывание `.m3u8`), `/media/library`,
+      `/media/play/:id`, `/media/scan`, `/media/search`, `POST /media/torrent`,
+      `POST /media/torrent/:hash/:action`, `POST /adguard/protection`
+- [x] MCP: `add_torrent`, `get_media_status`, `get_dns_stats` + INSTRUCTIONS
+- [x] Frontend: `hls.js`, новые api-функции, `MediaPage.tsx` (грид библиотеки → HLS-плеер,
+      magnet-инпут, Prowlarr-поиск, управление очередью), Cmd-K действия (рестарт/DNS/задача)
+- [ ] Деплой на hermes.lan + `PROWLARR_*` в server `.env`; верификация плеера/прокси
+
+---
+
 ## REST API (план)
 
 ```

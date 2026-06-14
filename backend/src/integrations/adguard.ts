@@ -80,3 +80,16 @@ export async function getAdguard(): Promise<AdguardStats> {
   cache = { data, at: Date.now() };
   return data;
 }
+
+// Включить/выключить защиту AdGuard. duration в мс (0 = бессрочно).
+export async function setAdguardProtection(enabled: boolean, durationMs = 0): Promise<void> {
+  if (!config.adguard.configured) throw new Error("AdGuard не настроен");
+  const res = await fetch(`${config.adguard.url}/control/protection`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled, duration: durationMs }),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`AdGuard protection responded ${res.status}`);
+  cache = null;
+}

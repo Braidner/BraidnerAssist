@@ -113,12 +113,18 @@ export const config = {
       password: env("QBITTORRENT_PASSWORD"),
       get configured() { return Boolean(this.url && this.username && this.password); },
     },
+    prowlarr: {
+      url: env("PROWLARR_URL"),
+      apiKey: env("PROWLARR_API_KEY"),
+      get configured() { return Boolean(this.url && this.apiKey); },
+    },
     get configured() {
       return (
         this.jellyfin.configured ||
         this.sonarr.configured ||
         this.radarr.configured ||
-        this.qbittorrent.configured
+        this.qbittorrent.configured ||
+        this.prowlarr.configured
       );
     },
   },

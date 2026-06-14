@@ -185,7 +185,7 @@ export function App() {
         />
       )}
       {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
-      <CommandPalette />
+      <CommandPalette containers={docker.containers} adguard={adguard} onAddTask={onAddTask} />
       <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
 
       <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
@@ -218,7 +218,7 @@ export function App() {
           <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
           <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
           <Route path="/metrics" element={<MetricsPage metrics={metrics} />} />
-          <Route path="/media" element={<MediaPage media={media} />} />
+          <Route path="/media" element={<MediaPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

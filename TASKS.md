@@ -167,7 +167,20 @@
 - [x] compose: закомментированное opt-in монтирование docker.sock с пометкой о безопасности
 - [x] Деплой: миграция `service_check` применена на hermes.lan; backend healthz 200,
       `/api/metrics/uptime` 401 (роут жив), frontend :3000 → 200
-- [ ] Включить opt-in на сервере (по желанию): `DOCKER_SOCKET` + rw-монтирование сокета, `NTFY_URL`
+- [x] Включить opt-in на сервере: `DOCKER_SOCKET` + rw-монтирование сокета (commit ece177c).
+      `NTFY_URL` — пропущен по решению пользователя.
+
+## Batch v3 — Homelab-стек + AdGuard + Media + Cmd-K (commit 472ada5, задеплоено)
+
+- [x] Развёрнут homelab-стек на hermes.lan: новый 1ТБ диск → `/srv/stack`, собственный
+      `docker-compose.yml` (AdGuard, Jellyfin, Sonarr, Radarr, Prowlarr, qBittorrent; не в репо)
+- [x] #6 AdGuard DNS: `integrations/adguard.ts` (basic auth `/control/stats`), `GET /api/adguard`,
+      карточка на `/system`. Env `ADGUARD_URL`/`ADGUARD_USER`/`ADGUARD_PASSWORD`
+- [x] #7 Медиа: `integrations/media.ts` (Jellyfin now-playing + Sonarr/Radarr/qBittorrent очередь
+      через `Promise.allSettled`), `GET /api/media`, `MediaPage.tsx` на `/media` + пункт Sidebar
+- [x] #4 Cmd-K: `CommandPalette.tsx` — переход между страницами + отправка команды Hermes
+- [x] Деплой: все 4 источника достижимы+авторизованы из backend-контейнера; REST-роуты 401-guarded;
+      frontend :3000 → 200. AdGuard статистика = 0 пока DNS клиентов не направят на 192.168.2.184
 
 ---
 

@@ -109,6 +109,24 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
    на `/system`. Доступ к docker.sock = root-эквивалент — монтировать осознанно (rw, LAN-only).
 9. **Нотификации** (opt-in `NTFY_URL`) — `integrations/notify.ts` шлёт ntfy-пуш при переходе
    агента в `error` (хук в MCP `report_status`). Env не задан → no-op.
+10. **AdGuard DNS** (opt-in `ADGUARD_URL`/`ADGUARD_USER`/`ADGUARD_PASSWORD`) — `integrations/
+    adguard.ts` (basic auth → `/control/stats`). `GET /api/adguard` отдаёт запросы/блокировки/%/
+    латентность + топ заблокированных. Карточка на `/system` (Ring по % блокировок).
+11. **Медиа-стек** (opt-in, любой из источников) — `integrations/media.ts` агрегирует Jellyfin
+    `/Sessions` (что играет) + Sonarr/Radarr `/api/v3/queue` + qBittorrent `/api/v2/torrents/info`
+    (очередь загрузок) через `Promise.allSettled`. `GET /api/media`, страница `/media`
+    (`MediaPage.tsx`) + пункт в Sidebar. Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`.
+12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K, переход между
+    страницами (источник — `NAV_ITEMS`) + отправка свободной команды Hermes через
+    `sendHermesCommand`. Смонтирована глобально в `App.tsx`.
+
+## Homelab-стек на hermes.lan (отдельный Docker compose)
+
+На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на
+`/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Sonarr, Radarr, Prowlarr,
+qBittorrent. Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
+`host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в
+`/srv/stack/.creds` (chmod 600) и в server `.env` дашборда — в гит не коммитятся.
 
 ## UI / Дизайн-система (неоморфизм)
 
@@ -150,6 +168,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
   `/hermes`, `/system`, `/tasks`, `/home-assistant`. ✅ ГОТОВО
 - **Batch v2 — Docker + uptime + ntfy** (2b1bbc1): история аптайма на `/metrics` (`ServiceCheck`
   + сэмплер), Docker-контроль на `/system` (opt-in), ntfy-нотификации Hermes (opt-in). ✅ ГОТОВО
+- **Batch v3 — AdGuard + Media + Cmd-K** (472ada5): развёрнут homelab-стек на `/srv/stack`
+  (1ТБ диск); AdGuard DNS-карточка на `/system`, страница `/media` (Jellyfin/Sonarr/Radarr/
+  qBittorrent), командная палитра Cmd-K. Все три задеплоены и проверены на hermes.lan. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout).
 
 Подробный трекинг — в `TASKS.md`.

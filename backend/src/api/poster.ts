@@ -18,9 +18,13 @@ posterRouter.get("/", async (req, res) => {
     let upstream: globalThis.Response;
 
     if (tmdb) {
-      // SSRF-guard: только TMDB-хост. Уменьшаем original → w342 для скорости.
+      // SSRF-guard: только TMDB-хост. Любой размер → w154.
+      // Почему w154, а не w342: у hermes.lan на egress сломан Path-MTU (реальный путь ~1300,
+      // но oversized return-пакеты от BunnyCDN чёрнодырятся без ICMP). Загрузка зависает после
+      // первого TCP-окна (~16КБ): w185+ виснет, w154 (~12КБ) укладывается в окно и доходит.
+      // Это обходной путь под сетевой баг (чинить надо MTU тоннеля/шлюза на хосте).
       if (!/^https:\/\/image\.tmdb\.org\//.test(tmdb)) return res.status(400).end("bad url");
-      const sized = tmdb.replace("/t/p/original/", "/t/p/w342/");
+      const sized = tmdb.replace(/\/t\/p\/[^/]+\//, "/t/p/w154/");
       upstream = await fetch(sized, { signal: AbortSignal.timeout(15_000) });
     } else if (jf) {
       if (!config.media.jellyfin.configured) return res.status(503).end();

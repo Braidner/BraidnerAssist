@@ -121,6 +121,12 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     DeviceProfile, `GET /media/play/:id`). Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
     `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
+    **Постер-прокси** (`api/poster.ts`, `GET /api/poster?url=<tmdb>|jf=<id>`): `<img>` не может
+    слать bearer → маршрут вынесен из-под `jwtAuth` (публичный, LAN-only), но жёстко ограничен
+    анти-SSRF (только `image.tmdb.org`, даунсайз `original→w342`; или Jellyfin по hex-id с
+    инжектом токена). Решает таймаут постеров: у клиентов нет IPv6-egress до BunnyCDN (TMDB
+    отдаёт AAAA), а бэкенд ходит по IPv4. Фронт: `posterUrl()`/`jellyfinPosterUrl()` в дравере
+    lookup и в сетке библиотеки (битые/отсутствующие постеры прячутся `onError`).
     **Правильный пайплайн в медиатеку** (основной путь добавления): `GET /media/lookup?type=movie|series&q=`
     ищет тайтл в Radarr/Sonarr (`/api/v3/{movie|series}/lookup`, постер/год/overview/added),
     `POST /media/add {type,id}` (`arrAdd`) добавляет тайтл с первым root folder + quality profile,

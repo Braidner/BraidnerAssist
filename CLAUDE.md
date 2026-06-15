@@ -137,9 +137,18 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     в свёрнутой секции «Вручную».
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий
     с Prowlarr grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
-    (Prowlarr), `POST /media/scan` (`/Library/Refresh`). Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/
-    `QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_movie`/`add_series` (правильный пайплайн, основной),
-    `add_torrent`/`get_media_status` (Hermes).
+    (Prowlarr), `POST /media/scan` (`/Library/Refresh`).
+    **Играть на устройство** (Jellyfin remote control): `GET /media/devices` отдаёт сессии с
+    `SupportsRemoteControl` (устройства с открытым приложением Jellyfin — напр. Sber TV), `POST /media/play-to
+    {sessionId,itemId}` шлёт `PlayNow` в `/Sessions/{id}/Playing`. Фронт: на плитке библиотеки контрол «📺»
+    с выпадайкой устройств. Предусловие: на ТВ открыто приложение Jellyfin.
+    **Подборки** (ещё не в библиотеке): `GET /media/recommendations` агрегирует import-list discover
+    Radarr `/api/v3/importlist/movie` + Sonarr `/api/v3/importlist/series` (фильтр `isExisting`/`isExcluded`),
+    добавление в один клик через существующий `POST /media/add`. Карточка «Подборки» на `/media`.
+    Предусловие: в Radarr/Sonarr включён хотя бы один import-list (встроенный, ключ TMDB не нужен).
+    Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_movie`/`add_series`
+    (правильный пайплайн, основной), `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/
+    `get_recommendations` (Hermes).
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
     создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление

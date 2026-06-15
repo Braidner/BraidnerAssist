@@ -7,7 +7,7 @@ import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
-import { getMedia, qbAdd, arrLookup, arrAdd } from "../integrations/media.js";
+import { getMedia, qbAdd, arrLookup, arrAdd, jellyfinSessions, jellyfinPlayTo, getRecommendations } from "../integrations/media.js";
 import { getAdguard } from "../integrations/adguard.js";
 
 function ok(data: unknown) {
@@ -264,6 +264,39 @@ export function createMcpServer() {
     async () => {
       const data = await getAdguard();
       return ok(data);
+    },
+  );
+
+  server.tool(
+    "list_devices",
+    "List Jellyfin devices that can be remotely controlled (the Jellyfin app must be open on the device). Use to find a target for play_on_device.",
+    async () => {
+      const devices = await jellyfinSessions();
+      return ok(devices);
+    },
+  );
+
+  server.tool(
+    "play_on_device",
+    "Play a library item on an external device (e.g. the TV). itemId is a Jellyfin item id (from get_media_status / the library); deviceName is matched case-insensitively against list_devices. The Jellyfin app must be open on the target device.",
+    { itemId: z.string(), deviceName: z.string() },
+    async ({ itemId, deviceName }) => {
+      const devices = await jellyfinSessions();
+      const target = devices.find((d) => d.deviceName.toLowerCase() === deviceName.toLowerCase());
+      if (!target) {
+        return ok({ ok: false, error: `Устройство "${deviceName}" не найдено`, available: devices.map((d) => d.deviceName) });
+      }
+      await jellyfinPlayTo(target.id, itemId);
+      return ok({ ok: true, device: target.deviceName });
+    },
+  );
+
+  server.tool(
+    "get_recommendations",
+    "Get movie/series recommendations not yet in the library (from Radarr/Sonarr import lists). Add a title with add_movie/add_series.",
+    async () => {
+      const items = await getRecommendations();
+      return ok(items);
     },
   );
 

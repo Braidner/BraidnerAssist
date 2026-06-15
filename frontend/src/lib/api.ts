@@ -622,6 +622,18 @@ export async function getMediaLibrary(): Promise<LibraryItem[]> {
   }
 }
 
+// Постеры тащим через бэкенд-прокси: у клиентов часто нет IPv6-egress до BunnyCDN
+// (TMDB резолвится в AAAA) → прямой <img> виснет по таймауту. Бэкенд ходит по IPv4.
+export function posterUrl(remote: string | null | undefined): string | undefined {
+  if (!remote) return undefined;
+  return `/api/poster?url=${encodeURIComponent(remote)}`;
+}
+
+// Постер из Jellyfin по id элемента (токен инжектит бэкенд, не утекает в браузер).
+export function jellyfinPosterUrl(id: string): string {
+  return `/api/poster?jf=${encodeURIComponent(id)}`;
+}
+
 // Получить HLS-путь (под бэкенд-прокси) для воспроизведения элемента.
 export async function getMediaPlayUrl(id: string): Promise<string | null> {
   try {

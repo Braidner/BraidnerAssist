@@ -8,7 +8,7 @@ import { Card } from "../Card.tsx";
 import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, getMediaPlayUrl, searchReleases, addTorrent, torrentAction, refreshJellyfin,
-  lookupTitle, addTitle,
+  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl,
   type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
 } from "../../lib/api.ts";
 import { getToken } from "../../lib/auth.ts";
@@ -175,7 +175,7 @@ function AddTorrentDrawer({
                 return (
                   <div key={it.id} className="lk-row">
                     <div className="lk-poster">
-                      {it.poster ? <img src={it.poster} alt="" loading="lazy" /> : <span className="lk-poster-ph">{kind === "movie" ? "🎬" : "📺"}</span>}
+                      {it.poster ? <img src={posterUrl(it.poster)} alt="" loading="lazy" /> : <span className="lk-poster-ph">{kind === "movie" ? "🎬" : "📺"}</span>}
                     </div>
                     <div className="lk-body">
                       <span className="lk-title" title={it.title}>{it.title}{it.year ? ` (${it.year})` : ""}</span>
@@ -367,6 +367,13 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
                     onClick={() => onPlay(it)}
                     title={it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}
                   >
+                    <img
+                      className="media-item-poster"
+                      src={jellyfinPosterUrl(it.id)}
+                      alt=""
+                      loading="lazy"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
                     <span className="media-item-name">{it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}</span>
                     <span className="media-item-meta mono">
                       {it.type === "Episode" ? "эпизод" : it.type === "Movie" ? "фильм" : it.type}

@@ -16,6 +16,9 @@ import {
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
+  jellyfinSessions,
+  jellyfinPlayTo,
+  getRecommendations,
   qbAdd,
   qbAction,
   prowlarrSearch,
@@ -328,6 +331,42 @@ apiRouter.post("/media/add", async (req, res) => {
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   try {
     res.json({ ok: true, ...(await arrAdd(kind, id)) });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Устройства Jellyfin, которыми можно управлять (цели для «играть на ТВ»).
+apiRouter.get("/media/devices", async (_req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await jellyfinSessions());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Отправить элемент библиотеки на устройство Jellyfin.
+apiRouter.post("/media/play-to", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  const sessionId = String(req.body?.sessionId ?? "").trim();
+  const itemId = String(req.body?.itemId ?? "").trim();
+  if (!sessionId || !itemId) return res.status(400).json({ error: "sessionId and itemId required" });
+  try {
+    await jellyfinPlayTo(sessionId, itemId);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Подборки (ещё не в библиотеке) из import-list'ов Radarr/Sonarr.
+apiRouter.get("/media/recommendations", async (_req, res) => {
+  if (!config.media.radarr.configured && !config.media.sonarr.configured) {
+    return res.status(503).json({ configured: false });
+  }
+  try {
+    res.json(await getRecommendations());
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

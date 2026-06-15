@@ -645,6 +645,75 @@ export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ ti
   return { title: created.title ?? found.title ?? "—" };
 }
 
+// ── Подборки (discover) из import-list'ов Radarr/Sonarr ─────────────────────
+// Radarr GET /api/v3/importlist/movie и Sonarr /api/v3/importlist/series отдают
+// тайтлы из настроенных import-list'ов с флагами isExisting/isExcluded. Ключ TMDB
+// не нужен — discover живёт внутри *arr. Предусловие: включён хотя бы один список.
+
+export interface Recommendation {
+  kind: "movie" | "series";
+  id: number; // tmdbId (movie) | tvdbId (series) — то, что принимает arrAdd
+  title: string;
+  year: number | null;
+  overview: string;
+  poster: string | null;
+}
+
+interface ArrImportListRecord {
+  title?: string;
+  year?: number;
+  tmdbId?: number;
+  tvdbId?: number;
+  overview?: string;
+  images?: ArrImage[];
+  isExisting?: boolean;
+  isExcluded?: boolean;
+}
+
+async function arrImportList(kind: "movie" | "series"): Promise<Recommendation[]> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) return [];
+  const path = kind === "movie" ? "movie" : "series";
+  const res = await fetch(`${cfg.url}/api/v3/importlist/${path}`, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`${kind} importlist ${res.status}`);
+  const items = (await res.json()) as ArrImportListRecord[];
+  return items
+    .filter((it) => !it.isExisting && !it.isExcluded)
+    .map((it) => ({
+      kind,
+      id: (kind === "movie" ? it.tmdbId : it.tvdbId) ?? 0,
+      title: it.title ?? "—",
+      year: it.year ?? null,
+      overview: it.overview ?? "",
+      poster: arrPoster(it.images),
+    }))
+    .filter((r) => r.id > 0);
+}
+
+// Подборки фильмов+сериалов, которых ещё нет в библиотеке.
+export async function getRecommendations(): Promise<Recommendation[]> {
+  if (!config.media.radarr.configured && !config.media.sonarr.configured) return [];
+  const [movies, series] = await Promise.allSettled([
+    arrImportList("movie"),
+    arrImportList("series"),
+  ]);
+  const all = [
+    ...(movies.status === "fulfilled" ? movies.value : []),
+    ...(series.status === "fulfilled" ? series.value : []),
+  ];
+  const seen = new Set<string>();
+  const deduped = all.filter((r) => {
+    const key = `${r.kind}:${r.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return deduped.slice(0, 40);
+}
+
 // ── Сводка ────────────────────────────────────────────────────────────────
 export async function getMedia(): Promise<MediaData> {
   if (!config.media.configured) {

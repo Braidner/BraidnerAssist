@@ -699,6 +699,55 @@ export async function addTitle(type: "movie" | "series", id: number): Promise<bo
   }
 }
 
+export interface PlayDevice {
+  id: string;
+  deviceName: string;
+  client: string;
+  nowPlaying: string | null;
+}
+
+export async function getMediaDevices(): Promise<PlayDevice[]> {
+  try {
+    const res = await apiFetch("/api/media/devices");
+    if (!res.ok) return [];
+    return (await res.json()) as PlayDevice[];
+  } catch {
+    return [];
+  }
+}
+
+export async function playOnDevice(sessionId: string, itemId: string): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/play-to", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, itemId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface Recommendation {
+  kind: "movie" | "series";
+  id: number;
+  title: string;
+  year: number | null;
+  overview: string;
+  poster: string | null;
+}
+
+export async function getRecommendations(): Promise<Recommendation[]> {
+  try {
+    const res = await apiFetch("/api/media/recommendations");
+    if (!res.ok) return [];
+    return (await res.json()) as Recommendation[];
+  } catch {
+    return [];
+  }
+}
+
 export async function addTorrent(url: string): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/torrent", {

@@ -222,7 +222,9 @@
       CSS `.seg`/`.lk-*`/`.add-toggle`. tsc + vite build чистые
 - [x] UI pass (задеплоен ранее этой сессией): убран дубль-логотип, единые `.btn*`, неоморфизм
       вложенных карточек, цветовые токены тем
-- [ ] Деплой образов на hermes.lan (env RADARR_*/SONARR_* уже заданы) + верификация
+- [x] Деплой образов на hermes.lan (commit 87256df, env RADARR_*/SONARR_* уже заданы); верификация:
+      healthz 200, frontend 200, `/media/lookup`+`/media/add` 401-guarded, чистый старт; авторизованный
+      `/media/lookup?type=movie&q=tetris` → 8 результатов с постерами, Tetris 2023 `added:true`
 
 ---
 

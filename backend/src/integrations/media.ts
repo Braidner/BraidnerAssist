@@ -48,10 +48,20 @@ export interface SearchResult {
   url: string | null; // magnet или .torrent — то, что отдаём в qBittorrent
 }
 
+export interface PlayDevice {
+  id: string;
+  deviceName: string;
+  client: string;
+  nowPlaying: string | null;
+}
+
 let cache: { data: MediaData; at: number } | null = null;
 
 // ── Jellyfin ───────────────────────────────────────────────────────────
 interface JfSession {
+  Id?: string;
+  DeviceName?: string;
+  SupportsRemoteControl?: boolean;
   UserName?: string;
   Client?: string;
   NowPlayingItem?: {
@@ -196,6 +206,40 @@ export async function jellyfinRefresh(): Promise<void> {
     signal: AbortSignal.timeout(8_000),
   });
   if (!res.ok && res.status !== 204) throw new Error(`Jellyfin Refresh responded ${res.status}`);
+}
+
+// Сессии Jellyfin, которыми можно дистанционно управлять (приложение Jellyfin
+// открыто на устройстве и поддерживает remote-control). Цели для «играть на ТВ».
+export async function jellyfinSessions(): Promise<PlayDevice[]> {
+  if (!config.media.jellyfin.configured) return [];
+  const res = await fetch(`${config.media.jellyfin.url}/Sessions`, {
+    headers: jfHeaders(),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) throw new Error(`Jellyfin /Sessions responded ${res.status}`);
+  const sessions = (await res.json()) as JfSession[];
+  return sessions
+    .filter((s) => s.SupportsRemoteControl && s.Id && s.DeviceName)
+    .map((s) => ({
+      id: s.Id!,
+      deviceName: s.DeviceName!,
+      client: s.Client ?? "—",
+      nowPlaying: s.NowPlayingItem?.Name ?? null,
+    }));
+}
+
+// Отправить элемент на устройство: PlayNow в указанную сессию.
+export async function jellyfinPlayTo(sessionId: string, itemId: string): Promise<void> {
+  if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
+  const url = new URL(`${config.media.jellyfin.url}/Sessions/${sessionId}/Playing`);
+  url.searchParams.set("playCommand", "PlayNow");
+  url.searchParams.set("itemIds", itemId);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: jfHeaders(),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`Jellyfin Playing responded ${res.status}`);
 }
 
 // Прозрачный реверс-прокси к Jellyfin: инжектит токен заголовком, api_key из запроса

@@ -85,7 +85,7 @@ function Player({ url, title, onClose }: { url: string; title: string; onClose: 
       <div className="player-modal neu" onClick={(e) => e.stopPropagation()}>
         <div className="player-head">
           <span className="player-title">{title}</span>
-          <button className="neu-sm player-close" onClick={onClose}>✕</button>
+          <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
         </div>
         <video ref={videoRef} controls autoPlay style={{ width: "100%", borderRadius: 12, background: "#000" }} />
       </div>
@@ -128,7 +128,7 @@ function AddTorrentDrawer({
         <div className="drawer-inner">
           <div className="drawer-head">
             <span className="drawer-kind">Добавить загрузку</span>
-            <button className="neu-sm player-close" onClick={onClose}>✕</button>
+            <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
           </div>
 
           <div className="add-label">Прямая ссылка (magnet или .torrent)</div>
@@ -140,7 +140,7 @@ function AddTorrentDrawer({
               onChange={(e) => setMagnet(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) onAdd(magnet.trim(), "magnet").then(() => setMagnet("")); }}
             />
-            <button className="neu-sm" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))}>
+            <button className="btn btn-icon btn-accent" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))}>
               {busy === "magnet" ? "…" : "+"}
             </button>
           </div>
@@ -154,7 +154,7 @@ function AddTorrentDrawer({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
             />
-            <button className="neu-sm" disabled={!query.trim() || searching} onClick={onSearch}>
+            <button className="btn btn-icon btn-accent" disabled={!query.trim() || searching} onClick={onSearch}>
               {searching ? "…" : "🔍"}
             </button>
           </div>
@@ -169,7 +169,7 @@ function AddTorrentDrawer({
                       {fmtSize(r.size)} · <span className="sr-seeds">{r.seeders} seed</span> · {r.indexer}
                     </span>
                     <button
-                      className="neu-sm"
+                      className="btn btn-sm btn-accent"
                       disabled={!r.url || busy === r.guid}
                       onClick={() => r.url && onAdd(r.url, r.guid)}
                     >
@@ -267,7 +267,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             icon="pulse"
             title="Библиотека"
             action={
-              <button className="neu-sm" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => refreshJellyfin().then(() => getMediaLibrary().then(setLibrary))}>
+              <button className="btn btn-sm" onClick={() => refreshJellyfin().then(() => getMediaLibrary().then(setLibrary))}>
                 Сканировать
               </button>
             }
@@ -305,7 +305,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             action={
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span className="panel-count">{media.downloads.length}</span>
-                <button className="neu-sm" style={{ fontSize: 12, padding: "4px 12px" }} onClick={() => setAddOpen(true)}>
+                <button className="btn btn-sm btn-accent" onClick={() => setAddOpen(true)}>
                   + Добавить
                 </button>
               </div>
@@ -341,11 +341,11 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
                         {isQb && (
                           <div className="dl-actions">
                             {paused ? (
-                              <button className="neu-sm" title="Возобновить" disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
+                              <button className="btn btn-icon btn-sm" title="Возобновить" disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
                             ) : (
-                              <button className="neu-sm" title="Пауза" disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
+                              <button className="btn btn-icon btn-sm" title="Пауза" disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
                             )}
-                            <button className="neu-sm" title="Удалить" disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
+                            <button className="btn btn-icon btn-sm" title="Удалить" disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
                           </div>
                         )}
                       </div>

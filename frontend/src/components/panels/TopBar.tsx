@@ -40,7 +40,6 @@ export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSetti
           <icons.menu style={{ width: 22, height: 22 }} />
         </button>
         <button className="tb-brand" onClick={onLogs} title="Открыть логи бэкенда">
-          <span className="tb-mark"><icons.target style={{ width: 28, height: 28 }} /></span>
           <div>
             <div className="tb-name">Mission Control</div>
             <div className="tb-sub mono">braidner · self-hosted · LAN-only</div>

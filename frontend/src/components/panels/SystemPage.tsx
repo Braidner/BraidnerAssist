@@ -71,31 +71,16 @@ function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: 
                 </span>
                 <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
                   {!running && (
-                    <button
-                      className="neu-sm"
-                      disabled={busy}
-                      style={{ padding: "2px 8px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}
-                      onClick={() => act(c, "start")}
-                    >
+                    <button className="btn btn-sm" disabled={busy} onClick={() => act(c, "start")}>
                       Запустить
                     </button>
                   )}
                   {running && (
-                    <button
-                      className="neu-sm"
-                      disabled={busy}
-                      style={{ padding: "2px 8px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}
-                      onClick={() => act(c, "stop")}
-                    >
+                    <button className="btn btn-sm" disabled={busy} onClick={() => act(c, "stop")}>
                       Стоп
                     </button>
                   )}
-                  <button
-                    className="neu-sm"
-                    disabled={busy}
-                    style={{ padding: "2px 8px", fontSize: 11, cursor: busy ? "wait" : "pointer" }}
-                    onClick={() => act(c, "restart")}
-                  >
+                  <button className="btn btn-sm" disabled={busy} onClick={() => act(c, "restart")}>
                     Рестарт
                   </button>
                 </div>

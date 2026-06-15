@@ -8,8 +8,9 @@ import { Card } from "../Card.tsx";
 import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, getMediaPlayUrl, searchReleases, addTorrent, torrentAction, refreshJellyfin,
-  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl,
+  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getMediaDevices, playOnDevice, getRecommendations,
   type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
+  type PlayDevice, type Recommendation,
 } from "../../lib/api.ts";
 import { getToken } from "../../lib/auth.ts";
 
@@ -274,6 +275,19 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     if (media.configured) getMediaLibrary().then(setLibrary);
   }, [media.configured]);
 
+  const [devices, setDevices] = useState<PlayDevice[]>([]);
+  const [castFor, setCastFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (media.configured) getMediaDevices().then(setDevices);
+  }, [media.configured]);
+
+  const [recs, setRecs] = useState<Recommendation[]>([]);
+
+  useEffect(() => {
+    if (media.configured) getRecommendations().then(setRecs);
+  }, [media.configured]);
+
   if (!media.configured) {
     return (
       <div className="page">
@@ -293,6 +307,13 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     if (url) setPlayer({ url, title: item.seriesName ? `${item.seriesName} — ${item.name}` : item.name });
   };
 
+  const onCast = async (item: LibraryItem, device: PlayDevice) => {
+    setBusy("cast" + item.id);
+    await playOnDevice(device.id, item.id);
+    setBusy(null);
+    setCastFor(null);
+  };
+
   const onAdd = async (url: string, key: string) => {
     setBusy(key);
     const ok = await addTorrent(url);
@@ -306,6 +327,17 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     setBusy(null);
     if (ok) onMediaUpdate();
     return ok;
+  };
+
+  const onAddRec = async (rec: Recommendation) => {
+    const key = "rec" + rec.kind + rec.id;
+    setBusy(key);
+    const okAdd = await addTitle(rec.kind, rec.id);
+    setBusy(null);
+    if (okAdd) {
+      setRecs((prev) => prev.filter((r) => !(r.kind === rec.kind && r.id === rec.id)));
+      onMediaUpdate();
+    }
   };
 
   const onTorrent = async (hash: string, action: "pause" | "resume" | "delete") => {
@@ -360,31 +392,94 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             ) : (
               <div className="media-grid">
                 {library.map((it) => (
-                  <button
-                    key={it.id}
-                    className="neu media-item"
-                    disabled={busy === it.id}
-                    onClick={() => onPlay(it)}
-                    title={it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}
-                  >
-                    <img
-                      className="media-item-poster"
-                      src={jellyfinPosterUrl(it.id)}
-                      alt=""
-                      loading="lazy"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                    />
-                    <span className="media-item-name">{it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}</span>
-                    <span className="media-item-meta mono">
-                      {it.type === "Episode" ? "эпизод" : it.type === "Movie" ? "фильм" : it.type}
-                      {it.year ? ` · ${it.year}` : ""}
-                    </span>
-                    <span className="media-item-play">{busy === it.id ? "…" : "▶"}</span>
-                  </button>
+                  <div key={it.id} className="media-item-wrap">
+                    <button
+                      className="neu media-item"
+                      disabled={busy === it.id}
+                      onClick={() => onPlay(it)}
+                      title={it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}
+                    >
+                      <img
+                        className="media-item-poster"
+                        src={jellyfinPosterUrl(it.id)}
+                        alt=""
+                        loading="lazy"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <span className="media-item-name">{it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}</span>
+                      <span className="media-item-meta mono">
+                        {it.type === "Episode" ? "эпизод" : it.type === "Movie" ? "фильм" : it.type}
+                        {it.year ? ` · ${it.year}` : ""}
+                      </span>
+                      <span className="media-item-play">{busy === it.id ? "…" : "▶"}</span>
+                    </button>
+                    {devices.length > 0 && (
+                      <div className="media-cast">
+                        <button
+                          className="btn btn-icon btn-sm media-cast-btn"
+                          title="Играть на устройстве"
+                          onClick={() => setCastFor(castFor === it.id ? null : it.id)}
+                        >
+                          📺
+                        </button>
+                        {castFor === it.id && (
+                          <div className="media-cast-menu neu">
+                            {devices.map((d) => (
+                              <button
+                                key={d.id}
+                                className="media-cast-item"
+                                disabled={busy === "cast" + it.id}
+                                onClick={() => onCast(it, d)}
+                              >
+                                {d.deviceName}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
           </Card>
+
+          {/* Подборки — ещё не в библиотеке */}
+          {recs.length > 0 && (
+            <Card icon="pulse" title="Подборки" action={<span className="panel-count">{recs.length}</span>}>
+              <div className="media-grid">
+                {recs.map((r) => {
+                  const key = "rec" + r.kind + r.id;
+                  return (
+                    <div key={key} className="neu media-item">
+                      {r.poster ? (
+                        <img
+                          className="media-item-poster"
+                          src={posterUrl(r.poster)}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <span className="media-item-poster lk-poster-ph">{r.kind === "movie" ? "🎬" : "📺"}</span>
+                      )}
+                      <span className="media-item-name">{r.title}</span>
+                      <span className="media-item-meta mono">
+                        {r.kind === "movie" ? "фильм" : "сериал"}{r.year ? ` · ${r.year}` : ""}
+                      </span>
+                      <button
+                        className="btn btn-sm btn-accent media-item-add"
+                        disabled={busy === key}
+                        onClick={() => onAddRec(r)}
+                      >
+                        {busy === key ? "…" : "+ Добавить"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </div>
 
         <div className="page-col-side">

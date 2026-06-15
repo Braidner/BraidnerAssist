@@ -7,7 +7,7 @@ import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
-import { getMedia, qbAdd } from "../integrations/media.js";
+import { getMedia, qbAdd, arrLookup, arrAdd } from "../integrations/media.js";
 import { getAdguard } from "../integrations/adguard.js";
 
 function ok(data: unknown) {
@@ -26,7 +26,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: add_torrent({ magnet }) queues a download in qBittorrent (magnet or .torrent URL); get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -231,6 +231,30 @@ export function createMcpServer() {
     async () => {
       const data = await getMedia();
       return ok(data);
+    },
+  );
+
+  server.tool(
+    "add_movie",
+    "Find a movie by name and add it to Radarr. Radarr grabs a release, imports it into the library folder and Jellyfin picks it up automatically — the proper pipeline (prefer this over add_torrent for movies).",
+    { query: z.string().describe("Movie title, optionally with year, e.g. \"Tetris 2023\"") },
+    async ({ query }) => {
+      const found = await arrLookup("movie", query);
+      if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
+      const result = await arrAdd("movie", found[0].id);
+      return ok({ ok: true, added: result.title, alreadyInLibrary: found[0].added });
+    },
+  );
+
+  server.tool(
+    "add_series",
+    "Find a TV series by name and add it to Sonarr. Sonarr grabs releases, imports episodes into the library folder and Jellyfin picks them up automatically — the proper pipeline.",
+    { query: z.string().describe("Series title, optionally with year") },
+    async ({ query }) => {
+      const found = await arrLookup("series", query);
+      if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
+      const result = await arrAdd("series", found[0].id);
+      return ok({ ok: true, added: result.title, alreadyInLibrary: found[0].added });
     },
   );
 

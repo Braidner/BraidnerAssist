@@ -19,6 +19,8 @@ import {
   qbAdd,
   qbAction,
   prowlarrSearch,
+  arrLookup,
+  arrAdd,
 } from "../integrations/media.js";
 import { log, getEntries } from "../logger.js";
 
@@ -298,6 +300,34 @@ apiRouter.get("/media/search", async (req, res) => {
   if (!q) return res.status(400).json({ error: "q required" });
   try {
     res.json(await prowlarrSearch(q));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Поиск тайтла в Radarr (movie) / Sonarr (series) для добавления в библиотеку.
+apiRouter.get("/media/lookup", async (req, res) => {
+  const kind = String(req.query.type ?? "") === "series" ? "series" : "movie";
+  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const q = String(req.query.q ?? "").trim();
+  if (!q) return res.status(400).json({ error: "q required" });
+  try {
+    res.json(await arrLookup(kind, q));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Добавить тайтл в Radarr/Sonarr (правильный пайплайн в медиатеку).
+apiRouter.post("/media/add", async (req, res) => {
+  const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
+  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const id = Number(req.body?.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
+  try {
+    res.json({ ok: true, ...(await arrAdd(kind, id)) });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

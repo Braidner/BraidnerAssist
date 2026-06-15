@@ -203,6 +203,29 @@
 
 ---
 
+## Batch v5 — *arr пайплайн в медиатеку + UI pass (2026-06-15)
+
+Проблема: скачанные торренты не попадают в Jellyfin. Корень — у Jellyfin было 0 библиотек,
+а торренты падали в `/data/downloads` без импорта. Решение — правильный homelab-пайплайн.
+
+- [x] Сервер (homelab-стек, НЕ репо): Radarr root `/data/movies` + qB client (cat radarr);
+      Sonarr root `/data/tv` + qB (cat sonarr); Prowlarr Applications → Radarr/Sonarr (indexer
+      sync); Jellyfin Movies(`/media/movies`)+Shows(`/media/tv`)
+- [x] Пайплайн проверен e2e: Tetris 2023 → Radarr ManualImport (hardlink) `/data/movies` →
+      скан Jellyfin → фильм в библиотеке
+- [x] Backend `media.ts`: `arrLookup(kind,term)` + `arrAdd(kind,id)` (первый rootfolder+
+      qualityprofile, lookup по tmdb:/tvdb:, POST full object + searchForMovie/MissingEpisodes)
+- [x] REST: `GET /media/lookup?type=&q=`, `POST /media/add {type,id}`
+- [x] MCP: `add_movie({query})` / `add_series({query})` (lookup→add топ) + INSTRUCTIONS (prefer over add_torrent)
+- [x] Frontend: `lookupTitle`/`addTitle` (api.ts); AddTorrentDrawer «Добавить в медиатеку» —
+      сегмент Фильм/Сериал → поиск → постер/«Добавить»; magnet+Prowlarr в свёрнутом «Вручную».
+      CSS `.seg`/`.lk-*`/`.add-toggle`. tsc + vite build чистые
+- [x] UI pass (задеплоен ранее этой сессией): убран дубль-логотип, единые `.btn*`, неоморфизм
+      вложенных карточек, цветовые токены тем
+- [ ] Деплой образов на hermes.lan (env RADARR_*/SONARR_* уже заданы) + верификация
+
+---
+
 ## REST API (план)
 
 ```

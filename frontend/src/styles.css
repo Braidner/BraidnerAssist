@@ -573,6 +573,32 @@ body.sb-locked { overflow: hidden; }
 .add-field .mc-input { padding: 9px 13px; }
 .add-label { font-family: var(--font); font-size: 11px; color: var(--muted); margin: 18px 0 7px; }
 
+/* Segmented Фильм/Сериал toggle */
+.seg { display: flex; gap: 6px; padding: 4px; margin-bottom: 12px; border-radius: 12px; background: var(--surface);
+  box-shadow: inset calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd), inset calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(5px*var(--depth)) var(--sl); }
+.seg-btn { flex: 1; height: 32px; border: none; cursor: pointer; border-radius: 9px; background: transparent; color: var(--muted);
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 500; transition: color .14s, box-shadow .14s, background .14s; }
+.seg-btn.on { color: var(--accent-ink); background: var(--accent);
+  box-shadow: calc(2px*var(--depth)) calc(2px*var(--depth)) calc(4px*var(--depth)) var(--sd); }
+.seg-btn:not(.on):hover { color: var(--ink); }
+
+/* Title lookup results (Radarr/Sonarr) */
+.lk-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+.lk-row { display: flex; gap: 11px; align-items: center; padding: 10px 12px; border-radius: calc(var(--radius) * 0.6); background: var(--surface);
+  box-shadow: inset calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd), inset calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(5px*var(--depth)) var(--sl); }
+.lk-poster { flex: none; width: 42px; height: 63px; border-radius: 7px; overflow: hidden; background: var(--groove);
+  display: flex; align-items: center; justify-content: center; }
+.lk-poster img { width: 100%; height: 100%; object-fit: cover; }
+.lk-poster-ph { font-size: 20px; opacity: .5; }
+.lk-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.lk-title { font-family: var(--font-ui); font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lk-overview { font-family: var(--font-ui); font-size: 11px; color: var(--muted); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lk-add { flex: none; }
+.add-toggle { width: 100%; margin-top: 22px; padding: 9px 0; border: none; cursor: pointer; background: transparent;
+  font-family: var(--font); font-size: 11.5px; color: var(--muted); text-align: left; transition: color .14s; }
+.add-toggle:hover { color: var(--ink); }
+
 /* ============================================================ Logs panel */
 .logs-panel { min-width: min(92vw, 680px); max-width: 780px; background: var(--raise); border-radius: var(--radius); padding: 24px 26px; }
 .logs-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }

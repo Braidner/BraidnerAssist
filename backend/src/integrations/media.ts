@@ -481,6 +481,126 @@ export async function prowlarrSearch(query: string): Promise<SearchResult[]> {
     }));
 }
 
+// ── Sonarr / Radarr — поиск и добавление в библиотеку ──────────────────────
+// «Правильный» путь в медиатеку: добавляем тайтл в Radarr/Sonarr, они грабят
+// релиз через qBittorrent (своя категория), импортируют (hardlink+rename) в
+// /data/movies|/data/tv и триггерят скан Jellyfin. UI только выбирает тайтл.
+export interface ArrLookupItem {
+  kind: "movie" | "series";
+  id: number; // tmdbId (movie) | tvdbId (series) — то, что шлём в arrAdd
+  title: string;
+  year: number | null;
+  overview: string;
+  poster: string | null;
+  added: boolean; // уже в библиотеке *arr
+}
+
+interface ArrImage {
+  coverType?: string;
+  remoteUrl?: string;
+  url?: string;
+}
+
+interface ArrLookupRecord {
+  id?: number;
+  tmdbId?: number;
+  tvdbId?: number;
+  title?: string;
+  year?: number;
+  overview?: string;
+  images?: ArrImage[];
+}
+
+function arrCfg(kind: "movie" | "series") {
+  return kind === "movie" ? config.media.radarr : config.media.sonarr;
+}
+
+function arrPoster(images?: ArrImage[]): string | null {
+  const p = (images ?? []).find((i) => i.coverType === "poster");
+  return p?.remoteUrl ?? p?.url ?? null;
+}
+
+// Поиск тайтла. Radarr → /movie/lookup (tmdbId), Sonarr → /series/lookup (tvdbId).
+export async function arrLookup(kind: "movie" | "series", term: string): Promise<ArrLookupItem[]> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) return [];
+  const path = kind === "movie" ? "movie" : "series";
+  const url = new URL(`${cfg.url}/api/v3/${path}/lookup`);
+  url.searchParams.set("term", term);
+  const res = await fetch(url, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`${kind} lookup ${res.status}`);
+  const items = (await res.json()) as ArrLookupRecord[];
+  return items.slice(0, 20).map((it) => ({
+    kind,
+    id: (kind === "movie" ? it.tmdbId : it.tvdbId) ?? 0,
+    title: it.title ?? "—",
+    year: it.year ?? null,
+    overview: it.overview ?? "",
+    poster: arrPoster(it.images),
+    added: Boolean(it.id && it.id > 0),
+  }));
+}
+
+// Добавить тайтл в библиотеку *arr и запустить поиск релиза.
+export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ title: string }> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  const headers = { "X-Api-Key": cfg.apiKey!, "Content-Type": "application/json" };
+
+  // root folder + quality profile — берём первые доступные (хардкодить путь не нужно).
+  const [rootRes, qpRes] = await Promise.all([
+    fetch(`${cfg.url}/api/v3/rootfolder`, { headers, signal: AbortSignal.timeout(8_000) }),
+    fetch(`${cfg.url}/api/v3/qualityprofile`, { headers, signal: AbortSignal.timeout(8_000) }),
+  ]);
+  if (!rootRes.ok) throw new Error(`${kind} rootfolder ${rootRes.status}`);
+  if (!qpRes.ok) throw new Error(`${kind} qualityprofile ${qpRes.status}`);
+  const root = ((await rootRes.json()) as { path: string }[])[0];
+  const qp = ((await qpRes.json()) as { id: number }[])[0];
+  if (!root || !qp) throw new Error(`${kind}: нет root folder или quality profile`);
+
+  // Полный объект тайтла для POST берём из lookup по идентификатору.
+  const path = kind === "movie" ? "movie" : "series";
+  const idScheme = kind === "movie" ? "tmdb" : "tvdb";
+  const lkRes = await fetch(`${cfg.url}/api/v3/${path}/lookup?term=${idScheme}:${id}`, {
+    headers,
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!lkRes.ok) throw new Error(`${kind} lookup ${lkRes.status}`);
+  const found = ((await lkRes.json()) as (ArrLookupRecord & Record<string, unknown>)[])[0];
+  if (!found) throw new Error(`${kind}: не найдено (id ${id})`);
+  if (found.id && found.id > 0) return { title: found.title ?? "—" }; // уже в библиотеке
+
+  const body: Record<string, unknown> = {
+    ...found,
+    qualityProfileId: qp.id,
+    rootFolderPath: root.path,
+    monitored: true,
+  };
+  if (kind === "movie") {
+    body.minimumAvailability = "released";
+    body.addOptions = { searchForMovie: true };
+  } else {
+    body.addOptions = { searchForMissingEpisodes: true, monitor: "all" };
+  }
+
+  const res = await fetch(`${cfg.url}/api/v3/${path}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok && res.status !== 201) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`${kind} add ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  const created = (await res.json()) as { title?: string };
+  cache = null;
+  return { title: created.title ?? found.title ?? "—" };
+}
+
 // ── Сводка ────────────────────────────────────────────────────────────────
 export async function getMedia(): Promise<MediaData> {
   if (!config.media.configured) {

@@ -8,7 +8,8 @@ import { Card } from "../Card.tsx";
 import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, getMediaPlayUrl, searchReleases, addTorrent, torrentAction, refreshJellyfin,
-  type MediaData, type DownloadItem, type LibraryItem, type SearchResult,
+  lookupTitle, addTitle,
+  type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
 } from "../../lib/api.ts";
 import { getToken } from "../../lib/auth.ts";
 
@@ -93,15 +94,24 @@ function Player({ url, title, onClose }: { url: string; title: string; onClose: 
   );
 }
 
-// Дравер «Добавить торрент»: прямой magnet/URL + поиск Prowlarr с выдачей релизов.
+// Дравер «Добавить»: основной путь — поиск тайтла в Radarr/Sonarr (правильный
+// пайплайн в медиатеку); ниже — ручные опции (прямой magnet + raw-поиск Prowlarr).
 function AddTorrentDrawer({
-  open, onClose, onAdd, busy,
+  open, onClose, onAdd, onAddTitle, busy,
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (url: string, key: string) => Promise<void>;
+  onAddTitle: (item: ArrLookupItem, key: string) => Promise<boolean>;
   busy: string | null;
 }) {
+  const [kind, setKind] = useState<"movie" | "series">("movie");
+  const [titleQuery, setTitleQuery] = useState("");
+  const [titleResults, setTitleResults] = useState<ArrLookupItem[]>([]);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [addedIds, setAddedIds] = useState<Record<number, boolean>>({});
+
+  const [showManual, setShowManual] = useState(false);
   const [magnet, setMagnet] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -112,6 +122,14 @@ function AddTorrentDrawer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const onLookup = async () => {
+    const q = titleQuery.trim();
+    if (!q) return;
+    setLookingUp(true);
+    setTitleResults(await lookupTitle(kind, q));
+    setLookingUp(false);
+  };
 
   const onSearch = async () => {
     const q = query.trim();
@@ -127,61 +145,118 @@ function AddTorrentDrawer({
       <aside className={`drawer ${open ? "open" : ""}`}>
         <div className="drawer-inner">
           <div className="drawer-head">
-            <span className="drawer-kind">Добавить загрузку</span>
+            <span className="drawer-kind">Добавить в медиатеку</span>
             <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
           </div>
 
-          <div className="add-label">Прямая ссылка (magnet или .torrent)</div>
+          {/* Основной путь: Radarr/Sonarr — авто-граб + импорт + скан */}
+          <div className="seg">
+            <button className={`seg-btn ${kind === "movie" ? "on" : ""}`} onClick={() => { setKind("movie"); setTitleResults([]); }}>Фильм</button>
+            <button className={`seg-btn ${kind === "series" ? "on" : ""}`} onClick={() => { setKind("series"); setTitleResults([]); }}>Сериал</button>
+          </div>
           <div className="add-field">
             <input
               className="neu-in mc-input"
-              placeholder="magnet:… или https://….torrent"
-              value={magnet}
-              onChange={(e) => setMagnet(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) onAdd(magnet.trim(), "magnet").then(() => setMagnet("")); }}
+              placeholder={kind === "movie" ? "Название фильма…" : "Название сериала…"}
+              value={titleQuery}
+              onChange={(e) => setTitleQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") onLookup(); }}
             />
-            <button className="btn btn-icon btn-accent" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))}>
-              {busy === "magnet" ? "…" : "+"}
+            <button className="btn btn-icon btn-accent" disabled={!titleQuery.trim() || lookingUp} onClick={onLookup}>
+              {lookingUp ? "…" : "🔍"}
             </button>
           </div>
 
-          <div className="add-label">Поиск релизов (Prowlarr)</div>
-          <div className="add-field">
-            <input
-              className="neu-in mc-input"
-              placeholder="Название фильма или сериала…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
-            />
-            <button className="btn btn-icon btn-accent" disabled={!query.trim() || searching} onClick={onSearch}>
-              {searching ? "…" : "🔍"}
-            </button>
-          </div>
-
-          {results.length > 0 && (
-            <div className="sr-list">
-              {results.map((r) => (
-                <div key={r.guid} className="sr-row">
-                  <span className="sr-title" title={r.title}>{r.title}</span>
-                  <div className="sr-foot">
-                    <span className="sr-meta">
-                      {fmtSize(r.size)} · <span className="sr-seeds">{r.seeders} seed</span> · {r.indexer}
-                    </span>
+          {titleResults.length > 0 && (
+            <div className="lk-list">
+              {titleResults.map((it) => {
+                const isAdded = it.added || addedIds[it.id];
+                const key = `title-${it.id}`;
+                return (
+                  <div key={it.id} className="lk-row">
+                    <div className="lk-poster">
+                      {it.poster ? <img src={it.poster} alt="" loading="lazy" /> : <span className="lk-poster-ph">{kind === "movie" ? "🎬" : "📺"}</span>}
+                    </div>
+                    <div className="lk-body">
+                      <span className="lk-title" title={it.title}>{it.title}{it.year ? ` (${it.year})` : ""}</span>
+                      {it.overview && <span className="lk-overview">{it.overview}</span>}
+                    </div>
                     <button
-                      className="btn btn-sm btn-accent"
-                      disabled={!r.url || busy === r.guid}
-                      onClick={() => r.url && onAdd(r.url, r.guid)}
+                      className="btn btn-sm btn-accent lk-add"
+                      disabled={isAdded || busy === key}
+                      onClick={async () => { const ok = await onAddTitle(it, key); if (ok) setAddedIds((p) => ({ ...p, [it.id]: true })); }}
                     >
-                      {busy === r.guid ? "…" : "Скачать"}
+                      {isAdded ? "В библиотеке" : busy === key ? "…" : "Добавить"}
                     </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
-          {!searching && query.trim() && results.length === 0 && (
-            <div className="empty" style={{ marginTop: 14 }}>Ничего не найдено.</div>
+          {!lookingUp && titleQuery.trim() && titleResults.length === 0 && (
+            <div className="empty" style={{ marginTop: 12 }}>Ничего не найдено.</div>
+          )}
+
+          {/* Ручные опции — прямой magnet и сырой поиск Prowlarr */}
+          <button className="add-toggle" onClick={() => setShowManual((v) => !v)}>
+            {showManual ? "▾" : "▸"} Вручную (magnet / Prowlarr)
+          </button>
+
+          {showManual && (
+            <>
+              <div className="add-label">Прямая ссылка (magnet или .torrent)</div>
+              <div className="add-field">
+                <input
+                  className="neu-in mc-input"
+                  placeholder="magnet:… или https://….torrent"
+                  value={magnet}
+                  onChange={(e) => setMagnet(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) onAdd(magnet.trim(), "magnet").then(() => setMagnet("")); }}
+                />
+                <button className="btn btn-icon btn-accent" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))}>
+                  {busy === "magnet" ? "…" : "+"}
+                </button>
+              </div>
+
+              <div className="add-label">Поиск релизов (Prowlarr)</div>
+              <div className="add-field">
+                <input
+                  className="neu-in mc-input"
+                  placeholder="Название релиза…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
+                />
+                <button className="btn btn-icon btn-accent" disabled={!query.trim() || searching} onClick={onSearch}>
+                  {searching ? "…" : "🔍"}
+                </button>
+              </div>
+
+              {results.length > 0 && (
+                <div className="sr-list">
+                  {results.map((r) => (
+                    <div key={r.guid} className="sr-row">
+                      <span className="sr-title" title={r.title}>{r.title}</span>
+                      <div className="sr-foot">
+                        <span className="sr-meta">
+                          {fmtSize(r.size)} · <span className="sr-seeds">{r.seeders} seed</span> · {r.indexer}
+                        </span>
+                        <button
+                          className="btn btn-sm btn-accent"
+                          disabled={!r.url || busy === r.guid}
+                          onClick={() => r.url && onAdd(r.url, r.guid)}
+                        >
+                          {busy === r.guid ? "…" : "Скачать"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!searching && query.trim() && results.length === 0 && (
+                <div className="empty" style={{ marginTop: 14 }}>Ничего не найдено.</div>
+              )}
+            </>
           )}
         </div>
       </aside>
@@ -225,6 +300,14 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     if (ok) onMediaUpdate();
   };
 
+  const onAddTitle = async (item: ArrLookupItem, key: string): Promise<boolean> => {
+    setBusy(key);
+    const ok = await addTitle(item.kind, item.id);
+    setBusy(null);
+    if (ok) onMediaUpdate();
+    return ok;
+  };
+
   const onTorrent = async (hash: string, action: "pause" | "resume" | "delete") => {
     setBusy(hash + action);
     await torrentAction(hash, action);
@@ -235,7 +318,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   return (
     <div className="page">
       {player && <Player url={player.url} title={player.title} onClose={() => setPlayer(null)} />}
-      <AddTorrentDrawer open={addOpen} onClose={() => setAddOpen(false)} onAdd={onAdd} busy={busy} />
+      <AddTorrentDrawer open={addOpen} onClose={() => setAddOpen(false)} onAdd={onAdd} onAddTitle={onAddTitle} busy={busy} />
 
       <div className="page-cols">
         <div className="page-col-main">

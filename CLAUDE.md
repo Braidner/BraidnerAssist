@@ -121,10 +121,19 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     DeviceProfile, `GET /media/play/:id`). Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
     `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
-    **Загрузки**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий с Prowlarr
-    grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
+    **Правильный пайплайн в медиатеку** (основной путь добавления): `GET /media/lookup?type=movie|series&q=`
+    ищет тайтл в Radarr/Sonarr (`/api/v3/{movie|series}/lookup`, постер/год/overview/added),
+    `POST /media/add {type,id}` (`arrAdd`) добавляет тайтл с первым root folder + quality profile,
+    `monitored:true`, и запускает поиск релиза (`searchForMovie`/`searchForMissingEpisodes`). Дальше
+    Radarr/Sonarr сами грабят через qBittorrent (категория `radarr`/`sonarr`), импортируют (hardlink
+    + rename) в `/data/movies`|`/data/tv` и триггерят скан Jellyfin. В дравере `/media` это верхняя
+    секция (сегмент Фильм/Сериал → поиск → постер/«Добавить»); ручной magnet + сырой Prowlarr-поиск —
+    в свёрнутой секции «Вручную».
+    **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий
+    с Prowlarr grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
     (Prowlarr), `POST /media/scan` (`/Library/Refresh`). Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/
-    `QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_torrent`/`get_media_status` (Hermes).
+    `QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_movie`/`add_series` (правильный пайплайн, основной),
+    `add_torrent`/`get_media_status` (Hermes).
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
     создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление

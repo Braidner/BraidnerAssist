@@ -653,6 +653,40 @@ export async function searchReleases(q: string): Promise<SearchResult[]> {
   }
 }
 
+// Поиск/добавление через Radarr (movie) / Sonarr (series) — правильный пайплайн.
+export interface ArrLookupItem {
+  kind: "movie" | "series";
+  id: number;
+  title: string;
+  year: number | null;
+  overview: string;
+  poster: string | null;
+  added: boolean;
+}
+
+export async function lookupTitle(type: "movie" | "series", q: string): Promise<ArrLookupItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/lookup?type=${type}&q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    return (await res.json()) as ArrLookupItem[];
+  } catch {
+    return [];
+  }
+}
+
+export async function addTitle(type: "movie" | "series", id: number): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, id }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function addTorrent(url: string): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/torrent", {

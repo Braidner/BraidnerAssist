@@ -2,7 +2,8 @@
 // бэкенд: TMDB по IPv4 (у клиента часто нет IPv6-egress до BunnyCDN → таймаут) и
 // Jellyfin с инжектом токена (<img> не может слать bearer). Маршрут вынесен из-под
 // jwtAuth (постеры — публичная афиша, не секрет; LAN-only), но жёстко ограничен по
-// источнику (анти-SSRF): только image.tmdb.org и собственный Jellyfin по id.
+// источнику (анти-SSRF): только image.tmdb.org, artworks.thetvdb.com и собственный
+// Jellyfin по id.
 
 import { Router } from "express";
 import { Readable } from "node:stream";
@@ -18,15 +19,18 @@ posterRouter.get("/", async (req, res) => {
     let upstream: globalThis.Response;
 
     if (tmdb) {
-      // SSRF-guard: только TMDB-хост. Любой размер → w92.
-      // Почему так мелко: у hermes.lan на egress сломан Path-MTU (реальный путь ~1300, но
-      // oversized return-пакеты от BunnyCDN чёрнодырятся без ICMP-фидбэка). Загрузка зависает
-      // после первого TCP-окна (~16КБ): w185+ всегда виснет, w154 (~8-16КБ) — на грани,
-      // w92 (~3-7КБ) гарантированно укладывается в окно. Для превью 42x63px w92 хватает.
-      // Это обходной путь под сетевой баг хоста (правильно — починить MTU тоннеля/шлюза).
-      if (!/^https:\/\/image\.tmdb\.org\//.test(tmdb)) return res.status(400).end("bad url");
-      const sized = tmdb.replace(/\/t\/p\/[^/]+\//, "/t/p/w92/");
-      upstream = await fetch(sized, { signal: AbortSignal.timeout(15_000) });
+      // SSRF-guard: разрешены только источники афиш *arr — TMDB (Radarr/фильмы) и
+      // TheTVDB (Sonarr/сериалы). Прочее режем. Тащим как есть (full-size): прежний
+      // даунсайз до w92 был обходом сломанного Path-MTU на egress хоста (oversized
+      // пакеты BunnyCDN чёрнодырились после ~16КБ); после смены egress-маршрута баг
+      // ушёл — full-size грузится мгновенно (TMDB original ~0.7МБ за <1с).
+      if (
+        !/^https:\/\/image\.tmdb\.org\//.test(tmdb) &&
+        !/^https:\/\/artworks\.thetvdb\.com\//.test(tmdb)
+      ) {
+        return res.status(400).end("bad url");
+      }
+      upstream = await fetch(tmdb, { signal: AbortSignal.timeout(15_000) });
     } else if (jf) {
       if (!config.media.jellyfin.configured) return res.status(503).end();
       if (!/^[a-f0-9]{8,}$/i.test(jf)) return res.status(400).end("bad id");

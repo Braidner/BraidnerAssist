@@ -607,9 +607,10 @@ export async function getMedia(): Promise<MediaData> {
 export interface LibraryItem {
   id: string;
   name: string;
-  type: string;
-  seriesName: string | null;
+  type: "Movie" | "Series";
   year: number | null;
+  tvdbId: number | null;
+  childCount: number | null;
 }
 
 export async function getMediaLibrary(): Promise<LibraryItem[]> {
@@ -619,6 +620,83 @@ export async function getMediaLibrary(): Promise<LibraryItem[]> {
     return (await res.json()) as LibraryItem[];
   } catch {
     return [];
+  }
+}
+
+export interface SeriesEpisode {
+  id: string;
+  name: string;
+  seasonNumber: number;
+  episodeNumber: number | null;
+  played: boolean;
+}
+export interface SeriesSeason {
+  seasonNumber: number;
+  episodes: SeriesEpisode[];
+}
+export interface SeriesDetail {
+  id: string;
+  name: string;
+  tvdbId: number | null;
+  seasons: SeriesSeason[];
+}
+
+export async function getSeriesDetail(id: string): Promise<SeriesDetail | null> {
+  try {
+    const res = await apiFetch(`/api/media/series/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as SeriesDetail;
+  } catch {
+    return null;
+  }
+}
+
+export interface ReleaseOption {
+  guid: string;
+  indexerId: number;
+  title: string;
+  quality: string;
+  languages: string[];
+  size: number;
+  seeders: number | null;
+  indexer: string;
+  protocol: string;
+  rejected: boolean;
+  rejections: string[];
+}
+
+export async function searchReleaseOptions(p: {
+  type: "movie" | "series";
+  id: number;
+  seasonNumber?: number;
+}): Promise<ReleaseOption[]> {
+  try {
+    const res = await apiFetch("/api/media/release/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as ReleaseOption[];
+  } catch {
+    return [];
+  }
+}
+
+export async function grabRelease(p: {
+  type: "movie" | "series";
+  guid: string;
+  indexerId: number;
+}): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/release/grab", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

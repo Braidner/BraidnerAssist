@@ -7,7 +7,7 @@ import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
-import { getMedia, qbAdd, arrLookup, arrAdd, jellyfinSessions, jellyfinPlayTo, getRecommendations } from "../integrations/media.js";
+import { getMedia, qbAdd, arrLookup, arrAdd, arrReleaseSearch, arrReleaseGrab, jellyfinSessions, jellyfinPlayTo, getRecommendations } from "../integrations/media.js";
 import { getAdguard } from "../integrations/adguard.js";
 
 function ok(data: unknown) {
@@ -26,7 +26,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -255,6 +255,28 @@ export function createMcpServer() {
       if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
       const result = await arrAdd("series", found[0].id);
       return ok({ ok: true, added: result.title, alreadyInLibrary: found[0].added });
+    },
+  );
+
+  server.tool(
+    "search_releases",
+    "Interactive release search for a movie or series season. Finds the title, then lists available torrent releases with quality, languages (dubbing/озвучка), size, seeders and any rejection reasons. Use grab_release to download a chosen one. For series pass the season number. Releases are cached for 10 min so grab_release can re-submit the full record — always call this before grab_release.",
+    { type: z.enum(["movie", "series"]), query: z.string(), season: z.number().optional().describe("season number, series only") },
+    async ({ type, query, season }) => {
+      const found = await arrLookup(type, query);
+      if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
+      const releases = await arrReleaseSearch(type, found[0].id, season);
+      return ok({ ok: true, title: found[0].title, count: releases.length, releases });
+    },
+  );
+
+  server.tool(
+    "grab_release",
+    "Force-grab a specific release returned by search_releases (by guid + indexerId). Radarr/Sonarr download it via qBittorrent, import into the library and trigger a Jellyfin scan. Works even for releases the arr would normally reject (e.g. multi-season packs). Call search_releases for the same title first so the full release record is cached.",
+    { type: z.enum(["movie", "series"]), guid: z.string(), indexerId: z.number() },
+    async ({ type, guid, indexerId }) => {
+      await arrReleaseGrab(type, guid, indexerId);
+      return ok({ ok: true });
     },
   );
 

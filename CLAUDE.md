@@ -118,7 +118,12 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
     **Встроенный плеер**: библиотека Jellyfin (`GET /media/library`) → клик → HTML5 video
     с HLS (`hls.js`); путь воспроизведения форсит HLS-транскод (пустые DirectPlayProfiles в
-    DeviceProfile, `GET /media/play/:id`). Стрим идёт через бэкенд-реверс-прокси
+    DeviceProfile, `GET /media/play/:id`). **Группировка библиотеки**: `GET /media/library` отдаёт
+    сгруппированный каталог — плитки `Series` (с `tvdbId`/`childCount`) и `Movie` (раздельные запросы
+    Jellyfin `/Items?IncludeItemTypes=Series|Movie`, без плоских эпизодов), сериалы идут первыми.
+    Клик по сериалу открывает `SeriesDrawer` (аккордеон сезонов → эпизоды) через `GET /media/series/:id`
+    (`getSeriesDetail` по Jellyfin `/Shows/{id}/Episodes`, группировка по `ParentIndexNumber`); эпизод
+    играется в том же HLS-плеере. Клик по фильму играет сразу. Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
     `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
     **Постер-прокси** (`api/poster.ts`, `GET /api/poster?url=<tmdb>|jf=<id>`): `<img>` не может
@@ -135,6 +140,17 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     + rename) в `/data/movies`|`/data/tv` и триггерят скан Jellyfin. В дравере `/media` это верхняя
     секция (сегмент Фильм/Сериал → поиск → постер/«Добавить»); ручной magnet + сырой Prowlarr-поиск —
     в свёрнутой секции «Вручную».
+    **Выбор раздачи (release picker)**: интерактивный поиск релизов Sonarr/Radarr `/api/v3/release`
+    (`POST /media/release/search {type,id,seasonNumber?}` → `arrReleaseSearch`) — выдаёт торренты с
+    качеством, языками/озвучкой, размером, сидами и причинами отклонения (`rejected`/`rejections`).
+    `id` = `tmdbId` (movie) / `tvdbId` (series); если тайтла нет в *arr, он добавляется monitored без
+    авто-поиска (`arrEnsureAdded(..., false)`) ради internal id. Полные raw-записи кешируются по `guid`
+    (10 мин). Force-grab `POST /media/release/grab {type,guid,indexerId}` (`arrReleaseGrab`) переотправляет
+    полный объект (надёжнее guid+indexerId; *arr может вернуть 5xx «Failed to connect to qBittorrent», но
+    торрент реально добавлен → 5xx считаем успехом, бросаем только на 4xx). Грабит даже отклонённые релизы
+    (multi-season паки и т.п.) — это и есть способ дотащить зависший сезон. Фронт: `ReleasePicker` (плашки
+    качества/языка/отклонения) доступен и в `SeriesDrawer` на каждый сезон («🔍 Раздача»), и в дравере
+    «Добавить» на результат поиска («Выбрать раздачу», для сериала — поле сезона).
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий
     с Prowlarr grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
     (Prowlarr), `POST /media/scan` (`/Library/Refresh`).
@@ -147,8 +163,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     добавление в один клик через существующий `POST /media/add`. Карточка «Подборки» на `/media`.
     Предусловие: в Radarr/Sonarr включён хотя бы один import-list (встроенный, ключ TMDB не нужен).
     Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_movie`/`add_series`
-    (правильный пайплайн, основной), `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/
-    `get_recommendations` (Hermes).
+    (правильный пайплайн, основной), `search_releases`/`grab_release` (интерактивный выбор раздачи с
+    нужной озвучкой/качеством; `grab_release` после своего `search_releases` — кеш по guid),
+    `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/`get_recommendations` (Hermes).
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
     создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление

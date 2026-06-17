@@ -5,6 +5,9 @@ node_modules/
 # Secrets
 .env
 *.local
+*.creds
+# Homelab: реальный setup-creds.sh содержит TMPPW, в репо только .example
+homelab/setup-creds.sh
 
 # Build output
 dist/

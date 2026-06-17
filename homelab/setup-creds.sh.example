@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Шаблон скрипта первоначальной настройки кред qBittorrent и Jellyfin.
+# Скопировать в /srv/stack/setup-creds.sh, заполнить INITIAL_QB_TMP_PW
+# (берётся из логов qBittorrent контейнера при первом старте), сделать
+# chmod +x, запустить ОДИН РАЗ после `docker compose up -d`.
+#
+# Скрипт:
+#   - меняет временный пароль qB на сгенерированный
+#   - проходит headless wizard Jellyfin
+#   - создаёт persistent API key Jellyfin
+#   - дописывает сгенерированные значения в /srv/stack/.creds (chmod 600)
+#
+# .creds потребляется внешними потребителями (mission-control .env) и
+# должен жить ТОЛЬКО на сервере, не в git.
+set -u
+
+# qBittorrent при первом старте пишет временный пароль admin/<random>
+# в лог: `docker logs qbittorrent | grep -i 'temporary password'`.
+# Вставить сюда найденную строку или подменить INITIAL_QB_TMP_PW при запуске.
+TMPPW="<INITIAL_QB_TMP_PW>"
+
+QBPW=$(openssl rand -base64 12 | tr -d "/+=" | cut -c1-14)
+JFPW=$(openssl rand -base64 12 | tr -d "/+=" | cut -c1-14)
+
+echo "=== qBittorrent: set permanent password ==="
+curl -s -c /tmp/qb.cookie -d "username=admin&password=$TMPPW" http://localhost:8080/api/v2/auth/login >/dev/null
+PREF=$(printf "{\"web_ui_password\":\"%s\"}" "$QBPW")
+code=$(curl -s -o /dev/null -w "%{http_code}" -b /tmp/qb.cookie --data-urlencode "json=$PREF" http://localhost:8080/api/v2/app/setPreferences)
+echo "setPreferences -> HTTP $code"
+echo "QBIT_USER=admin"
+echo "QBIT_PASS=$QBPW"
+
+echo "=== Jellyfin: headless wizard ==="
+JF=http://localhost:8096
+curl -s -o /dev/null -w "  config -> %{http_code}\n" -X POST $JF/Startup/Configuration -H "Content-Type: application/json" -d "{\"UICulture\":\"en-US\",\"MetadataCountryCode\":\"US\",\"PreferredMetadataLanguage\":\"en\"}"
+curl -s -o /dev/null $JF/Startup/User
+curl -s -o /dev/null -w "  user -> %{http_code}\n" -X POST $JF/Startup/User -H "Content-Type: application/json" -d "{\"Name\":\"admin\",\"Password\":\"$JFPW\"}"
+curl -s -o /dev/null -w "  remote -> %{http_code}\n" -X POST $JF/Startup/RemoteAccess -H "Content-Type: application/json" -d "{\"EnableRemoteAccess\":true,\"EnableAutomaticPortMapping\":false}"
+curl -s -o /dev/null -w "  complete -> %{http_code}\n" -X POST $JF/Startup/Complete
+AUTH=$(curl -s -X POST $JF/Users/AuthenticateByName -H "Content-Type: application/json" -H "X-Emby-Authorization: MediaBrowser Client=\"mc\", Device=\"mc\", DeviceId=\"mc1\", Version=\"1\"" -d "{\"Username\":\"admin\",\"Pw\":\"$JFPW\"}")
+TOKEN=$(echo "$AUTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get(\"AccessToken\",\"\"))" 2>/dev/null)
+echo "  access token: ${TOKEN:0:8}..."
+curl -s -o /dev/null -w "  create apikey -> %{http_code}\n" -X POST "$JF/Auth/Keys?App=mission-control" -H "X-Emby-Token: $TOKEN"
+APIKEY=$(curl -s "$JF/Auth/Keys" -H "X-Emby-Token: $TOKEN" | python3 -c "import sys,json; ks=json.load(sys.stdin).get(\"Items\",[]); print(next((k[\"AccessToken\"] for k in ks if k.get(\"AppName\")==\"mission-control\"),\"\"))" 2>/dev/null)
+echo "JELLYFIN_USER=admin"
+echo "JELLYFIN_PASS=$JFPW"
+echo "JELLYFIN_API_KEY=$APIKEY"
+
+# persist non-secret-safe creds file (root of stack, perms 600)
+{
+  echo "QBIT_USER=admin"
+  echo "QBIT_PASS=$QBPW"
+  echo "JELLYFIN_USER=admin"
+  echo "JELLYFIN_PASS=$JFPW"
+  echo "JELLYFIN_API_KEY=$APIKEY"
+} >> /srv/stack/.creds
+chmod 600 /srv/stack/.creds

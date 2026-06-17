@@ -1,0 +1,142 @@
+# Homelab stack: AdGuard Home (DNS) + media (Jellyfin, *arr, qBittorrent, Jackett).
+# Data/config + media library live on the 1TB disk at /srv/stack.
+#
+# Этот файл — каноничный источник конфигурации стека. На hermes.lan
+# /srv/stack/docker-compose.yml — симлинк сюда. Менять только этот файл,
+# на сервере просто `git pull && docker compose up -d`.
+#
+# Deploy:
+#   cd /srv/stack && docker compose up -d
+#
+# Реальные .env и .creds живут в /srv/stack/ и НЕ в git
+# (см. homelab/.env.example, homelab/setup-creds.sh.example).
+name: stack
+
+networks:
+  stack:
+    driver: bridge
+  lan_direct:
+    driver: macvlan
+    driver_opts:
+      parent: ens18
+    ipam:
+      config:
+        - subnet: 192.168.2.0/24
+          gateway: 192.168.2.1
+
+services:
+  adguard:
+    image: adguard/adguardhome:latest
+    container_name: adguard
+    hostname: adguard
+    networks: [stack]
+    ports:
+      - "192.168.2.184:53:53/tcp"   # DNS (bound to LAN IP, avoids systemd-resolved on 127.0.0.53)
+      - "192.168.2.184:53:53/udp"
+      - "8053:80"                    # web UI + API (after setup)
+      - "3053:3000"                  # initial setup wizard (one-time)
+    volumes:
+      - ./adguard/work:/opt/adguardhome/work
+      - ./adguard/conf:/opt/adguardhome/conf
+    restart: unless-stopped
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    networks: [stack]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - "8096:8096"
+    volumes:
+      - ./jellyfin/config:/config
+      - ./media:/media
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    networks:
+      stack: {}
+      lan_direct:
+        ipv4_address: 192.168.2.190
+        mac_address: 02:42:c0:a8:02:be
+        gw_priority: 100
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8080
+    ports:
+      - "8080:8080"
+      - "6881:6881/tcp"
+      - "6881:6881/udp"
+    volumes:
+      - ./qbittorrent/config:/config
+      - ./media:/data
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    networks: [stack]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - "9696:9696"
+    volumes:
+      - ./prowlarr/config:/config
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    networks: [stack]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - "8989:8989"
+    volumes:
+      - ./sonarr/config:/config
+      - ./media:/data
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    networks: [stack]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./radarr/config:/config
+      - ./media:/data
+    restart: unless-stopped
+
+  # Jackett — Cardigann-индексер с широкой библиотекой определений
+  # (особенно для русских/нишевых трекеров). Подключается в Prowlarr как
+  # Torznab. Подробнее: docs/superpowers/specs/2026-06-17-homelab-jackett-design.md
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    networks: [stack]
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - AUTO_UPDATE=true   # автообновление Cardigann-определений
+    ports:
+      - "9117:9117"
+    volumes:
+      - ./jackett/config:/config
+      - ./media/downloads:/downloads
+    restart: unless-stopped

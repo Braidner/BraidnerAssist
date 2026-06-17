@@ -628,6 +628,31 @@ body.sb-locked { overflow: hidden; }
   font-family: var(--font); font-size: 11.5px; color: var(--muted); text-align: left; transition: color .14s; }
 .add-toggle:hover { color: var(--ink); }
 
+/* Lookup result wrapper + inline actions + release picker */
+.lk-wrap { display: flex; flex-direction: column; gap: 8px; }
+.lk-actions { display: flex; gap: 8px; margin-top: 4px; }
+.lk-picker { padding: 4px 2px 8px; }
+
+/* ── Series drawer: season accordion + episode rows ── */
+.media-season { border-radius: calc(var(--radius) * 0.6); margin-top: 10px; background: var(--surface);
+  box-shadow: inset calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd), inset calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(5px*var(--depth)) var(--sl); }
+.media-season-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; }
+.media-season-toggle { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: none; background: transparent; cursor: pointer; color: var(--ink); font-family: var(--font-ui); font-size: 13px; font-weight: 500; padding: 4px 2px; }
+.media-season-toggle:hover { color: var(--accent); }
+.media-ep-list { display: flex; flex-direction: column; gap: 4px; padding: 4px 10px 10px; }
+.media-ep-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; transition: background .12s; }
+.media-ep-row:hover { background: var(--hair); }
+.media-ep-num { flex: none; width: 26px; text-align: center; font-size: 11px; color: var(--muted); }
+.media-ep-name { flex: 1; min-width: 0; font-family: var(--font-ui); font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.media-ep-played { opacity: .5; }
+
+/* ── Release picker badges ── */
+.rel-badge { font-family: var(--font); font-size: 10px; padding: 2px 7px; border-radius: 99px; color: var(--accent-ink); background: var(--accent); white-space: nowrap; }
+.rel-lang { font-family: var(--font); font-size: 10px; padding: 2px 7px; border-radius: 99px; color: var(--info); background: color-mix(in srgb, var(--info) 18%, transparent); white-space: nowrap; }
+.rel-reject { font-family: var(--font); font-size: 10px; color: var(--err); white-space: nowrap; cursor: help; }
+.sr-row.rel-rejected { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--err) 45%, transparent); }
+
 /* ============================================================ Logs panel */
 .logs-panel { min-width: min(92vw, 680px); max-width: 780px; background: var(--raise); border-radius: var(--radius); padding: 24px 26px; }
 .logs-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }

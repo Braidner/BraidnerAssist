@@ -9,8 +9,9 @@ import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, getMediaPlayUrl, searchReleases, addTorrent, torrentAction, refreshJellyfin,
   lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getMediaDevices, playOnDevice, getRecommendations,
+  getSeriesDetail, searchReleaseOptions, grabRelease,
   type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
-  type PlayDevice, type Recommendation,
+  type PlayDevice, type Recommendation, type SeriesDetail, type ReleaseOption,
 } from "../../lib/api.ts";
 import { getToken } from "../../lib/auth.ts";
 
@@ -95,15 +96,174 @@ function Player({ url, title, onClose }: { url: string; title: string; onClose: 
   );
 }
 
+// ── Интерактивный выбор раздачи (Sonarr/Radarr /release) ──────────────
+// Показывает релизы с качеством/озвучкой/сидами; отклонённые (multi-season
+// и т.п.) выделены, но грабятся принудительно через force-grab.
+function ReleasePicker({
+  params, onGrabbed,
+}: {
+  params: { type: "movie" | "series"; id: number; seasonNumber?: number };
+  onGrabbed?: () => void;
+}) {
+  const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
+  const [busyGuid, setBusyGuid] = useState<string | null>(null);
+  const [done, setDone] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let alive = true;
+    setReleases(null);
+    searchReleaseOptions(params).then((r) => { if (alive) setReleases(r); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.type, params.id, params.seasonNumber]);
+
+  const onGrab = async (r: ReleaseOption) => {
+    setBusyGuid(r.guid);
+    const ok = await grabRelease({ type: params.type, guid: r.guid, indexerId: r.indexerId });
+    setBusyGuid(null);
+    if (ok) {
+      setDone((p) => ({ ...p, [r.guid]: true }));
+      onGrabbed?.();
+    }
+  };
+
+  if (releases === null) return <div className="empty" style={{ marginTop: 10 }}>Ищем раздачи…</div>;
+  if (releases.length === 0) return <div className="empty" style={{ marginTop: 10 }}>Раздачи не найдены.</div>;
+
+  return (
+    <div className="sr-list">
+      {releases.map((r) => (
+        <div key={r.guid} className={`sr-row ${r.rejected ? "rel-rejected" : ""}`}>
+          <span className="sr-title" title={r.title}>{r.title}</span>
+          <div className="sr-foot" style={{ flexWrap: "wrap", gap: 6 }}>
+            <span className="sr-meta" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span className="rel-badge">{r.quality}</span>
+              {r.languages.map((l) => <span key={l} className="rel-lang">{l}</span>)}
+              <span>{fmtSize(r.size)}</span>
+              <span className="sr-seeds">{r.seeders ?? 0} seed</span>
+              <span>{r.indexer}</span>
+              {r.rejected && (
+                <span className="rel-reject" title={r.rejections.join("; ")}>⚠ отклонён</span>
+              )}
+            </span>
+            <button
+              className="btn btn-sm btn-accent"
+              disabled={busyGuid === r.guid || done[r.guid]}
+              onClick={() => onGrab(r)}
+            >
+              {done[r.guid] ? "✓ В очереди" : busyGuid === r.guid ? "…" : "Скачать"}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Дравер сериала: аккордеон сезонов → эпизоды (play) + выбор раздачи на сезон ──
+function SeriesDrawer({
+  item, onClose, onPlay, busy,
+}: {
+  item: LibraryItem;
+  onClose: () => void;
+  onPlay: (episodeId: string, title: string) => void;
+  busy: string | null;
+}) {
+  const [detail, setDetail] = useState<SeriesDetail | null>(null);
+  const [openSeason, setOpenSeason] = useState<number | null>(null);
+  const [pickerSeason, setPickerSeason] = useState<number | null>(null);
+
+  useEffect(() => {
+    getSeriesDetail(item.id).then(setDetail);
+  }, [item.id]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <>
+      <div className="drawer-overlay open" onClick={onClose} />
+      <aside className="drawer open">
+        <div className="drawer-inner">
+          <div className="drawer-head">
+            <span className="drawer-kind">{item.name}</span>
+            <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
+          </div>
+
+          {detail === null ? (
+            <div className="empty" style={{ marginTop: 12 }}>Загружаем сезоны…</div>
+          ) : detail.seasons.length === 0 ? (
+            <div className="empty" style={{ marginTop: 12 }}>Эпизоды не найдены.</div>
+          ) : (
+            detail.seasons.map((s) => {
+              const isOpen = openSeason === s.seasonNumber;
+              const pickerOn = pickerSeason === s.seasonNumber;
+              const label = s.seasonNumber === 0 ? "Спецвыпуски" : `Сезон ${s.seasonNumber}`;
+              return (
+                <div key={s.seasonNumber} className="media-season">
+                  <div className="media-season-head">
+                    <button
+                      className="media-season-toggle"
+                      onClick={() => setOpenSeason(isOpen ? null : s.seasonNumber)}
+                    >
+                      <span>{isOpen ? "▾" : "▸"} {label}</span>
+                      <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{s.episodes.length} эп.</span>
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      disabled={item.tvdbId == null}
+                      title={item.tvdbId == null ? "Нет tvdbId — пересканируйте библиотеку" : "Найти раздачу для сезона"}
+                      onClick={() => setPickerSeason(pickerOn ? null : s.seasonNumber)}
+                    >
+                      🔍 Раздача
+                    </button>
+                  </div>
+
+                  {pickerOn && item.tvdbId != null && (
+                    <ReleasePicker params={{ type: "series", id: item.tvdbId, seasonNumber: s.seasonNumber }} />
+                  )}
+
+                  {isOpen && (
+                    <div className="media-ep-list">
+                      {s.episodes.map((ep) => (
+                        <div key={ep.id} className={`media-ep-row ${ep.played ? "media-ep-played" : ""}`}>
+                          <span className="media-ep-num mono">{ep.episodeNumber ?? "—"}</span>
+                          <span className="media-ep-name" title={ep.name}>{ep.name}</span>
+                          <button
+                            className="btn btn-icon btn-sm"
+                            title="Воспроизвести"
+                            disabled={busy === ep.id}
+                            onClick={() => onPlay(ep.id, `${item.name} — S${s.seasonNumber}E${ep.episodeNumber ?? "?"} ${ep.name}`)}
+                          >
+                            {busy === ep.id ? "…" : "▶"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}
+
 // Дравер «Добавить»: основной путь — поиск тайтла в Radarr/Sonarr (правильный
 // пайплайн в медиатеку); ниже — ручные опции (прямой magnet + raw-поиск Prowlarr).
 function AddTorrentDrawer({
-  open, onClose, onAdd, onAddTitle, busy,
+  open, onClose, onAdd, onAddTitle, onGrabbed, busy,
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (url: string, key: string) => Promise<void>;
   onAddTitle: (item: ArrLookupItem, key: string) => Promise<boolean>;
+  onGrabbed: () => void;
   busy: string | null;
 }) {
   const [kind, setKind] = useState<"movie" | "series">("movie");
@@ -111,6 +271,8 @@ function AddTorrentDrawer({
   const [titleResults, setTitleResults] = useState<ArrLookupItem[]>([]);
   const [lookingUp, setLookingUp] = useState(false);
   const [addedIds, setAddedIds] = useState<Record<number, boolean>>({});
+  const [pickerFor, setPickerFor] = useState<number | null>(null);
+  const [pickSeason, setPickSeason] = useState(1);
 
   const [showManual, setShowManual] = useState(false);
   const [magnet, setMagnet] = useState("");
@@ -173,22 +335,56 @@ function AddTorrentDrawer({
               {titleResults.map((it) => {
                 const isAdded = it.added || addedIds[it.id];
                 const key = `title-${it.id}`;
+                const pickerOn = pickerFor === it.id;
                 return (
-                  <div key={it.id} className="lk-row">
-                    <div className="lk-poster">
-                      {it.poster ? <img src={posterUrl(it.poster)} alt="" loading="lazy" /> : <span className="lk-poster-ph">{kind === "movie" ? "🎬" : "📺"}</span>}
+                  <div key={it.id} className="lk-wrap">
+                    <div className="lk-row">
+                      <div className="lk-poster">
+                        {it.poster ? <img src={posterUrl(it.poster)} alt="" loading="lazy" /> : <span className="lk-poster-ph">{kind === "movie" ? "🎬" : "📺"}</span>}
+                      </div>
+                      <div className="lk-body">
+                        <span className="lk-title" title={it.title}>{it.title}{it.year ? ` (${it.year})` : ""}</span>
+                        {it.overview && <span className="lk-overview">{it.overview}</span>}
+                        <div className="lk-actions">
+                          <button
+                            className="btn btn-sm btn-accent"
+                            disabled={isAdded || busy === key}
+                            onClick={async () => { const ok = await onAddTitle(it, key); if (ok) setAddedIds((p) => ({ ...p, [it.id]: true })); }}
+                          >
+                            {isAdded ? "В библиотеке" : busy === key ? "…" : "Добавить"}
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => setPickerFor(pickerOn ? null : it.id)}
+                          >
+                            {pickerOn ? "Скрыть раздачи" : "Выбрать раздачу"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="lk-body">
-                      <span className="lk-title" title={it.title}>{it.title}{it.year ? ` (${it.year})` : ""}</span>
-                      {it.overview && <span className="lk-overview">{it.overview}</span>}
-                    </div>
-                    <button
-                      className="btn btn-sm btn-accent lk-add"
-                      disabled={isAdded || busy === key}
-                      onClick={async () => { const ok = await onAddTitle(it, key); if (ok) setAddedIds((p) => ({ ...p, [it.id]: true })); }}
-                    >
-                      {isAdded ? "В библиотеке" : busy === key ? "…" : "Добавить"}
-                    </button>
+                    {pickerOn && (
+                      <div className="lk-picker">
+                        {it.kind === "series" && (
+                          <div className="add-field" style={{ alignItems: "center" }}>
+                            <span className="add-label" style={{ margin: 0 }}>Сезон</span>
+                            <input
+                              className="neu-in mc-input"
+                              type="number"
+                              min={1}
+                              value={pickSeason}
+                              onChange={(e) => setPickSeason(Math.max(0, Number(e.target.value) || 1))}
+                              style={{ width: 70 }}
+                            />
+                          </div>
+                        )}
+                        <ReleasePicker
+                          params={it.kind === "series"
+                            ? { type: "series", id: it.id, seasonNumber: pickSeason }
+                            : { type: "movie", id: it.id }}
+                          onGrabbed={onGrabbed}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -269,6 +465,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [seriesOpen, setSeriesOpen] = useState<LibraryItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -300,12 +497,14 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     );
   }
 
-  const onPlay = async (item: LibraryItem) => {
-    setBusy(item.id);
-    const url = await getMediaPlayUrl(item.id);
+  const onPlayId = async (id: string, title: string) => {
+    setBusy(id);
+    const url = await getMediaPlayUrl(id);
     setBusy(null);
-    if (url) setPlayer({ url, title: item.seriesName ? `${item.seriesName} — ${item.name}` : item.name });
+    if (url) setPlayer({ url, title });
   };
+
+  const onPlay = (item: LibraryItem) => onPlayId(item.id, item.name);
 
   const onCast = async (item: LibraryItem, device: PlayDevice) => {
     setBusy("cast" + item.id);
@@ -350,7 +549,15 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   return (
     <div className="page">
       {player && <Player url={player.url} title={player.title} onClose={() => setPlayer(null)} />}
-      <AddTorrentDrawer open={addOpen} onClose={() => setAddOpen(false)} onAdd={onAdd} onAddTitle={onAddTitle} busy={busy} />
+      <AddTorrentDrawer open={addOpen} onClose={() => setAddOpen(false)} onAdd={onAdd} onAddTitle={onAddTitle} onGrabbed={onMediaUpdate} busy={busy} />
+      {seriesOpen && (
+        <SeriesDrawer
+          item={seriesOpen}
+          onClose={() => setSeriesOpen(null)}
+          onPlay={onPlayId}
+          busy={busy}
+        />
+      )}
 
       <div className="page-cols">
         <div className="page-col-main">
@@ -391,55 +598,60 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
               <div className="empty">Библиотека пуста или ещё не отсканирована.</div>
             ) : (
               <div className="media-grid">
-                {library.map((it) => (
-                  <div key={it.id} className="media-item-wrap">
-                    <button
-                      className="neu media-item"
-                      disabled={busy === it.id}
-                      onClick={() => onPlay(it)}
-                      title={it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}
-                    >
-                      <img
-                        className="media-item-poster"
-                        src={jellyfinPosterUrl(it.id)}
-                        alt=""
-                        loading="lazy"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-                      />
-                      <span className="media-item-name">{it.seriesName ? `${it.seriesName} — ${it.name}` : it.name}</span>
-                      <span className="media-item-meta mono">
-                        {it.type === "Episode" ? "эпизод" : it.type === "Movie" ? "фильм" : it.type}
-                        {it.year ? ` · ${it.year}` : ""}
-                      </span>
-                      <span className="media-item-play">{busy === it.id ? "…" : "▶"}</span>
-                    </button>
-                    {devices.length > 0 && (
-                      <div className="media-cast">
-                        <button
-                          className="btn btn-icon btn-sm media-cast-btn"
-                          title="Играть на устройстве"
-                          onClick={() => setCastFor(castFor === it.id ? null : it.id)}
-                        >
-                          📺
-                        </button>
-                        {castFor === it.id && (
-                          <div className="media-cast-menu neu">
-                            {devices.map((d) => (
-                              <button
-                                key={d.id}
-                                className="media-cast-item"
-                                disabled={busy === "cast" + it.id}
-                                onClick={() => onCast(it, d)}
-                              >
-                                {d.deviceName}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {library.map((it) => {
+                  const isSeries = it.type === "Series";
+                  return (
+                    <div key={it.id} className="media-item-wrap">
+                      <button
+                        className="neu media-item"
+                        disabled={busy === it.id}
+                        onClick={() => (isSeries ? setSeriesOpen(it) : onPlay(it))}
+                        title={it.name}
+                      >
+                        <img
+                          className="media-item-poster"
+                          src={jellyfinPosterUrl(it.id)}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                        />
+                        <span className="media-item-name">{it.name}</span>
+                        <span className="media-item-meta mono">
+                          {isSeries
+                            ? `📺${it.childCount ? ` · ${it.childCount} сез.` : ""}`
+                            : "фильм"}
+                          {it.year ? ` · ${it.year}` : ""}
+                        </span>
+                        <span className="media-item-play">{busy === it.id ? "…" : isSeries ? "›" : "▶"}</span>
+                      </button>
+                      {!isSeries && devices.length > 0 && (
+                        <div className="media-cast">
+                          <button
+                            className="btn btn-icon btn-sm media-cast-btn"
+                            title="Играть на устройстве"
+                            onClick={() => setCastFor(castFor === it.id ? null : it.id)}
+                          >
+                            📺
+                          </button>
+                          {castFor === it.id && (
+                            <div className="media-cast-menu neu">
+                              {devices.map((d) => (
+                                <button
+                                  key={d.id}
+                                  className="media-cast-item"
+                                  disabled={busy === "cast" + it.id}
+                                  onClick={() => onCast(it, d)}
+                                >
+                                  {d.deviceName}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Card>

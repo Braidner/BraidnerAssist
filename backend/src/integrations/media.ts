@@ -34,9 +34,30 @@ export interface MediaData {
 export interface LibraryItem {
   id: string;
   name: string;
-  type: string; // Movie | Episode | Series
-  seriesName: string | null;
+  type: "Movie" | "Series";
   year: number | null;
+  tvdbId: number | null; // series only — маппится на внутренний id Sonarr для поиска релизов
+  childCount: number | null; // series only — число сезонов
+}
+
+export interface SeriesEpisode {
+  id: string;
+  name: string;
+  seasonNumber: number;
+  episodeNumber: number | null;
+  played: boolean;
+}
+
+export interface SeriesSeason {
+  seasonNumber: number;
+  episodes: SeriesEpisode[];
+}
+
+export interface SeriesDetail {
+  id: string;
+  name: string;
+  tvdbId: number | null;
+  seasons: SeriesSeason[];
 }
 
 export interface SearchResult {
@@ -109,28 +130,82 @@ interface JfItem {
   Type?: string;
   SeriesName?: string;
   ProductionYear?: number;
+  ProviderIds?: Record<string, string>;
+  ChildCount?: number;
 }
 
-// Недавно добавленные элементы библиотеки (фильмы + эпизоды).
+// Каталог библиотеки: все фильмы + все сериалы (сериал — одна плитка, эпизоды
+// видны в drill-down). Movies и Series тащим отдельными запросами через allSettled.
 export async function getLibrary(): Promise<LibraryItem[]> {
   if (!config.media.jellyfin.configured) return [];
-  const url = new URL(`${config.media.jellyfin.url}/Items`);
-  url.searchParams.set("Recursive", "true");
-  url.searchParams.set("IncludeItemTypes", "Movie,Episode");
-  url.searchParams.set("SortBy", "DateCreated");
-  url.searchParams.set("SortOrder", "Descending");
-  url.searchParams.set("Limit", "40");
-  url.searchParams.set("Fields", "ProductionYear");
+  const fetchItems = async (type: "Movie" | "Series"): Promise<LibraryItem[]> => {
+    const url = new URL(`${config.media.jellyfin.url}/Items`);
+    url.searchParams.set("Recursive", "true");
+    url.searchParams.set("IncludeItemTypes", type);
+    url.searchParams.set("SortBy", "SortName");
+    url.searchParams.set("SortOrder", "Ascending");
+    url.searchParams.set("Fields", "ProductionYear,ProviderIds,ChildCount");
+    const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
+    if (!res.ok) throw new Error(`Jellyfin /Items(${type}) responded ${res.status}`);
+    const body = (await res.json()) as { Items?: JfItem[] };
+    return (body.Items ?? []).map((it) => ({
+      id: it.Id,
+      name: it.Name ?? "—",
+      type,
+      year: it.ProductionYear ?? null,
+      tvdbId: type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null,
+      childCount: type === "Series" ? it.ChildCount ?? null : null,
+    }));
+  };
+  const [movies, series] = await Promise.allSettled([fetchItems("Movie"), fetchItems("Series")]);
+  return [
+    ...(series.status === "fulfilled" ? series.value : []),
+    ...(movies.status === "fulfilled" ? movies.value : []),
+  ];
+}
+
+// Сезоны + эпизоды сериала (drill-down). /Shows/{id}/Episodes отдаёт все эпизоды
+// с ParentIndexNumber=сезон, IndexNumber=эпизод. Группируем по сезонам.
+export async function getSeriesDetail(seriesId: string): Promise<SeriesDetail> {
+  if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
+  const userId = await jellyfinUserId();
+  const url = new URL(`${config.media.jellyfin.url}/Shows/${seriesId}/Episodes`);
+  if (userId) url.searchParams.set("UserId", userId);
+  url.searchParams.set("Fields", "ProviderIds");
   const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
-  if (!res.ok) throw new Error(`Jellyfin /Items responded ${res.status}`);
-  const body = (await res.json()) as { Items?: JfItem[] };
-  return (body.Items ?? []).map((it) => ({
-    id: it.Id,
-    name: it.Name ?? "—",
-    type: it.Type ?? "—",
-    seriesName: it.SeriesName ?? null,
-    year: it.ProductionYear ?? null,
-  }));
+  if (!res.ok) throw new Error(`Jellyfin /Episodes responded ${res.status}`);
+  const body = (await res.json()) as {
+    Items?: {
+      Id: string;
+      Name?: string;
+      ParentIndexNumber?: number;
+      IndexNumber?: number;
+      SeriesName?: string;
+      UserData?: { Played?: boolean };
+      SeriesProviderIds?: Record<string, string>;
+    }[];
+  };
+  const items = body.Items ?? [];
+  const seasonsMap = new Map<number, SeriesEpisode[]>();
+  for (const e of items) {
+    const sn = e.ParentIndexNumber ?? 0;
+    if (!seasonsMap.has(sn)) seasonsMap.set(sn, []);
+    seasonsMap.get(sn)!.push({
+      id: e.Id,
+      name: e.Name ?? "—",
+      seasonNumber: sn,
+      episodeNumber: e.IndexNumber ?? null,
+      played: Boolean(e.UserData?.Played),
+    });
+  }
+  const seasons: SeriesSeason[] = [...seasonsMap.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([seasonNumber, eps]) => ({
+      seasonNumber,
+      episodes: eps.sort((a, b) => (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0)),
+    }));
+  const tvdbId = Number(items[0]?.SeriesProviderIds?.Tvdb) || null;
+  return { id: seriesId, name: items[0]?.SeriesName ?? "—", tvdbId, seasons };
 }
 
 // Первый userId Jellyfin (нужен PlaybackInfo). Кешируем.
@@ -588,8 +663,16 @@ export async function arrLookup(kind: "movie" | "series", term: string): Promise
   }));
 }
 
-// Добавить тайтл в библиотеку *arr и запустить поиск релиза.
-export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ title: string }> {
+// Обеспечить присутствие тайтла в библиотеке *arr и вернуть внутренний id.
+// Если тайтл уже добавлен — lookup по id вернёт found.id>0, отдаём его без POST.
+// autoSearch=true (ручка «Добавить») сразу запускает поиск релиза; false («Выбрать
+// раздачу») добавляет monitored без авто-поиска, чтобы появился internal id для
+// интерактивного /release. Единый источник логики добавления (DRY с arrAdd).
+async function arrEnsureAdded(
+  kind: "movie" | "series",
+  id: number,
+  autoSearch: boolean,
+): Promise<{ id: number; title: string; alreadyInLibrary: boolean }> {
   const cfg = arrCfg(kind);
   if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
   const headers = { "X-Api-Key": cfg.apiKey!, "Content-Type": "application/json" };
@@ -615,7 +698,9 @@ export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ ti
   if (!lkRes.ok) throw new Error(`${kind} lookup ${lkRes.status}`);
   const found = ((await lkRes.json()) as (ArrLookupRecord & Record<string, unknown>)[])[0];
   if (!found) throw new Error(`${kind}: не найдено (id ${id})`);
-  if (found.id && found.id > 0) return { title: found.title ?? "—" }; // уже в библиотеке
+  if (found.id && found.id > 0) {
+    return { id: found.id, title: found.title ?? "—", alreadyInLibrary: true };
+  }
 
   const body: Record<string, unknown> = {
     ...found,
@@ -625,9 +710,9 @@ export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ ti
   };
   if (kind === "movie") {
     body.minimumAvailability = "released";
-    body.addOptions = { searchForMovie: true };
+    body.addOptions = { searchForMovie: autoSearch };
   } else {
-    body.addOptions = { searchForMissingEpisodes: true, monitor: "all" };
+    body.addOptions = { searchForMissingEpisodes: autoSearch, monitor: "all" };
   }
 
   const res = await fetch(`${cfg.url}/api/v3/${path}`, {
@@ -640,9 +725,112 @@ export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ ti
     const txt = await res.text().catch(() => "");
     throw new Error(`${kind} add ${res.status}: ${txt.slice(0, 200)}`);
   }
-  const created = (await res.json()) as { title?: string };
+  const created = (await res.json()) as { id: number; title?: string };
   cache = null;
-  return { title: created.title ?? found.title ?? "—" };
+  return { id: created.id, title: created.title ?? found.title ?? "—", alreadyInLibrary: false };
+}
+
+// Добавить тайтл в библиотеку *arr и запустить поиск релиза (авто-граб).
+export async function arrAdd(kind: "movie" | "series", id: number): Promise<{ title: string }> {
+  const { title } = await arrEnsureAdded(kind, id, true);
+  return { title };
+}
+
+// ── Интерактивный поиск/граб релизов (Sonarr/Radarr /api/v3/release) ────────
+export interface ReleaseOption {
+  guid: string;
+  indexerId: number;
+  title: string;
+  quality: string; // напр. "WEBDL-1080p"
+  languages: string[]; // напр. ["Russian"] — несёт инфо об озвучке для русских релизов
+  size: number;
+  seeders: number | null;
+  indexer: string;
+  protocol: string;
+  rejected: boolean;
+  rejections: string[];
+}
+
+// Кеш полных raw-записей релизов по guid — grab переотправляет полный объект
+// (надёжнее, чем guid+indexerId, который ловит downloadAllowed:false вне кеша *arr).
+const releaseCache = new Map<string, { record: Record<string, unknown>; kind: "movie" | "series"; at: number }>();
+const RELEASE_TTL = 10 * 60_000;
+
+function mapRelease(r: Record<string, unknown>): ReleaseOption {
+  const q = r.quality as { quality?: { name?: string } } | undefined;
+  const langs = Array.isArray(r.languages)
+    ? (r.languages as { name?: string }[]).map((l) => String(l.name ?? "")).filter(Boolean)
+    : [];
+  return {
+    guid: String(r.guid ?? ""),
+    indexerId: Number(r.indexerId ?? 0),
+    title: String(r.title ?? "—"),
+    quality: String(q?.quality?.name ?? "—"),
+    languages: langs,
+    size: Number(r.size ?? 0),
+    seeders: r.seeders != null ? Number(r.seeders) : null,
+    indexer: String(r.indexer ?? "—"),
+    protocol: String(r.protocol ?? "—"),
+    rejected: Boolean(r.rejected),
+    rejections: Array.isArray(r.rejections) ? (r.rejections as unknown[]).map(String) : [],
+  };
+}
+
+// Интерактивный поиск релизов. movie → Radarr ?movieId; series → Sonarr ?seriesId&seasonNumber.
+// externalId — tmdbId (movie) | tvdbId (series); тайтл при необходимости добавляется
+// monitored без авто-поиска, чтобы получить internal id.
+export async function arrReleaseSearch(
+  kind: "movie" | "series",
+  externalId: number,
+  seasonNumber?: number,
+): Promise<ReleaseOption[]> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  const internalId = (await arrEnsureAdded(kind, externalId, false)).id;
+  const url = new URL(`${cfg.url}/api/v3/release`);
+  if (kind === "movie") {
+    url.searchParams.set("movieId", String(internalId));
+  } else {
+    url.searchParams.set("seriesId", String(internalId));
+    if (seasonNumber != null) url.searchParams.set("seasonNumber", String(seasonNumber));
+  }
+  const res = await fetch(url, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`${kind} release search ${res.status}`);
+  const records = (await res.json()) as Record<string, unknown>[];
+  const now = Date.now();
+  for (const [g, v] of releaseCache) if (now - v.at > RELEASE_TTL) releaseCache.delete(g);
+  const torrents = records.filter((r) => r.protocol === "torrent");
+  for (const r of torrents) if (r.guid) releaseCache.set(String(r.guid), { record: r, kind, at: now });
+  return torrents.map(mapRelease).sort((a, b) => (b.seeders ?? 0) - (a.seeders ?? 0));
+}
+
+// Форс-граб выбранного релиза: POST полного объекта (из кеша) → *arr качает+импортирует.
+export async function arrReleaseGrab(
+  kind: "movie" | "series",
+  guid: string,
+  indexerId: number,
+): Promise<void> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  const headers = { "X-Api-Key": cfg.apiKey!, "Content-Type": "application/json" };
+  const cached = releaseCache.get(guid);
+  const body: Record<string, unknown> = cached ? cached.record : { guid, indexerId };
+  const res = await fetch(`${cfg.url}/api/v3/release`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  // *arr иногда отдаёт 500 «Failed to connect to qBittorrent», но торрент реально
+  // добавлен — считаем 2xx и 5xx успехом (как выяснено при форс-грабе), бросаем на 4xx.
+  if (res.status >= 400 && res.status < 500) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`${kind} grab ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  cache = null;
 }
 
 // ── Подборки (discover) из import-list'ов Radarr/Sonarr ─────────────────────

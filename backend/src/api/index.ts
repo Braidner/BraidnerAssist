@@ -13,6 +13,7 @@ import { getAdguard, setAdguardProtection } from "../integrations/adguard.js";
 import {
   getMedia,
   getLibrary,
+  getSeriesDetail,
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
@@ -24,6 +25,8 @@ import {
   prowlarrSearch,
   arrLookup,
   arrAdd,
+  arrReleaseSearch,
+  arrReleaseGrab,
 } from "../integrations/media.js";
 import { log, getEntries } from "../logger.js";
 
@@ -275,6 +278,16 @@ apiRouter.get("/media/library", async (_req, res) => {
   }
 });
 
+// Детали сериала: сезоны + эпизоды (drill-down).
+apiRouter.get("/media/series/:id", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getSeriesDetail(req.params.id));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
 // Путь воспроизведения (HLS) для элемента — под наш прокси, без api_key.
 apiRouter.get("/media/play/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
@@ -331,6 +344,37 @@ apiRouter.post("/media/add", async (req, res) => {
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   try {
     res.json({ ok: true, ...(await arrAdd(kind, id)) });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Интерактивный поиск релизов (выбор раздачи с озвучкой/качеством).
+apiRouter.post("/media/release/search", async (req, res) => {
+  const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
+  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const id = Number(req.body?.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
+  const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
+  try {
+    res.json(await arrReleaseSearch(kind, id, seasonNumber));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Форс-граб выбранного релиза (guid + indexerId из результатов поиска).
+apiRouter.post("/media/release/grab", async (req, res) => {
+  const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
+  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const guid = String(req.body?.guid ?? "").trim();
+  const indexerId = Number(req.body?.indexerId);
+  if (!guid || !Number.isFinite(indexerId)) return res.status(400).json({ error: "guid and indexerId required" });
+  try {
+    await arrReleaseGrab(kind, guid, indexerId);
+    res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

@@ -23,6 +23,9 @@ export interface DownloadItem {
   eta?: number | null; // секунды до завершения, null = неизвестно
   seeds?: number;
   size?: number; // байт
+  downloadId?: string; // qB-хеш (Sonarr/Radarr) — ключ для ручного импорта
+  importPending?: boolean; // скачано, но Sonarr/Radarr не смог импортировать (multi-season и т.п.)
+  importMessage?: string; // краткая причина из statusMessages
 }
 
 export interface MediaData {
@@ -335,6 +338,9 @@ interface ArrQueueRecord {
   sizeleft?: number;
   status?: string;
   downloadId?: string;
+  trackedDownloadState?: string;
+  trackedDownloadStatus?: string;
+  statusMessages?: { title?: string; messages?: string[] }[];
 }
 
 async function arrQueue(
@@ -352,6 +358,14 @@ async function arrQueue(
     const size = r.size ?? 0;
     const left = r.sizeleft ?? 0;
     const progress = size > 0 ? Math.round(((size - left) / size) * 100) : 0;
+    // Раздача скачана, но импорт не прошёл (multi-season пак / мис-парс): Sonarr/Radarr
+    // держит её в очереди с warning/error и statusMessages про импорт.
+    const msgs = (r.statusMessages ?? []).flatMap((m) => m.messages ?? []);
+    const blockedState = r.trackedDownloadState === "importPending" || r.trackedDownloadState === "importBlocked";
+    const warnStatus = r.trackedDownloadStatus === "warning" || r.trackedDownloadStatus === "error";
+    const importHint = msgs.some((m) => /import|grabbed release|season|episode/i.test(m));
+    const importPending = blockedState || (warnStatus && importHint);
+    const importMessage = importPending ? (msgs.find((m) => m.trim())?.trim().slice(0, 90) || undefined) : undefined;
     return {
       hash: r.downloadId ?? r.title ?? Math.random().toString(36),
       title: r.title ?? "—",
@@ -359,6 +373,9 @@ async function arrQueue(
       progress,
       state: r.status ?? "—",
       size,
+      downloadId: r.downloadId,
+      importPending,
+      importMessage,
     };
   });
 }
@@ -831,6 +848,161 @@ export async function arrReleaseGrab(
     throw new Error(`${kind} grab ${res.status}: ${txt.slice(0, 200)}`);
   }
   cache = null;
+}
+
+// ── Ручной импорт застрявших раздач (Sonarr/Radarr ManualImport) ───────
+// Multi-season пак скачан, но авто-импорт отклонён («not found in the grabbed
+// release» и т.п.). Manual Import импортирует выбранные файлы в обход реджекта —
+// как кнопка «Import» в UI Sonarr/Radarr.
+export interface ManualImportEpisode {
+  id: number;
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+}
+export interface ManualImportFile {
+  id: number;
+  path: string;
+  relativePath: string;
+  folderName: string | null;
+  size: number;
+  quality: string;
+  languages: string[];
+  releaseGroup: string | null;
+  seasonNumber: number | null; // series
+  episodes: ManualImportEpisode[]; // series
+  movieTitle: string | null; // movie
+  rejections: string[];
+}
+
+// Кеш сырых записей manualimport по downloadId — execute переотправляет точные
+// quality/languages объекты (та же логика, что и releaseCache).
+const importCache = new Map<string, { records: Record<string, any>[]; kind: "movie" | "series"; at: number }>();
+const IMPORT_TTL = 10 * 60_000;
+
+function mapImportFile(r: Record<string, any>, id: number): ManualImportFile {
+  const eps = Array.isArray(r.episodes) ? r.episodes : [];
+  return {
+    id,
+    path: String(r.path ?? ""),
+    relativePath: String(r.relativePath ?? r.name ?? ""),
+    folderName: r.folderName ?? null,
+    size: Number(r.size ?? 0),
+    quality: String(r.quality?.quality?.name ?? "—"),
+    languages: Array.isArray(r.languages) ? r.languages.map((l: any) => String(l.name ?? "")).filter(Boolean) : [],
+    releaseGroup: r.releaseGroup ?? null,
+    seasonNumber: r.seasonNumber ?? null,
+    episodes: eps.map((e: any) => ({
+      id: Number(e.id ?? 0),
+      seasonNumber: Number(e.seasonNumber ?? r.seasonNumber ?? 0),
+      episodeNumber: Number(e.episodeNumber ?? 0),
+      title: String(e.title ?? "—"),
+    })),
+    movieTitle: r.movie?.title ?? null,
+    rejections: Array.isArray(r.rejections) ? r.rejections.map((x: any) => String(x.reason ?? x)) : [],
+  };
+}
+
+// Кандидаты для ручного импорта застрявшей раздачи (по downloadId = qB-хеш).
+export async function manualImportCandidates(
+  kind: "movie" | "series",
+  downloadId: string,
+): Promise<ManualImportFile[]> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  const url = new URL(`${cfg.url}/api/v3/manualimport`);
+  url.searchParams.set("downloadId", downloadId);
+  url.searchParams.set("filterExistingFiles", "true");
+  const res = await fetch(url, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`${kind} manualimport ${res.status}`);
+  const records = (await res.json()) as Record<string, any>[];
+  const now = Date.now();
+  for (const [k, v] of importCache) if (now - v.at > IMPORT_TTL) importCache.delete(k);
+  importCache.set(downloadId, { records, kind, at: now });
+  return records.map((r, i) => mapImportFile(r, i));
+}
+
+// Авто-выбор файлов: по одному лучшему на серию (series) / на фильм (movie),
+// дедуп копий (две S2 в паке). Используется MCP-дефолтом (UI зеркалит ту же логику).
+export function autoSelectImportFileIds(files: ManualImportFile[], kind: "movie" | "series"): number[] {
+  const usable = files.filter((f) => {
+    // пропускаем дубли уже существующего лучшего качества
+    if (f.rejections.some((m) => /not an upgrade|already imported/i.test(m))) return false;
+    return kind === "series" ? f.episodes.length > 0 : Boolean(f.movieTitle);
+  });
+  const best = new Map<string, ManualImportFile>();
+  for (const f of usable) {
+    const keys =
+      kind === "series"
+        ? f.episodes.map((e) => `S${e.seasonNumber}E${e.episodeNumber}`)
+        : [`movie-${f.movieTitle}`];
+    for (const key of keys) {
+      const prev = best.get(key);
+      if (!prev || f.rejections.length < prev.rejections.length ||
+          (f.rejections.length === prev.rejections.length && f.size > prev.size)) {
+        best.set(key, f);
+      }
+    }
+  }
+  return [...new Set([...best.values()].map((f) => f.id))];
+}
+
+// Импорт выбранных файлов: POST ManualImport-команды полными объектами из кеша.
+export async function manualImportExecute(
+  kind: "movie" | "series",
+  downloadId: string,
+  fileIds: number[],
+  importMode: "copy" | "move" = "copy",
+): Promise<number> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  let cached = importCache.get(downloadId);
+  if (!cached) {
+    await manualImportCandidates(kind, downloadId);
+    cached = importCache.get(downloadId);
+  }
+  if (!cached) throw new Error("Нет кандидатов для импорта");
+  const wanted = new Set(fileIds);
+  const files = cached.records
+    .map((r, i) => ({ r, i }))
+    .filter(({ i }) => wanted.has(i))
+    .map(({ r }) =>
+      kind === "series"
+        ? {
+            path: r.path,
+            folderName: r.folderName,
+            seriesId: r.series?.id,
+            episodeIds: (r.episodes ?? []).map((e: any) => e.id),
+            quality: r.quality,
+            languages: r.languages,
+            releaseGroup: r.releaseGroup,
+          }
+        : {
+            path: r.path,
+            folderName: r.folderName,
+            movieId: r.movie?.id,
+            quality: r.quality,
+            languages: r.languages,
+            releaseGroup: r.releaseGroup,
+          },
+    );
+  if (files.length === 0) throw new Error("Не выбрано ни одного файла");
+  const headers = { "X-Api-Key": cfg.apiKey!, "Content-Type": "application/json" };
+  const res = await fetch(`${cfg.url}/api/v3/command`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name: "ManualImport", importMode, files }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (res.status >= 400 && res.status < 500) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`${kind} import ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  cache = null;
+  return files.length;
 }
 
 // ── Подборки (discover) из import-list'ов Radarr/Sonarr ─────────────────────

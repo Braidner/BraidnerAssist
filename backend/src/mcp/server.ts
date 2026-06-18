@@ -7,7 +7,7 @@ import { getServices } from "../integrations/services.js";
 import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
-import { getMedia, qbAdd, arrLookup, arrAdd, arrReleaseSearch, arrReleaseGrab, jellyfinSessions, jellyfinPlayTo, getRecommendations } from "../integrations/media.js";
+import { getMedia, qbAdd, arrLookup, arrAdd, arrReleaseSearch, arrReleaseGrab, manualImportCandidates, manualImportExecute, autoSelectImportFileIds, jellyfinSessions, jellyfinPlayTo, getRecommendations } from "../integrations/media.js";
 import { getAdguard } from "../integrations/adguard.js";
 
 function ok(data: unknown) {
@@ -26,7 +26,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). If a download finishes but never appears in the library — a multi-season pack or mis-parsed release stuck in the queue (get_media_status marks it importPending) — resolve it with list_import_candidates({type, downloadId}) then import_release({type, downloadId, fileIds?}) (omit fileIds to auto-import one best file per episode); this force-imports past the "not in grabbed release" rejection. get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -277,6 +277,32 @@ export function createMcpServer() {
     async ({ type, guid, indexerId }) => {
       await arrReleaseGrab(type, guid, indexerId);
       return ok({ ok: true });
+    },
+  );
+
+  server.tool(
+    "list_import_candidates",
+    "List files of a finished-but-not-imported download (a multi-season pack or mis-parsed release stuck in the Sonarr/Radarr queue). downloadId is the qBittorrent hash from get_media_status (the download's downloadId/hash). Shows each file's mapped episode(s)/movie, quality, languages and rejection reasons. Pass the file ids to import_release, or call import_release without ids to auto-import one best file per episode.",
+    { type: z.enum(["movie", "series"]), downloadId: z.string() },
+    async ({ type, downloadId }) => {
+      const files = await manualImportCandidates(type, downloadId);
+      return ok({ ok: true, count: files.length, files });
+    },
+  );
+
+  server.tool(
+    "import_release",
+    "Force-import files of a stuck download via Sonarr/Radarr ManualImport — imports the selected files regardless of the \"not in grabbed release\" rejection (how multi-season packs get split into the library). Pass fileIds from list_import_candidates; omit fileIds to auto-pick one best file per episode/movie. importMode \"copy\" (default) keeps the torrent seeding.",
+    { type: z.enum(["movie", "series"]), downloadId: z.string(), fileIds: z.array(z.number()).optional() },
+    async ({ type, downloadId, fileIds }) => {
+      let ids = fileIds;
+      if (!ids || ids.length === 0) {
+        const files = await manualImportCandidates(type, downloadId);
+        ids = autoSelectImportFileIds(files, type);
+      }
+      if (ids.length === 0) return ok({ ok: false, error: "Нет подходящих файлов для импорта" });
+      const imported = await manualImportExecute(type, downloadId, ids);
+      return ok({ ok: true, imported });
     },
   );
 

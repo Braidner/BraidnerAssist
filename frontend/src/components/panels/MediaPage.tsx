@@ -10,8 +10,9 @@ import {
   getMediaLibrary, getMediaPlayUrl, searchReleases, addTorrent, torrentAction, refreshJellyfin,
   lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getMediaDevices, playOnDevice, getRecommendations,
   getSeriesDetail, searchReleaseOptions, grabRelease,
+  getImportCandidates, executeImport,
   type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
-  type PlayDevice, type Recommendation, type SeriesDetail, type ReleaseOption,
+  type PlayDevice, type Recommendation, type SeriesDetail, type ReleaseOption, type ManualImportFile,
 } from "../../lib/api.ts";
 import { getToken } from "../../lib/auth.ts";
 
@@ -154,6 +155,11 @@ function ReleasePicker({
               {done[r.guid] ? "✓ В очереди" : busyGuid === r.guid ? "…" : "Скачать"}
             </button>
           </div>
+          {done[r.guid] && /multi-season/i.test(r.rejections.join(" ")) && (
+            <div className="rel-reject" style={{ fontSize: 10.5 }}>
+              Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках, чтобы разложить серии.
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -247,6 +253,148 @@ function SeriesDrawer({
                 </div>
               );
             })
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// Клиентский предвыбор: по одному лучшему файлу на серию/фильм (дедуп копий).
+function autoSelectFiles(files: ManualImportFile[], kind: "movie" | "series"): Set<number> {
+  const usable = files.filter((f) => {
+    if (f.rejections.some((m) => /not an upgrade|already imported/i.test(m))) return false;
+    return kind === "series" ? f.episodes.length > 0 : Boolean(f.movieTitle);
+  });
+  const best = new Map<string, ManualImportFile>();
+  for (const f of usable) {
+    const keys = kind === "series"
+      ? f.episodes.map((e) => `S${e.seasonNumber}E${e.episodeNumber}`)
+      : [`movie-${f.movieTitle}`];
+    for (const key of keys) {
+      const prev = best.get(key);
+      if (!prev || f.rejections.length < prev.rejections.length ||
+          (f.rejections.length === prev.rejections.length && f.size > prev.size)) {
+        best.set(key, f);
+      }
+    }
+  }
+  return new Set([...best.values()].map((f) => f.id));
+}
+
+// Дравер ручного импорта застрявшей раздачи: файлы по сезонам/сериям, флажки,
+// предвыбран один файл на серию (дедуп копий с разной озвучкой), «Импорт».
+function ImportDrawer({
+  item, onClose, onDone,
+}: {
+  item: DownloadItem;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const kind: "movie" | "series" = item.source === "radarr" ? "movie" : "series";
+  const downloadId = item.downloadId ?? item.hash;
+  const [files, setFiles] = useState<ManualImportFile[] | null>(null);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getImportCandidates({ type: kind, downloadId }).then((fs) => {
+      setFiles(fs);
+      setSel(autoSelectFiles(fs, kind));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [downloadId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const toggle = (id: number) => setSel((p) => {
+    const n = new Set(p);
+    n.has(id) ? n.delete(id) : n.add(id);
+    return n;
+  });
+
+  const onImport = async () => {
+    setBusy(true);
+    const ok = await executeImport({ type: kind, downloadId, fileIds: [...sel] });
+    setBusy(false);
+    if (ok) onDone();
+  };
+
+  // Группировка по сезонам (series) либо плоский список (movie).
+  const groups = (() => {
+    if (!files) return [];
+    if (kind === "movie") return [{ key: -1, label: "Файлы", files }] as { key: number; label: string; files: ManualImportFile[] }[];
+    const map = new Map<number, ManualImportFile[]>();
+    for (const f of files) {
+      const sn = f.episodes[0]?.seasonNumber ?? f.seasonNumber ?? 0;
+      if (!map.has(sn)) map.set(sn, []);
+      map.get(sn)!.push(f);
+    }
+    return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([sn, fs]) => ({
+      key: sn,
+      label: sn === 0 ? "Спецвыпуски" : `Сезон ${sn}`,
+      files: fs.sort((a, b) => (a.episodes[0]?.episodeNumber ?? 0) - (b.episodes[0]?.episodeNumber ?? 0)),
+    }));
+  })();
+
+  const fileLabel = (f: ManualImportFile) => {
+    if (kind === "series" && f.episodes.length > 0) {
+      const e = f.episodes[0];
+      const range = f.episodes.length > 1 ? `–E${f.episodes[f.episodes.length - 1].episodeNumber}` : "";
+      return `S${e.seasonNumber}E${e.episodeNumber}${range}`;
+    }
+    return f.movieTitle ?? "—";
+  };
+
+  return (
+    <>
+      <div className="drawer-overlay open" onClick={onClose} />
+      <aside className="drawer open">
+        <div className="drawer-inner">
+          <div className="drawer-head">
+            <span className="drawer-kind">Импорт: {item.title}</span>
+            <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
+          </div>
+
+          {files === null ? (
+            <div className="empty" style={{ marginTop: 12 }}>Сканируем файлы…</div>
+          ) : files.length === 0 ? (
+            <div className="empty" style={{ marginTop: 12 }}>Файлы для импорта не найдены.</div>
+          ) : (
+            <>
+              {groups.map((g) => (
+                <div key={g.key} className="media-season">
+                  <div className="media-season-head">
+                    <span className="media-season-toggle" style={{ cursor: "default" }}>{g.label}</span>
+                    <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{g.files.length} файл.</span>
+                  </div>
+                  <div className="media-ep-list">
+                    {g.files.map((f) => (
+                      <label key={f.id} className="imp-row">
+                        <input type="checkbox" className="imp-check" checked={sel.has(f.id)} onChange={() => toggle(f.id)} />
+                        <span className="media-ep-num mono">{fileLabel(f)}</span>
+                        <span className="imp-meta">
+                          <span className="rel-badge">{f.quality}</span>
+                          {f.languages.map((l) => <span key={l} className="rel-lang">{l}</span>)}
+                          <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{fmtSize(f.size)}</span>
+                          {f.rejections.length > 0 && (
+                            <span className="rel-reject" title={f.rejections.join("; ")}>⚠</span>
+                          )}
+                          <span className="imp-path" title={f.relativePath}>{f.relativePath}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <button className="btn btn-accent" style={{ width: "100%", marginTop: 16 }} disabled={busy || sel.size === 0} onClick={onImport}>
+                {busy ? "Импортируем…" : `Импортировать выбранное (${sel.size})`}
+              </button>
+            </>
           )}
         </div>
       </aside>
@@ -466,6 +614,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [seriesOpen, setSeriesOpen] = useState<LibraryItem | null>(null);
+  const [importFor, setImportFor] = useState<DownloadItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -556,6 +705,13 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
           onClose={() => setSeriesOpen(null)}
           onPlay={onPlayId}
           busy={busy}
+        />
+      )}
+      {importFor && (
+        <ImportDrawer
+          item={importFor}
+          onClose={() => setImportFor(null)}
+          onDone={() => { setImportFor(null); onMediaUpdate(); refreshJellyfin(); }}
         />
       )}
 
@@ -727,6 +883,9 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
                     <div key={d.hash} className="dl-row">
                       <div className="dl-head">
                         <span className="dl-title" title={d.title}>{d.title}</span>
+                        {d.importPending && (
+                          <span className="dl-import-badge" title={d.importMessage}>⚠ не импортировано</span>
+                        )}
                         <span className="dl-source">{SOURCE_LABEL[d.source]}</span>
                       </div>
                       <div className="dl-progress">
@@ -735,16 +894,21 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
                       </div>
                       <div className="dl-foot">
                         <span className="dl-meta">{meta || "—"}</span>
-                        {isQb && (
-                          <div className="dl-actions">
-                            {paused ? (
-                              <button className="btn btn-icon btn-sm" title="Возобновить" disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
-                            ) : (
-                              <button className="btn btn-icon btn-sm" title="Пауза" disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
-                            )}
-                            <button className="btn btn-icon btn-sm" title="Удалить" disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
-                          </div>
-                        )}
+                        <div className="dl-actions">
+                          {!isQb && d.importPending && (
+                            <button className="btn btn-sm btn-accent" title="Ручной импорт файлов" onClick={() => setImportFor(d)}>Импорт</button>
+                          )}
+                          {isQb && (
+                            <>
+                              {paused ? (
+                                <button className="btn btn-icon btn-sm" title="Возобновить" disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
+                              ) : (
+                                <button className="btn btn-icon btn-sm" title="Пауза" disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
+                              )}
+                              <button className="btn btn-icon btn-sm" title="Удалить" disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

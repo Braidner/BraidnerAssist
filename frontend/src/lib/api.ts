@@ -586,6 +586,30 @@ export interface DownloadItem {
   eta?: number | null;
   seeds?: number;
   size?: number;
+  downloadId?: string;
+  importPending?: boolean;
+  importMessage?: string;
+}
+
+export interface ManualImportEpisode {
+  id: number;
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+}
+export interface ManualImportFile {
+  id: number;
+  path: string;
+  relativePath: string;
+  folderName: string | null;
+  size: number;
+  quality: string;
+  languages: string[];
+  releaseGroup: string | null;
+  seasonNumber: number | null;
+  episodes: ManualImportEpisode[];
+  movieTitle: string | null;
+  rejections: string[];
 }
 
 export interface MediaData {
@@ -690,6 +714,41 @@ export async function grabRelease(p: {
 }): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/release/grab", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function getImportCandidates(p: {
+  type: "movie" | "series";
+  downloadId: string;
+}): Promise<ManualImportFile[]> {
+  try {
+    const res = await apiFetch("/api/media/import/candidates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(p),
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as ManualImportFile[];
+  } catch {
+    return [];
+  }
+}
+
+export async function executeImport(p: {
+  type: "movie" | "series";
+  downloadId: string;
+  fileIds: number[];
+  importMode?: "copy" | "move";
+}): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/import/execute", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p),

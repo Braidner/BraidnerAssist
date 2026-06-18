@@ -27,6 +27,8 @@ import {
   arrAdd,
   arrReleaseSearch,
   arrReleaseGrab,
+  manualImportCandidates,
+  manualImportExecute,
 } from "../integrations/media.js";
 import { log, getEntries } from "../logger.js";
 
@@ -375,6 +377,37 @@ apiRouter.post("/media/release/grab", async (req, res) => {
   try {
     await arrReleaseGrab(kind, guid, indexerId);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Кандидаты для ручного импорта застрявшей раздачи (по downloadId = qB-хеш).
+apiRouter.post("/media/import/candidates", async (req, res) => {
+  const kind = String(req.body?.type ?? "") === "movie" ? "movie" : "series";
+  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const downloadId = String(req.body?.downloadId ?? "").trim();
+  if (!downloadId) return res.status(400).json({ error: "downloadId required" });
+  try {
+    res.json(await manualImportCandidates(kind, downloadId));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Импорт выбранных файлов (ManualImport — в обход реджекта «not in grabbed release»).
+apiRouter.post("/media/import/execute", async (req, res) => {
+  const kind = String(req.body?.type ?? "") === "movie" ? "movie" : "series";
+  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const downloadId = String(req.body?.downloadId ?? "").trim();
+  const fileIds = Array.isArray(req.body?.fileIds) ? req.body.fileIds.map(Number).filter(Number.isFinite) : [];
+  if (!downloadId || fileIds.length === 0) return res.status(400).json({ error: "downloadId and fileIds required" });
+  const importMode = req.body?.importMode === "move" ? "move" : "copy";
+  try {
+    const imported = await manualImportExecute(kind, downloadId, fileIds, importMode);
+    res.json({ ok: true, imported });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

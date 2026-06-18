@@ -151,6 +151,20 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     (multi-season паки и т.п.) — это и есть способ дотащить зависший сезон. Фронт: `ReleasePicker` (плашки
     качества/языка/отклонения) доступен и в `SeriesDrawer` на каждый сезон («🔍 Раздача»), и в дравере
     «Добавить» на результат поиска («Выбрать раздачу», для сериала — поле сезона).
+    **Ручной импорт застрявших раздач (multi-season паки и т.п.)**: после force-grab пака через
+    поиск по одному сезону Sonarr помечает раздачу как «релиз сезона N» и **отклоняет авто-импорт**
+    серий вне него («Episode 2x01 was not found in the grabbed release») — пак скачан, но не разложен.
+    Очередь (`arrQueue`) теперь отдаёт `importPending`/`importMessage` (по `trackedDownloadState`
+    `importPending|importBlocked` + statusMessages). `POST /media/import/candidates {type,downloadId}`
+    (`manualImportCandidates` → Sonarr/Radarr `GET /api/v3/manualimport?downloadId=`) отдаёт файлы с
+    распарсенными сериями/сезоном, качеством, озвучкой и причинами реджекта; сырые записи кешируются по
+    `downloadId` (10 мин). `POST /media/import/execute {type,downloadId,fileIds[],importMode?}`
+    (`manualImportExecute` → `POST /api/v3/command {name:"ManualImport"}`) импортирует выбранные файлы
+    **в обход реджекта** — как кнопка «Import» в UI Sonarr; `importMode:"copy"` (дефолт) сохраняет
+    сидирование. `autoSelectImportFileIds` берёт по одному лучшему файлу на серию/фильм (дедуп копий —
+    в паке бывает две копии сезона с разной озвучкой). Фронт: застрявшие раздачи в карточке Загрузки
+    помечены «⚠ не импортировано» + кнопка «Импорт» → `ImportDrawer` (файлы по сезонам, флажки,
+    предвыбран один файл на серию). `downloadId` = qB-хеш (`DownloadItem.downloadId`).
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий
     с Prowlarr grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
     (Prowlarr), `POST /media/scan` (`/Library/Refresh`).
@@ -165,6 +179,8 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_movie`/`add_series`
     (правильный пайплайн, основной), `search_releases`/`grab_release` (интерактивный выбор раздачи с
     нужной озвучкой/качеством; `grab_release` после своего `search_releases` — кеш по guid),
+    `list_import_candidates`/`import_release` (разложить застрявший multi-season пак: ManualImport
+    в обход реджекта; `import_release` без `fileIds` — авто-выбор по одному файлу на серию),
     `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/`get_recommendations` (Hermes).
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:

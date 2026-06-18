@@ -40,9 +40,14 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
   if (!d) return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Не удалось загрузить сериал.</div></div>;
 
   const poster = d.posterRemote ? posterUrl(d.posterRemote) : jellyfinPosterUrl(d.jellyfinId);
-  const stuck = media.downloads.filter(
-    (x) => x.importPending && x.source === "sonarr" && norm(x.title).includes(norm(d.title)),
-  );
+  // Один и тот же пак приходит несколькими queue-записями → дедуп по downloadId.
+  const stuck = [
+    ...new Map(
+      media.downloads
+        .filter((x) => x.importPending && x.source === "sonarr" && norm(x.title).includes(norm(d.title)))
+        .map((x) => [x.downloadId ?? x.hash, x]),
+    ).values(),
+  ];
 
   return (
     <div className="page">
@@ -75,11 +80,15 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
             {[d.network, d.runtime ? `${d.runtime} мин` : "", d.rating ? `★ ${d.rating.toFixed(1)}` : ""].filter(Boolean).join("  ·  ")}
           </div>
           {d.overview && <p className="mediadetail-overview">{d.overview}</p>}
-          {stuck.map((s) => (
-            <button key={s.hash} className="btn btn-sm btn-accent" style={{ marginTop: 8 }} onClick={() => setImportItem(s)}>
-              ⚠ Импорт застрявшей раздачи
-            </button>
-          ))}
+          {stuck.length > 0 && (
+            <div className="mediadetail-actions">
+              {stuck.map((s) => (
+                <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>
+                  ⚠ Импорт застрявшей раздачи
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

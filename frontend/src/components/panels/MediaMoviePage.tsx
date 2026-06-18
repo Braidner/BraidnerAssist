@@ -41,9 +41,13 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
   if (!d) return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Не удалось загрузить фильм.</div></div>;
 
   const poster = d.posterRemote ? posterUrl(d.posterRemote) : jellyfinPosterUrl(d.jellyfinId);
-  const stuck = media.downloads.filter(
-    (x) => x.importPending && x.source === "radarr" && norm(x.title).includes(norm(d.title)),
-  );
+  const stuck = [
+    ...new Map(
+      media.downloads
+        .filter((x) => x.importPending && x.source === "radarr" && norm(x.title).includes(norm(d.title)))
+        .map((x) => [x.downloadId ?? x.hash, x]),
+    ).values(),
+  ];
 
   return (
     <div className="page">
@@ -101,7 +105,7 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
               </div>
             )}
             {stuck.map((s) => (
-              <button key={s.hash} className="btn btn-sm btn-accent" onClick={() => setImportItem(s)}>⚠ Импорт застрявшей</button>
+              <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>⚠ Импорт застрявшей</button>
             ))}
           </div>
         </div>

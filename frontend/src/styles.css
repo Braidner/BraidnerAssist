@@ -673,6 +673,11 @@ body.sb-locked { overflow: hidden; }
 .mediadetail-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .mediadetail-facts { font-size: 11.5px; color: var(--muted); }
 .mediadetail-overview { font-family: var(--font-ui); font-size: 13px; line-height: 1.5; color: var(--ink); margin: 2px 0 0; opacity: .9; }
+.mediadetail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.mediadetail-import { align-self: flex-start; color: var(--warn, #f59e0b);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn, #f59e0b) 45%, transparent),
+    calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd),
+    calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(4px*var(--depth)) var(--sl); }
 .mediadetail-filerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .mediadetail-ep { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; transition: background .12s; }
 .mediadetail-ep:hover { background: var(--hair); }

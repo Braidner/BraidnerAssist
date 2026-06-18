@@ -121,9 +121,19 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     DeviceProfile, `GET /media/play/:id`). **Группировка библиотеки**: `GET /media/library` отдаёт
     сгруппированный каталог — плитки `Series` (с `tvdbId`/`childCount`) и `Movie` (раздельные запросы
     Jellyfin `/Items?IncludeItemTypes=Series|Movie`, без плоских эпизодов), сериалы идут первыми.
-    Клик по сериалу открывает `SeriesDrawer` (аккордеон сезонов → эпизоды) через `GET /media/series/:id`
-    (`getSeriesDetail` по Jellyfin `/Shows/{id}/Episodes`, группировка по `ParentIndexNumber`); эпизод
-    играется в том же HLS-плеере. Клик по фильму играет сразу. Стрим идёт через бэкенд-реверс-прокси
+    **Детальные страницы** (Sonarr/Radarr-style): клик по плитке ведёт на отдельную роутовую страницу
+    `/media/series/:id` (`MediaSeriesPage`) или `/media/movie/:id` (`MediaMoviePage`), `:id` = Jellyfin item id
+    (React Router v6, BrowserRouter + nginx SPA-fallback). Данные — merge `GET /media/detail/{series|movie}/:id`
+    (`getSeriesPageDetail`/`getMoviePageDetail`): метаданные и статус файлов из Sonarr/Radarr (read-only резолвер
+    `arrFindByExternalId` по tvdb/tmdb — ничего НЕ добавляет), played-статус и плеер из Jellyfin. Сериал
+    показывает ВСЕ эпизоды (вкл. отсутствующие) с датой выхода, «скачано/нет», качеством и размером (Sonarr
+    `/api/v3/episode?includeEpisodeFile=true`); фильм — статус файла (качество/размер или «отсутствует»). Если
+    тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: встроенный HLS-плеер,
+    `ReleasePicker` на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
+    ручного импорта застрявшей раздачи (`ImportDrawer`, если в очереди есть `importPending`-раздача этого тайтла).
+    Старый `SeriesDrawer` удалён; общие компоненты (`Player`/`ReleasePicker`/`ImportDrawer`/форматтеры) вынесены
+    в `components/panels/mediaShared.tsx`. (`GET /media/series/:id` — Jellyfin-only seasons — остаётся для обратной
+    совместимости.) Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
     `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
     **Постер-прокси** (`api/poster.ts`, `GET /api/poster?url=<tmdb>|jf=<id>`): `<img>` не может
@@ -149,7 +159,8 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     полный объект (надёжнее guid+indexerId; *arr может вернуть 5xx «Failed to connect to qBittorrent», но
     торрент реально добавлен → 5xx считаем успехом, бросаем только на 4xx). Грабит даже отклонённые релизы
     (multi-season паки и т.п.) — это и есть способ дотащить зависший сезон. Фронт: `ReleasePicker` (плашки
-    качества/языка/отклонения) доступен и в `SeriesDrawer` на каждый сезон («🔍 Раздача»), и в дравере
+    качества/языка/отклонения) доступен на детальной странице сериала на каждый сезон («🔍 Раздача»), на странице
+    фильма (карточка «Раздачи»), и в дравере
     «Добавить» на результат поиска («Выбрать раздачу», для сериала — поле сезона).
     **Ручной импорт застрявших раздач (multi-season паки и т.п.)**: после force-grab пака через
     поиск по одному сезону Sonarr помечает раздачу как «релиз сезона N» и **отклоняет авто-импорт**

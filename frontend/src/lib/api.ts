@@ -675,6 +675,77 @@ export async function getSeriesDetail(id: string): Promise<SeriesDetail | null> 
   }
 }
 
+// ── Детальные страницы (Sonarr/Radarr + Jellyfin) ──────────────────────
+export interface DetailEpisode {
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+  airDate: string | null;
+  hasFile: boolean;
+  quality: string | null;
+  size: number | null;
+  jellyfinId: string | null;
+  played: boolean;
+}
+export interface DetailSeason {
+  seasonNumber: number;
+  episodes: DetailEpisode[];
+  fileCount: number;
+  totalCount: number;
+}
+export interface SeriesPageDetail {
+  jellyfinId: string;
+  title: string;
+  year: number | null;
+  overview: string | null;
+  genres: string[];
+  network: string | null;
+  status: string | null;
+  runtime: number | null;
+  rating: number | null;
+  posterRemote: string | null;
+  tvdbId: number | null;
+  inArr: boolean;
+  seasons: DetailSeason[];
+}
+export interface MoviePageDetail {
+  jellyfinId: string;
+  title: string;
+  year: number | null;
+  overview: string | null;
+  genres: string[];
+  studio: string | null;
+  status: string | null;
+  runtime: number | null;
+  rating: number | null;
+  posterRemote: string | null;
+  tmdbId: number | null;
+  inArr: boolean;
+  hasFile: boolean;
+  quality: string | null;
+  size: number | null;
+}
+
+export async function getSeriesPageDetail(id: string): Promise<SeriesPageDetail | null> {
+  try {
+    const res = await apiFetch(`/api/media/detail/series/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as SeriesPageDetail;
+  } catch {
+    return null;
+  }
+}
+
+export async function getMoviePageDetail(id: string): Promise<MoviePageDetail | null> {
+  try {
+    const res = await apiFetch(`/api/media/detail/movie/${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as MoviePageDetail;
+  } catch {
+    return null;
+  }
+}
+
 export interface ReleaseOption {
   guid: string;
   indexerId: number;

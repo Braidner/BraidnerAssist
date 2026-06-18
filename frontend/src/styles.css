@@ -662,6 +662,28 @@ body.sb-locked { overflow: hidden; }
 .imp-meta { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .imp-path { flex: 1; min-width: 80px; font-family: var(--font); font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* ── Детальная страница фильма/сериала ── */
+.mediadetail-back { margin-bottom: 14px; }
+.mediadetail-head { display: flex; gap: 20px; padding: 20px; margin-bottom: 16px; }
+.mediadetail-poster { flex: none; width: 150px; height: 225px; border-radius: 12px; object-fit: cover; background: var(--groove); }
+.mediadetail-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.mediadetail-titlerow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mediadetail-title { font-family: var(--font-ui); font-size: 22px; font-weight: 600; color: var(--ink); margin: 0; }
+.mediadetail-year { font-size: 14px; color: var(--muted); }
+.mediadetail-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.mediadetail-facts { font-size: 11.5px; color: var(--muted); }
+.mediadetail-overview { font-family: var(--font-ui); font-size: 13px; line-height: 1.5; color: var(--ink); margin: 2px 0 0; opacity: .9; }
+.mediadetail-filerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.mediadetail-ep { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; transition: background .12s; }
+.mediadetail-ep:hover { background: var(--hair); }
+.mediadetail-ep-title { flex: 1; min-width: 0; font-family: var(--font-ui); font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mediadetail-ep-air { font-size: 10.5px; color: var(--muted); flex: none; }
+.mediadetail-missing { font-family: var(--font); font-size: 10px; color: var(--muted); padding: 2px 7px; border-radius: 99px; background: var(--groove); white-space: nowrap; }
+@media (max-width: 640px) {
+  .mediadetail-head { flex-direction: column; align-items: center; text-align: center; }
+  .mediadetail-badges, .mediadetail-filerow, .mediadetail-titlerow { justify-content: center; }
+}
+
 /* ============================================================ Logs panel */
 .logs-panel { min-width: min(92vw, 680px); max-width: 780px; background: var(--raise); border-radius: var(--radius); padding: 24px 26px; }
 .logs-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }

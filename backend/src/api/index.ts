@@ -14,6 +14,8 @@ import {
   getMedia,
   getLibrary,
   getSeriesDetail,
+  getSeriesPageDetail,
+  getMoviePageDetail,
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
@@ -285,6 +287,26 @@ apiRouter.get("/media/series/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     res.json(await getSeriesDetail(req.params.id));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Детальная страница сериала: Sonarr + Jellyfin (метаданные, все эпизоды, файлы).
+apiRouter.get("/media/detail/series/:id", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getSeriesPageDetail(req.params.id));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Детальная страница фильма: Radarr + Jellyfin.
+apiRouter.get("/media/detail/movie/:id", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getMoviePageDetail(req.params.id));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

@@ -63,6 +63,57 @@ export interface SeriesDetail {
   seasons: SeriesSeason[];
 }
 
+// ── Детальные страницы (Jellyfin + Sonarr/Radarr) ──────────────────────
+export interface DetailEpisode {
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+  airDate: string | null;
+  hasFile: boolean;
+  quality: string | null;
+  size: number | null;
+  jellyfinId: string | null; // для плеера, если эпизод есть в Jellyfin
+  played: boolean;
+}
+export interface DetailSeason {
+  seasonNumber: number;
+  episodes: DetailEpisode[];
+  fileCount: number;
+  totalCount: number;
+}
+export interface SeriesPageDetail {
+  jellyfinId: string;
+  title: string;
+  year: number | null;
+  overview: string | null;
+  genres: string[];
+  network: string | null;
+  status: string | null;
+  runtime: number | null; // минуты
+  rating: number | null;
+  posterRemote: string | null;
+  tvdbId: number | null;
+  inArr: boolean;
+  seasons: DetailSeason[];
+}
+export interface MoviePageDetail {
+  jellyfinId: string;
+  title: string;
+  year: number | null;
+  overview: string | null;
+  genres: string[];
+  studio: string | null;
+  status: string | null;
+  runtime: number | null;
+  rating: number | null;
+  posterRemote: string | null;
+  tmdbId: number | null;
+  inArr: boolean;
+  hasFile: boolean;
+  quality: string | null;
+  size: number | null;
+}
+
 export interface SearchResult {
   guid: string;
   title: string;
@@ -209,6 +260,172 @@ export async function getSeriesDetail(seriesId: string): Promise<SeriesDetail> {
     }));
   const tvdbId = Number(items[0]?.SeriesProviderIds?.Tvdb) || null;
   return { id: seriesId, name: items[0]?.SeriesName ?? "—", tvdbId, seasons };
+}
+
+// Полная карточка Jellyfin-элемента (для шапки детальной страницы + played).
+interface JfFullItem {
+  Name?: string;
+  Overview?: string;
+  Genres?: string[];
+  ProviderIds?: Record<string, string>;
+  Studios?: { Name?: string }[];
+  CommunityRating?: number;
+  ProductionYear?: number;
+  RunTimeTicks?: number;
+  Status?: string;
+  UserData?: { Played?: boolean };
+}
+async function jellyfinItem(id: string): Promise<JfFullItem | null> {
+  if (!config.media.jellyfin.configured) return null;
+  const userId = await jellyfinUserId();
+  const base = userId
+    ? `${config.media.jellyfin.url}/Users/${userId}/Items/${id}`
+    : `${config.media.jellyfin.url}/Items/${id}`;
+  const url = new URL(base);
+  url.searchParams.set("Fields", "Overview,Genres,ProviderIds,Studios,CommunityRating,ProductionYear,RunTimeTicks,Status");
+  const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
+  if (!res.ok) return null;
+  return (await res.json()) as JfFullItem;
+}
+
+// Read-only поиск внутренней записи *arr по внешнему id (НЕ добавляет тайтл).
+// movie → Radarr ?tmdbId; series → Sonarr ?tvdbId.
+async function arrFindByExternalId(kind: "movie" | "series", externalId: number): Promise<Record<string, any> | null> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured || !externalId) return null;
+  const param = kind === "movie" ? "tmdbId" : "tvdbId";
+  const res = await fetch(`${cfg.url}/api/v3/${kind}?${param}=${externalId}`, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) return null;
+  const list = (await res.json()) as Record<string, any>[];
+  return Array.isArray(list) && list.length > 0 ? list[0] : null;
+}
+
+// Все эпизоды сериала в Sonarr (вкл. отсутствующие) + инфа о файле/качестве.
+async function sonarrEpisodes(seriesId: number): Promise<Record<string, any>[]> {
+  const cfg = config.media.sonarr;
+  if (!cfg.configured) return [];
+  const res = await fetch(`${cfg.url}/api/v3/episode?seriesId=${seriesId}&includeEpisodeFile=true`, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) return [];
+  return (await res.json()) as Record<string, any>[];
+}
+
+const ticksToMin = (t?: number): number | null => (t && t > 0 ? Math.round(t / 600_000_000) : null);
+
+// Детальная страница сериала: Sonarr (метаданные + полный список эпизодов с
+// файлом/качеством/датой) merged с Jellyfin (played + id для плеера).
+export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPageDetail> {
+  if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
+  const [jfItemR, jfEpisodesR] = await Promise.allSettled([
+    jellyfinItem(jellyfinId),
+    getSeriesDetail(jellyfinId),
+  ]);
+  const jf = jfItemR.status === "fulfilled" ? jfItemR.value : null;
+  const jfDetail = jfEpisodesR.status === "fulfilled" ? jfEpisodesR.value : null;
+  const tvdbId = Number(jf?.ProviderIds?.Tvdb) || jfDetail?.tvdbId || null;
+
+  // карта Jellyfin-эпизодов по S{n}E{n} → { id, played }
+  const jfMap = new Map<string, { id: string; played: boolean }>();
+  for (const s of jfDetail?.seasons ?? []) {
+    for (const e of s.episodes) {
+      if (e.episodeNumber != null) jfMap.set(`S${s.seasonNumber}E${e.episodeNumber}`, { id: e.id, played: e.played });
+    }
+  }
+
+  const sonarr = tvdbId ? await arrFindByExternalId("series", tvdbId) : null;
+  let seasons: DetailSeason[] = [];
+
+  if (sonarr) {
+    const eps = await sonarrEpisodes(sonarr.id);
+    const map = new Map<number, DetailEpisode[]>();
+    for (const e of eps) {
+      const sn = Number(e.seasonNumber ?? 0);
+      const en = Number(e.episodeNumber ?? 0);
+      const jfHit = jfMap.get(`S${sn}E${en}`);
+      if (!map.has(sn)) map.set(sn, []);
+      map.get(sn)!.push({
+        seasonNumber: sn,
+        episodeNumber: en,
+        title: String(e.title ?? "—"),
+        airDate: e.airDateUtc ?? null,
+        hasFile: Boolean(e.hasFile),
+        quality: e.episodeFile?.quality?.quality?.name ?? null,
+        size: e.episodeFile?.size ?? null,
+        jellyfinId: jfHit?.id ?? null,
+        played: jfHit?.played ?? false,
+      });
+    }
+    seasons = [...map.entries()].sort((a, b) => a[0] - b[0]).map(([sn, list]) => ({
+      seasonNumber: sn,
+      episodes: list.sort((a, b) => a.episodeNumber - b.episodeNumber),
+      fileCount: list.filter((x) => x.hasFile).length,
+      totalCount: list.length,
+    }));
+  } else if (jfDetail) {
+    // Fallback: только Jellyfin.
+    seasons = jfDetail.seasons.map((s) => ({
+      seasonNumber: s.seasonNumber,
+      episodes: s.episodes.map((e) => ({
+        seasonNumber: s.seasonNumber,
+        episodeNumber: e.episodeNumber ?? 0,
+        title: e.name,
+        airDate: null,
+        hasFile: true,
+        quality: null,
+        size: null,
+        jellyfinId: e.id,
+        played: e.played,
+      })),
+      fileCount: s.episodes.length,
+      totalCount: s.episodes.length,
+    }));
+  }
+
+  return {
+    jellyfinId,
+    title: String(sonarr?.title ?? jf?.Name ?? jfDetail?.name ?? "—"),
+    year: sonarr?.year ?? jf?.ProductionYear ?? null,
+    overview: sonarr?.overview ?? jf?.Overview ?? null,
+    genres: sonarr?.genres ?? jf?.Genres ?? [],
+    network: sonarr?.network ?? jf?.Studios?.[0]?.Name ?? null,
+    status: sonarr?.status ?? jf?.Status ?? null,
+    runtime: sonarr?.runtime ?? ticksToMin(jf?.RunTimeTicks),
+    rating: sonarr?.ratings?.value ?? jf?.CommunityRating ?? null,
+    posterRemote: sonarr ? arrPoster(sonarr.images) : null,
+    tvdbId,
+    inArr: Boolean(sonarr),
+    seasons,
+  };
+}
+
+// Детальная страница фильма: Radarr (метаданные + файл/качество) merged с Jellyfin.
+export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageDetail> {
+  if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
+  const jf = await jellyfinItem(jellyfinId);
+  const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
+  const radarr = tmdbId ? await arrFindByExternalId("movie", tmdbId) : null;
+  return {
+    jellyfinId,
+    title: String(radarr?.title ?? jf?.Name ?? "—"),
+    year: radarr?.year ?? jf?.ProductionYear ?? null,
+    overview: radarr?.overview ?? jf?.Overview ?? null,
+    genres: radarr?.genres ?? jf?.Genres ?? [],
+    studio: radarr?.studio ?? jf?.Studios?.[0]?.Name ?? null,
+    status: radarr?.status ?? jf?.Status ?? null,
+    runtime: radarr?.runtime ?? ticksToMin(jf?.RunTimeTicks),
+    rating: radarr?.ratings?.value ?? radarr?.ratings?.tmdb?.value ?? jf?.CommunityRating ?? null,
+    posterRemote: radarr ? arrPoster(radarr.images) : null,
+    tmdbId,
+    inArr: Boolean(radarr),
+    hasFile: Boolean(radarr?.hasFile),
+    quality: radarr?.movieFile?.quality?.quality?.name ?? null,
+    size: radarr?.movieFile?.size ?? null,
+  };
 }
 
 // Первый userId Jellyfin (нужен PlaybackInfo). Кешируем.

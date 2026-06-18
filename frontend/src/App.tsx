@@ -22,6 +22,8 @@ import { HermesPage } from "./components/panels/HermesPage.tsx";
 import { SystemPage } from "./components/panels/SystemPage.tsx";
 import { MetricsPage } from "./components/panels/MetricsPage.tsx";
 import { MediaPage } from "./components/panels/MediaPage.tsx";
+import { MediaSeriesPage } from "./components/panels/MediaSeriesPage.tsx";
+import { MediaMoviePage } from "./components/panels/MediaMoviePage.tsx";
 import { StubPage } from "./components/panels/StubPage.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 
@@ -219,6 +221,8 @@ export function App() {
           <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
           <Route path="/metrics" element={<MetricsPage metrics={metrics} />} />
           <Route path="/media" element={<MediaPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
+          <Route path="/media/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
+          <Route path="/media/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -120,11 +120,19 @@ export function CommandPalette({ containers, adguard, onAddTask }: Props) {
     : [];
 
   const match = (a: Action) => !trimmed || a.label.toLowerCase().includes(lc);
+  const matchedNavActions = navActions.filter(match);
+  const exactNavActions = trimmed
+    ? matchedNavActions.filter((a) => a.label.toLowerCase() === lc)
+    : [];
+  const fuzzyNavActions = exactNavActions.length > 0
+    ? matchedNavActions.filter((a) => a.label.toLowerCase() !== lc)
+    : matchedNavActions;
   const actions = [
+    ...exactNavActions,
     ...textActions,
     ...dnsActions.filter(match),
     ...dockerActions.filter(match),
-    ...navActions.filter(match),
+    ...fuzzyNavActions,
   ];
   const clampedSel = Math.min(sel, Math.max(actions.length - 1, 0));
 

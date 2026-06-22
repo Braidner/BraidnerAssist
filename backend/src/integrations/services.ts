@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import { dirname } from "path";
 import { config } from "../config.js";
 
 export interface ServiceConfig {
@@ -79,5 +80,6 @@ export async function writeServicesConfig(configs: ServiceConfig[]): Promise<voi
     if (!svc.name?.trim()) throw new Error("Service name cannot be empty");
     new URL(svc.url); // throws if invalid
   }
+  await mkdir(dirname(config.servicesFile), { recursive: true });
   await writeFile(config.servicesFile, JSON.stringify(configs, null, 2), "utf-8");
 }

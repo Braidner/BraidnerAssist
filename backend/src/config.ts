@@ -12,9 +12,11 @@ function num(key: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+const nodeEnv = env("NODE_ENV") ?? "development";
+
 export const config = {
   backendPort: num("BACKEND_PORT", 3001),
-  nodeEnv: env("NODE_ENV") ?? "development",
+  nodeEnv,
   mcpToken: env("MCP_TOKEN"),
 
   auth: {
@@ -129,7 +131,7 @@ export const config = {
     },
   },
 
-  servicesFile: env("SERVICES_FILE") ?? "/data/services.json",
+  servicesFile: env("SERVICES_FILE") ?? (nodeEnv === "production" ? "/data/services.json" : "data/services.json"),
 
   health: {
     exportPath: env("HEALTH_EXPORT_PATH") ?? "/data/health/export.xml",

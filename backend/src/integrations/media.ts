@@ -30,6 +30,7 @@ export interface DownloadItem {
 
 export interface MediaData {
   configured: boolean;
+  torrserver: boolean; // TorrServer настроен → фронт показывает блок «Смотреть онлайн»
   nowPlaying: NowPlaying[];
   downloads: DownloadItem[];
 }
@@ -41,6 +42,8 @@ export interface LibraryItem {
   year: number | null;
   tvdbId: number | null; // series only — маппится на внутренний id Sonarr для поиска релизов
   childCount: number | null; // series only — число сезонов
+  played: boolean; // фильм просмотрен / сериал досмотрен полностью
+  unplayed: number; // series only — число непросмотренных эпизодов (0 для фильмов)
 }
 
 export interface SeriesEpisode {
@@ -80,6 +83,7 @@ export interface DetailSeason {
   episodes: DetailEpisode[];
   fileCount: number;
   totalCount: number;
+  monitored: boolean;
 }
 export interface SeriesPageDetail {
   jellyfinId: string;
@@ -94,6 +98,7 @@ export interface SeriesPageDetail {
   posterRemote: string | null;
   tvdbId: number | null;
   inArr: boolean;
+  monitored: boolean;
   seasons: DetailSeason[];
 }
 export interface MoviePageDetail {
@@ -109,6 +114,7 @@ export interface MoviePageDetail {
   posterRemote: string | null;
   tmdbId: number | null;
   inArr: boolean;
+  monitored: boolean;
   hasFile: boolean;
   quality: string | null;
   size: number | null;
@@ -186,12 +192,14 @@ interface JfItem {
   ProductionYear?: number;
   ProviderIds?: Record<string, string>;
   ChildCount?: number;
+  UserData?: { Played?: boolean; UnplayedItemCount?: number };
 }
 
 // Каталог библиотеки: все фильмы + все сериалы (сериал — одна плитка, эпизоды
 // видны в drill-down). Movies и Series тащим отдельными запросами через allSettled.
 export async function getLibrary(): Promise<LibraryItem[]> {
   if (!config.media.jellyfin.configured) return [];
+  const userId = await jellyfinUserId();
   const fetchItems = async (type: "Movie" | "Series"): Promise<LibraryItem[]> => {
     const url = new URL(`${config.media.jellyfin.url}/Items`);
     url.searchParams.set("Recursive", "true");
@@ -199,6 +207,7 @@ export async function getLibrary(): Promise<LibraryItem[]> {
     url.searchParams.set("SortBy", "SortName");
     url.searchParams.set("SortOrder", "Ascending");
     url.searchParams.set("Fields", "ProductionYear,ProviderIds,ChildCount");
+    if (userId) url.searchParams.set("userId", userId);
     const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
     if (!res.ok) throw new Error(`Jellyfin /Items(${type}) responded ${res.status}`);
     const body = (await res.json()) as { Items?: JfItem[] };
@@ -209,6 +218,8 @@ export async function getLibrary(): Promise<LibraryItem[]> {
       year: it.ProductionYear ?? null,
       tvdbId: type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null,
       childCount: type === "Series" ? it.ChildCount ?? null : null,
+      played: Boolean(it.UserData?.Played),
+      unplayed: type === "Series" ? Number(it.UserData?.UnplayedItemCount ?? 0) : 0,
     }));
   };
   const [movies, series] = await Promise.allSettled([fetchItems("Movie"), fetchItems("Series")]);
@@ -340,6 +351,12 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
   const sonarr = tvdbId ? await arrFindByExternalId("series", tvdbId) : null;
   let seasons: DetailSeason[] = [];
 
+  // карта monitored по сезонам из записи Sonarr (seasons[].monitored).
+  const seasonMonitored = new Map<number, boolean>();
+  for (const s of (sonarr?.seasons ?? []) as any[]) {
+    seasonMonitored.set(Number(s.seasonNumber), Boolean(s.monitored));
+  }
+
   if (sonarr) {
     const eps = await sonarrEpisodes(sonarr.id);
     const map = new Map<number, DetailEpisode[]>();
@@ -365,6 +382,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
       episodes: list.sort((a, b) => a.episodeNumber - b.episodeNumber),
       fileCount: list.filter((x) => x.hasFile).length,
       totalCount: list.length,
+      monitored: seasonMonitored.get(sn) ?? false,
     }));
   } else if (jfDetail) {
     // Fallback: только Jellyfin.
@@ -383,6 +401,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
       })),
       fileCount: s.episodes.length,
       totalCount: s.episodes.length,
+      monitored: false,
     }));
   }
 
@@ -399,6 +418,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
     posterRemote: sonarr ? arrPoster(sonarr.images) : null,
     tvdbId,
     inArr: Boolean(sonarr),
+    monitored: Boolean(sonarr?.monitored),
     seasons,
   };
 }
@@ -422,6 +442,7 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
     posterRemote: radarr ? arrPoster(radarr.images) : null,
     tmdbId,
     inArr: Boolean(radarr),
+    monitored: Boolean(radarr?.monitored),
     hasFile: Boolean(radarr?.hasFile),
     quality: radarr?.movieFile?.quality?.quality?.name ?? null,
     size: radarr?.movieFile?.size ?? null,
@@ -1291,10 +1312,212 @@ export async function getRecommendations(): Promise<Recommendation[]> {
   return deduped.slice(0, 40);
 }
 
+// ── Расписание / monitor / поиск сезона (удобный пайплайн сериалов) ─────────
+export interface CalendarItem {
+  kind: "movie" | "series";
+  title: string;
+  externalId: number | null; // tvdbId (series) | tmdbId (movie) — для monitor/поиска
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  episodeTitle: string | null;
+  airDate: string | null;
+  hasFile: boolean;
+  monitored: boolean;
+}
+
+// Расписание выходящих эпизодов (Sonarr) + релизов фильмов (Radarr) на N дней вперёд/назад.
+export async function getCalendar(days = 14): Promise<CalendarItem[]> {
+  const start = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const end = new Date(Date.now() + days * 86_400_000).toISOString();
+
+  const sonarrCal = async (): Promise<CalendarItem[]> => {
+    const cfg = config.media.sonarr;
+    if (!cfg.configured) return [];
+    const url = new URL(`${cfg.url}/api/v3/calendar`);
+    url.searchParams.set("start", start);
+    url.searchParams.set("end", end);
+    url.searchParams.set("includeSeries", "true");
+    url.searchParams.set("includeEpisodeFile", "true");
+    const res = await fetch(url, { headers: { "X-Api-Key": cfg.apiKey! }, signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) throw new Error(`sonarr calendar ${res.status}`);
+    const recs = (await res.json()) as Record<string, any>[];
+    return recs.map((r) => ({
+      kind: "series" as const,
+      title: String(r.series?.title ?? "—"),
+      externalId: Number(r.series?.tvdbId) || null,
+      seasonNumber: r.seasonNumber ?? null,
+      episodeNumber: r.episodeNumber ?? null,
+      episodeTitle: r.title ?? null,
+      airDate: r.airDateUtc ?? null,
+      hasFile: Boolean(r.hasFile),
+      monitored: Boolean(r.monitored),
+    }));
+  };
+
+  const radarrCal = async (): Promise<CalendarItem[]> => {
+    const cfg = config.media.radarr;
+    if (!cfg.configured) return [];
+    const url = new URL(`${cfg.url}/api/v3/calendar`);
+    url.searchParams.set("start", start);
+    url.searchParams.set("end", end);
+    const res = await fetch(url, { headers: { "X-Api-Key": cfg.apiKey! }, signal: AbortSignal.timeout(12_000) });
+    if (!res.ok) throw new Error(`radarr calendar ${res.status}`);
+    const recs = (await res.json()) as Record<string, any>[];
+    return recs.map((r) => ({
+      kind: "movie" as const,
+      title: String(r.title ?? "—"),
+      externalId: Number(r.tmdbId) || null,
+      seasonNumber: null,
+      episodeNumber: null,
+      episodeTitle: null,
+      airDate: r.digitalRelease ?? r.physicalRelease ?? r.inCinemas ?? null,
+      hasFile: Boolean(r.hasFile),
+      monitored: Boolean(r.monitored),
+    }));
+  };
+
+  const [s, m] = await Promise.allSettled([sonarrCal(), radarrCal()]);
+  const all = [
+    ...(s.status === "fulfilled" ? s.value : []),
+    ...(m.status === "fulfilled" ? m.value : []),
+  ];
+  return all
+    .filter((x) => x.airDate)
+    .sort((a, b) => new Date(a.airDate!).getTime() - new Date(b.airDate!).getTime());
+}
+
+// Запуск поиска: весь сезон (Sonarr SeasonSearch) / недостающие (MissingEpisodeSearch) /
+// фильм (Radarr MoviesSearch). id = внешний (tvdbId/tmdbId) → резолвим внутренний.
+export async function arrTriggerSearch(
+  kind: "movie" | "series",
+  externalId: number,
+  seasonNumber?: number,
+): Promise<void> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  const rec = await arrFindByExternalId(kind, externalId);
+  if (!rec) throw new Error("Тайтл не найден в библиотеке *arr");
+  const headers = { "X-Api-Key": cfg.apiKey!, "Content-Type": "application/json" };
+  const body: Record<string, unknown> =
+    kind === "movie"
+      ? { name: "MoviesSearch", movieIds: [rec.id] }
+      : seasonNumber != null
+        ? { name: "SeasonSearch", seriesId: rec.id, seasonNumber }
+        : { name: "MissingEpisodeSearch", seriesId: rec.id };
+  const res = await fetch(`${cfg.url}/api/v3/command`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok && res.status !== 201) throw new Error(`${kind} search command ${res.status}`);
+  cache = null;
+}
+
+// Monitor toggle: сезон сериала / весь сериал / фильм. GET → patch → PUT (не затираем поля).
+export async function arrSetMonitored(
+  kind: "movie" | "series",
+  externalId: number,
+  monitored: boolean,
+  seasonNumber?: number,
+): Promise<void> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured) throw new Error(`${kind === "movie" ? "Radarr" : "Sonarr"} не настроен`);
+  const rec = await arrFindByExternalId(kind, externalId);
+  if (!rec) throw new Error("Тайтл не найден в библиотеке *arr");
+  const headers = { "X-Api-Key": cfg.apiKey!, "Content-Type": "application/json" };
+  const path = kind === "movie" ? "movie" : "series";
+
+  if (kind === "series" && seasonNumber != null && Array.isArray(rec.seasons)) {
+    rec.seasons = rec.seasons.map((s: any) =>
+      Number(s.seasonNumber) === seasonNumber ? { ...s, monitored } : s,
+    );
+  } else {
+    rec.monitored = monitored;
+  }
+  const res = await fetch(`${cfg.url}/api/v3/${path}/${rec.id}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(rec),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`${kind} monitor ${res.status}`);
+  cache = null;
+}
+
+// ── Продолжить просмотр + единый поиск (discovery) ──────────────────────────
+export interface ResumeItem {
+  id: string;
+  title: string;
+  kind: "movie" | "episode";
+  positionPct: number;
+  year: number | null;
+}
+
+// «Продолжить просмотр» из Jellyfin — недосмотренные фильмы/эпизоды с позицией.
+export async function getContinueWatching(): Promise<ResumeItem[]> {
+  if (!config.media.jellyfin.configured) return [];
+  const userId = await jellyfinUserId();
+  if (!userId) return [];
+  const url = new URL(`${config.media.jellyfin.url}/Users/${userId}/Items/Resume`);
+  url.searchParams.set("Limit", "20");
+  url.searchParams.set("MediaTypes", "Video");
+  url.searchParams.set("Recursive", "true");
+  url.searchParams.set("Fields", "SeriesName,UserData,RunTimeTicks,ProductionYear");
+  const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
+  if (!res.ok) throw new Error(`Jellyfin Resume ${res.status}`);
+  const body = (await res.json()) as {
+    Items?: {
+      Id: string; Name?: string; SeriesName?: string; Type?: string;
+      ProductionYear?: number; RunTimeTicks?: number;
+      UserData?: { PlaybackPositionTicks?: number };
+    }[];
+  };
+  return (body.Items ?? []).map((it) => {
+    const runtime = it.RunTimeTicks ?? 0;
+    const pos = it.UserData?.PlaybackPositionTicks ?? 0;
+    return {
+      id: it.Id,
+      title: it.SeriesName ? `${it.SeriesName} — ${it.Name ?? ""}` : it.Name ?? "—",
+      kind: it.Type === "Movie" ? "movie" as const : "episode" as const,
+      positionPct: runtime > 0 ? Math.round((pos / runtime) * 100) : 0,
+      year: it.ProductionYear ?? null,
+    };
+  });
+}
+
+export interface UnifiedSearch {
+  inLibrary: LibraryItem[];
+  discover: ArrLookupItem[];
+  releases: SearchResult[];
+}
+
+// Единый поиск: библиотека Jellyfin (по имени) + lookup Radarr/Sonarr (discover) +
+// Prowlarr (релизы для мгновенного стрима). Каждый источник изолирован.
+export async function unifiedSearch(q: string): Promise<UnifiedSearch> {
+  const term = q.trim().toLowerCase();
+  if (!term) return { inLibrary: [], discover: [], releases: [] };
+  const [lib, movies, series, releases] = await Promise.allSettled([
+    getLibrary(),
+    arrLookup("movie", q),
+    arrLookup("series", q),
+    prowlarrSearch(q),
+  ]);
+  const inLibrary = (lib.status === "fulfilled" ? lib.value : [])
+    .filter((it) => it.name.toLowerCase().includes(term))
+    .slice(0, 8);
+  const discover = [
+    ...(movies.status === "fulfilled" ? movies.value : []),
+    ...(series.status === "fulfilled" ? series.value : []),
+  ].slice(0, 8);
+  const rel = (releases.status === "fulfilled" ? releases.value : []).slice(0, 8);
+  return { inLibrary, discover, releases: rel };
+}
+
 // ── Сводка ────────────────────────────────────────────────────────────────
 export async function getMedia(): Promise<MediaData> {
   if (!config.media.configured) {
-    return { configured: false, nowPlaying: [], downloads: [] };
+    return { configured: false, torrserver: false, nowPlaying: [], downloads: [] };
   }
   if (cache && Date.now() - cache.at < 8_000) return cache.data;
 
@@ -1312,7 +1535,12 @@ export async function getMedia(): Promise<MediaData> {
     ...(qb.status === "fulfilled" ? qb.value : []),
   ];
 
-  const data: MediaData = { configured: true, nowPlaying, downloads };
+  const data: MediaData = {
+    configured: true,
+    torrserver: config.media.torrserver.configured,
+    nowPlaying,
+    downloads,
+  };
   cache = { data, at: Date.now() };
   return data;
 }

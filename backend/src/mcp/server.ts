@@ -8,7 +8,9 @@ import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
 import { getMedia, qbAdd, arrLookup, arrAdd, arrReleaseSearch, arrReleaseGrab, manualImportCandidates, manualImportExecute, autoSelectImportFileIds, jellyfinSessions, jellyfinPlayTo, getRecommendations } from "../integrations/media.js";
+import { torrserverAdd, pickVideoFile, isBrowserPlayable } from "../integrations/torrserver.js";
 import { getAdguard } from "../integrations/adguard.js";
+import { config } from "../config.js";
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -26,7 +28,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). If a download finishes but never appears in the library — a multi-season pack or mis-parsed release stuck in the queue (get_media_status marks it importPending) — resolve it with list_import_candidates({type, downloadId}) then import_release({type, downloadId, fileIds?}) (omit fileIds to auto-import one best file per episode); this force-imports past the "not in grabbed release" rejection. get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). If a download finishes but never appears in the library — a multi-season pack or mis-parsed release stuck in the queue (get_media_status marks it importPending) — resolve it with list_import_candidates({type, downloadId}) then import_release({type, downloadId, fileIds?}) (omit fileIds to auto-import one best file per episode); this force-imports past the "not in grabbed release" rejection. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library) — for a quick one-off watch. get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -345,6 +347,23 @@ export function createMcpServer() {
     async () => {
       const items = await getRecommendations();
       return ok(items);
+    },
+  );
+
+  server.tool(
+    "watch_now",
+    "Stream a magnet/torrent instantly via TorrServer without a full download or adding it to the library. Returns the torrent hash, the best video file and a relative streamUrl (/api/media/torrserver/stream?hash=&index=) playable in a browser for mp4/m4v/webm; other containers (mkv/avi) need an external player. Use for a quick one-off watch; for permanent library additions prefer add_movie/add_series.",
+    { magnet: z.string().describe("magnet: link or .torrent URL") },
+    async ({ magnet }) => {
+      if (!config.media.torrserver.configured) return ok({ error: "TorrServer не настроен" });
+      const info = await torrserverAdd(magnet);
+      const file = pickVideoFile(info.files);
+      return ok({
+        hash: info.hash,
+        title: info.title,
+        file: file ? { path: file.path, index: file.index, browserPlayable: isBrowserPlayable(file.path) } : null,
+        streamUrl: file ? `/api/media/torrserver/stream?hash=${info.hash}&index=${file.index}` : null,
+      });
     },
   );
 

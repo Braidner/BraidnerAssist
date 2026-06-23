@@ -228,6 +228,29 @@
 
 ---
 
+## Batch v6 — TorrServer + пайплайн сериалов + UX/UI (2026-06-22)
+
+Цель: мгновенный стрим (TorrServer), удобный пайплайн сериалов, доработки UX/UI.
+Сборки tsc(backend)+vite(frontend) чистые; деплой/верификация на hermes.lan — pending.
+
+- [x] **TorrServer** `integrations/torrserver.ts` (add/list/rem/health + Range-прокси), config+env
+      `TORRSERVER_*`, роуты (`/media/torrserver/add|list|:hash`), публичный стрим-роут вне jwtAuth
+      (`api/torrserverStream.ts`, анти-SSRF hash, 206), `media.torrserver` флаг, MCP `watch_now`
+- [x] **Player** direct-режим (`<video>` + копировать ссылку/.m3u); карточка «Смотреть онлайн»
+      на `/media` + «▶ Сейчас» на Prowlarr-результатах
+- [x] **Сериалы**: `getCalendar`/`arrTriggerSearch`/`arrSetMonitored` + роуты; monitor-toggle и
+      bulk-поиск сезона/недостающих на детальных; `/media/calendar` (`MediaCalendarPage`)+nav;
+      карточка «Скоро выйдет»
+- [x] **Discovery**: `getContinueWatching` (Jellyfin Resume) ряд на `/media`; `unifiedSearch`
+      в Cmd-K (библиотека/добавить/скачать)
+- [x] **UX**: тост-система (`Toast.tsx`/`ToastProvider`/`useToast`) на все действия; сетка с
+      оверлеями (просмотрено/N, `UserData`)+фильтр/сортировка/скелетоны; детальная сериала —
+      прогресс сезона/превью/относительные даты/missed; адаптивный поллинг (5с/15с); mobile/a11y
+- [ ] **Деплой**: TorrServer в `/srv/stack` (порт 8090) + `TORRSERVER_URL` в server `.env`;
+      пуш образов GHCR → `docker compose -f docker-compose.prod.yml pull/up -d`; e2e верификация
+
+---
+
 ## REST API (план)
 
 ```

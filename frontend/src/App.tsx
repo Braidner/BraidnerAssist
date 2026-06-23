@@ -24,6 +24,7 @@ import { MetricsPage } from "./components/panels/MetricsPage.tsx";
 import { MediaPage } from "./components/panels/MediaPage.tsx";
 import { MediaSeriesPage } from "./components/panels/MediaSeriesPage.tsx";
 import { MediaMoviePage } from "./components/panels/MediaMoviePage.tsx";
+import { MediaCalendarPage } from "./components/panels/MediaCalendarPage.tsx";
 import { StubPage } from "./components/panels/StubPage.tsx";
 import { CommandPalette } from "./components/CommandPalette.tsx";
 
@@ -52,7 +53,7 @@ export function App() {
   const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
   const [metrics, setMetrics] = useState<UptimeSeries[]>([]);
   const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
-  const [media, setMedia] = useState<MediaData>({ configured: false, nowPlaying: [], downloads: [] });
+  const [media, setMedia] = useState<MediaData>({ configured: false, torrserver: false, nowPlaying: [], downloads: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -95,7 +96,6 @@ export function App() {
     const dockerTimer = setInterval(() => getDocker().then(setDocker), 30_000);
     const metricsTimer = setInterval(() => getMetrics().then(setMetrics), 60_000);
     const adguardTimer = setInterval(() => getAdguard().then(setAdguard), 30_000);
-    const mediaTimer = setInterval(() => getMedia().then(setMedia), 15_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
     const hermesTimer = setInterval(() => {
@@ -110,12 +110,21 @@ export function App() {
       clearInterval(dockerTimer);
       clearInterval(metricsTimer);
       clearInterval(adguardTimer);
-      clearInterval(mediaTimer);
       clearInterval(tasksTimer);
       clearInterval(hassTimer);
       clearInterval(hermesTimer);
     };
   }, [authed]);
+
+  // Адаптивный поллинг медиа: 5с при активной загрузке, иначе 15с.
+  const dlActive = media.downloads.some(
+    (d) => d.progress < 100 && !/paused|stopped|completed|error/i.test(d.state),
+  );
+  useEffect(() => {
+    if (!authed) return;
+    const t = setInterval(() => getMedia().then(setMedia), dlActive ? 5_000 : 15_000);
+    return () => clearInterval(t);
+  }, [authed, dlActive]);
 
   // ── Handlers ─────────────────────────────────────────────────────
   const onToggleTask = (task: PanelTask) => {
@@ -221,6 +230,7 @@ export function App() {
           <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
           <Route path="/metrics" element={<MetricsPage metrics={metrics} />} />
           <Route path="/media" element={<MediaPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
+          <Route path="/media/calendar" element={<MediaCalendarPage />} />
           <Route path="/media/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/media/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />

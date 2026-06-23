@@ -120,13 +120,22 @@ export const config = {
       apiKey: env("PROWLARR_API_KEY"),
       get configured() { return Boolean(this.url && this.apiKey); },
     },
+    // TorrServer (YouROK) — мгновенный стриминг магнетов без полной загрузки.
+    // Auth опционален (LAN); basic при заданных USER/PASSWORD.
+    torrserver: {
+      url: env("TORRSERVER_URL"), // напр. http://host.docker.internal:8090
+      username: env("TORRSERVER_USER"),
+      password: env("TORRSERVER_PASSWORD"),
+      get configured() { return Boolean(this.url); },
+    },
     get configured() {
       return (
         this.jellyfin.configured ||
         this.sonarr.configured ||
         this.radarr.configured ||
         this.qbittorrent.configured ||
-        this.prowlarr.configured
+        this.prowlarr.configured ||
+        this.torrserver.configured
       );
     },
   },

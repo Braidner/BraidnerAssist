@@ -8,17 +8,21 @@ import { Card } from "../Card.tsx";
 import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./mediaShared.tsx";
 import {
   getMoviePageDetail, getMediaPlayUrl, getMediaDevices, playOnDevice, posterUrl, jellyfinPosterUrl,
+  seasonSearch, setMonitored,
   type MoviePageDetail, type DownloadItem, type MediaData, type PlayDevice,
 } from "../../lib/api.ts";
+import { useToast } from "../Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 
 export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
+  const toast = useToast();
   const [d, setD] = useState<MoviePageDetail | null | "loading">("loading");
   const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [act, setAct] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const [devices, setDevices] = useState<PlayDevice[]>([]);
@@ -39,6 +43,24 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
 
   if (d === "loading") return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Загружаем…</div></div>;
   if (!d) return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Не удалось загрузить фильм.</div></div>;
+
+  const det = d;
+  const toggleMonitor = async (val: boolean) => {
+    if (det.tmdbId == null) return;
+    setAct("mon");
+    const ok = await setMonitored("movie", det.tmdbId, val);
+    setAct(null);
+    if (ok) { setD((p) => (p && p !== "loading" ? { ...p, monitored: val } : p)); toast.success(val ? "Мониторинг включён" : "Мониторинг выключен"); }
+    else toast.error("Не удалось изменить мониторинг");
+  };
+  const findMovie = async () => {
+    if (det.tmdbId == null) return;
+    setAct("find");
+    const ok = await seasonSearch("movie", det.tmdbId);
+    setAct(null);
+    if (ok) toast.success("Поиск фильма запущен");
+    else toast.error("Не удалось запустить поиск");
+  };
 
   const poster = d.posterRemote ? posterUrl(d.posterRemote) : jellyfinPosterUrl(d.jellyfinId);
   const stuck = [
@@ -103,6 +125,23 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
                   </div>
                 )}
               </div>
+            )}
+            {det.inArr && det.tmdbId != null && (
+              <>
+                <button
+                  className={`btn btn-sm ${det.monitored ? "btn-accent" : ""}`}
+                  disabled={act === "mon"}
+                  title={det.monitored ? "Снять с мониторинга" : "Мониторить"}
+                  onClick={() => toggleMonitor(!det.monitored)}
+                >
+                  {act === "mon" ? "…" : det.monitored ? "★ Мониторится" : "☆ Мониторить"}
+                </button>
+                {!det.hasFile && (
+                  <button className="btn btn-sm" disabled={act === "find"} title="Найти фильм (force search)" onClick={findMovie}>
+                    {act === "find" ? "…" : "⬇ Найти"}
+                  </button>
+                )}
+              </>
             )}
             {stuck.map((s) => (
               <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>⚠ Импорт застрявшей</button>

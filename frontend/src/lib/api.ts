@@ -614,6 +614,7 @@ export interface ManualImportFile {
 
 export interface MediaData {
   configured: boolean;
+  torrserver: boolean;
   nowPlaying: NowPlaying[];
   downloads: DownloadItem[];
 }
@@ -621,11 +622,68 @@ export interface MediaData {
 export async function getMedia(): Promise<MediaData> {
   try {
     const res = await apiFetch("/api/media");
-    if (!res.ok) return { configured: false, nowPlaying: [], downloads: [] };
+    if (!res.ok) return { configured: false, torrserver: false, nowPlaying: [], downloads: [] };
     return (await res.json()) as MediaData;
   } catch {
-    return { configured: false, nowPlaying: [], downloads: [] };
+    return { configured: false, torrserver: false, nowPlaying: [], downloads: [] };
   }
+}
+
+// ── TorrServer (мгновенный стриминг) ───────────────────────────────────
+export interface TorrServerFile {
+  index: number;
+  path: string;
+  length: number;
+  playable: boolean; // браузер тянет напрямую (mp4/m4v/webm)
+}
+export interface TorrServerAdd {
+  hash: string;
+  title: string;
+  file: TorrServerFile | null; // лучший видеофайл
+  files: TorrServerFile[];
+}
+export interface TorrServerStream {
+  hash: string;
+  title: string;
+  file: TorrServerFile | null;
+}
+
+export async function torrserverAdd(link: string, title?: string): Promise<TorrServerAdd | null> {
+  try {
+    const res = await apiFetch("/api/media/torrserver/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ link, title }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as TorrServerAdd;
+  } catch {
+    return null;
+  }
+}
+
+export async function torrserverList(): Promise<TorrServerStream[]> {
+  try {
+    const res = await apiFetch("/api/media/torrserver/list");
+    if (!res.ok) return [];
+    return (await res.json()) as TorrServerStream[];
+  } catch {
+    return [];
+  }
+}
+
+export async function torrserverRemove(hash: string): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/api/media/torrserver/${hash}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Прямой URL стрима (вне jwtAuth, LAN-only) — для <video src> и копирования/.m3u.
+export function torrserverStreamUrl(hash: string, index: number): string {
+  return `/api/media/torrserver/stream?hash=${hash}&index=${index}`;
 }
 
 export interface LibraryItem {
@@ -635,6 +693,8 @@ export interface LibraryItem {
   year: number | null;
   tvdbId: number | null;
   childCount: number | null;
+  played: boolean;
+  unplayed: number;
 }
 
 export async function getMediaLibrary(): Promise<LibraryItem[]> {
@@ -692,6 +752,7 @@ export interface DetailSeason {
   episodes: DetailEpisode[];
   fileCount: number;
   totalCount: number;
+  monitored: boolean;
 }
 export interface SeriesPageDetail {
   jellyfinId: string;
@@ -706,6 +767,7 @@ export interface SeriesPageDetail {
   posterRemote: string | null;
   tvdbId: number | null;
   inArr: boolean;
+  monitored: boolean;
   seasons: DetailSeason[];
 }
 export interface MoviePageDetail {
@@ -721,6 +783,7 @@ export interface MoviePageDetail {
   posterRemote: string | null;
   tmdbId: number | null;
   inArr: boolean;
+  monitored: boolean;
   hasFile: boolean;
   quality: string | null;
   size: number | null;
@@ -743,6 +806,94 @@ export async function getMoviePageDetail(id: string): Promise<MoviePageDetail | 
     return (await res.json()) as MoviePageDetail;
   } catch {
     return null;
+  }
+}
+
+// ── Расписание / monitor / поиск сезона ────────────────────────────────
+export interface CalendarItem {
+  kind: "movie" | "series";
+  title: string;
+  externalId: number | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  episodeTitle: string | null;
+  airDate: string | null;
+  hasFile: boolean;
+  monitored: boolean;
+}
+
+export async function getCalendar(days = 14): Promise<CalendarItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/calendar?days=${days}`);
+    if (!res.ok) return [];
+    return (await res.json()) as CalendarItem[];
+  } catch {
+    return [];
+  }
+}
+
+// Запуск поиска: весь сезон (seasonNumber) / недостающие (без него) / фильм. id = tvdbId|tmdbId.
+export async function seasonSearch(type: "series" | "movie", id: number, seasonNumber?: number): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/season/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, id, seasonNumber }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function setMonitored(
+  type: "series" | "movie",
+  id: number,
+  monitored: boolean,
+  seasonNumber?: number,
+): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/monitor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, id, monitored, seasonNumber }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── Продолжить просмотр + единый поиск ─────────────────────────────────
+export interface ResumeItem {
+  id: string;
+  title: string;
+  kind: "movie" | "episode";
+  positionPct: number;
+  year: number | null;
+}
+export async function getContinueWatching(): Promise<ResumeItem[]> {
+  try {
+    const res = await apiFetch("/api/media/continue");
+    if (!res.ok) return [];
+    return (await res.json()) as ResumeItem[];
+  } catch {
+    return [];
+  }
+}
+
+export interface UnifiedSearchResult {
+  inLibrary: LibraryItem[];
+  discover: ArrLookupItem[];
+  releases: SearchResult[];
+}
+export async function unifiedSearch(q: string): Promise<UnifiedSearchResult> {
+  try {
+    const res = await apiFetch(`/api/media/unified?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return { inLibrary: [], discover: [], releases: [] };
+    return (await res.json()) as UnifiedSearchResult;
+  } catch {
+    return { inLibrary: [], discover: [], releases: [] };
   }
 }
 

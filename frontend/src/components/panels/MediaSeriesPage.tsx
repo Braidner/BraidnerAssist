@@ -1,25 +1,43 @@
 // Детальная страница сериала (/media/series/:id) — Sonarr-style: шапка с
-// метаданными, полный список сезонов/эпизодов (скачано/нет, качество, дата),
-// встроенный плеер, поиск раздач на сезон и ручной импорт застрявшей раздачи.
+// метаданными и monitor/поиском, полный список сезонов/эпизодов (скачано/нет,
+// качество, дата, превью), прогресс по сезону, встроенный плеер, поиск раздач
+// на сезон, bulk-поиск недостающих и ручной импорт застрявшей раздачи.
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "../Card.tsx";
-import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./mediaShared.tsx";
+import { Player, ReleasePicker, ImportDrawer, ProgressBar, fmtSize } from "./mediaShared.tsx";
 import {
-  getSeriesPageDetail, getMediaPlayUrl, posterUrl, jellyfinPosterUrl,
+  getSeriesPageDetail, getMediaPlayUrl, posterUrl, jellyfinPosterUrl, seasonSearch, setMonitored,
   type SeriesPageDetail, type DownloadItem, type MediaData,
 } from "../../lib/api.ts";
+import { useToast } from "../Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 const fmtAir = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("ru-RU") : "");
 
+// Относительная дата выхода: «сегодня/завтра/вчера/через N дн/дата».
+function relAir(iso: string | null): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diff = Math.round((t - Date.now()) / 86_400_000);
+  if (diff === 0) return "сегодня";
+  if (diff === 1) return "завтра";
+  if (diff === -1) return "вчера";
+  if (diff > 1 && diff <= 21) return `через ${diff} дн`;
+  return new Date(iso).toLocaleDateString("ru-RU");
+}
+const isAired = (iso: string | null) => Boolean(iso && new Date(iso).getTime() < Date.now());
+
 export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
+  const toast = useToast();
   const [d, setD] = useState<SeriesPageDetail | null | "loading">("loading");
   const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [act, setAct] = useState<string | null>(null);
   const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
@@ -39,12 +57,40 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
   if (d === "loading") return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Загружаем…</div></div>;
   if (!d) return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Не удалось загрузить сериал.</div></div>;
 
-  const poster = d.posterRemote ? posterUrl(d.posterRemote) : jellyfinPosterUrl(d.jellyfinId);
+  const det = d; // d сужен до SeriesPageDetail ниже
+  const tvdbId = det.tvdbId;
+
+  const patchSeasonMon = (sn: number, val: boolean) =>
+    setD((p) => (p && p !== "loading" ? { ...p, seasons: p.seasons.map((s) => (s.seasonNumber === sn ? { ...s, monitored: val } : s)) } : p));
+  const patchSeriesMon = (val: boolean) =>
+    setD((p) => (p && p !== "loading" ? { ...p, monitored: val } : p));
+
+  const toggleMonitor = async (val: boolean, sn?: number) => {
+    if (tvdbId == null) return;
+    setAct(sn == null ? "mon" : "mon" + sn);
+    const ok = await setMonitored("series", tvdbId, val, sn);
+    setAct(null);
+    if (ok) {
+      sn == null ? patchSeriesMon(val) : patchSeasonMon(sn, val);
+      toast.success(val ? "Мониторинг включён" : "Мониторинг выключен");
+    } else toast.error("Не удалось изменить мониторинг");
+  };
+
+  const findSeason = async (sn?: number) => {
+    if (tvdbId == null) return;
+    setAct(sn == null ? "find" : "find" + sn);
+    const ok = await seasonSearch("series", tvdbId, sn);
+    setAct(null);
+    if (ok) toast.success(sn == null ? "Поиск недостающих серий запущен" : `Поиск сезона ${sn} запущен`);
+    else toast.error("Не удалось запустить поиск");
+  };
+
+  const poster = det.posterRemote ? posterUrl(det.posterRemote) : jellyfinPosterUrl(det.jellyfinId);
   // Один и тот же пак приходит несколькими queue-записями → дедуп по downloadId.
   const stuck = [
     ...new Map(
       media.downloads
-        .filter((x) => x.importPending && x.source === "sonarr" && norm(x.title).includes(norm(d.title)))
+        .filter((x) => x.importPending && x.source === "sonarr" && norm(x.title).includes(norm(det.title)))
         .map((x) => [x.downloadId ?? x.hash, x]),
     ).values(),
   ];
@@ -68,80 +114,130 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
         )}
         <div className="mediadetail-info">
           <div className="mediadetail-titlerow">
-            <h1 className="mediadetail-title">{d.title}</h1>
-            {d.year && <span className="mediadetail-year mono">{d.year}</span>}
+            <h1 className="mediadetail-title">{det.title}</h1>
+            {det.year && <span className="mediadetail-year mono">{det.year}</span>}
           </div>
           <div className="mediadetail-badges">
-            {d.status && <span className="rel-badge">{d.status}</span>}
-            {!d.inArr && <span className="rel-reject" title="Нет в Sonarr — данные из Jellyfin">только Jellyfin</span>}
-            {d.genres.slice(0, 5).map((g) => <span key={g} className="rel-lang">{g}</span>)}
+            {det.status && <span className="rel-badge">{det.status}</span>}
+            {!det.inArr && <span className="rel-reject" title="Нет в Sonarr — данные из Jellyfin">только Jellyfin</span>}
+            {det.genres.slice(0, 5).map((g) => <span key={g} className="rel-lang">{g}</span>)}
           </div>
           <div className="mediadetail-facts mono">
-            {[d.network, d.runtime ? `${d.runtime} мин` : "", d.rating ? `★ ${d.rating.toFixed(1)}` : ""].filter(Boolean).join("  ·  ")}
+            {[det.network, det.runtime ? `${det.runtime} мин` : "", det.rating ? `★ ${det.rating.toFixed(1)}` : ""].filter(Boolean).join("  ·  ")}
           </div>
-          {d.overview && <p className="mediadetail-overview">{d.overview}</p>}
-          {stuck.length > 0 && (
-            <div className="mediadetail-actions">
-              {stuck.map((s) => (
-                <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>
-                  ⚠ Импорт застрявшей раздачи
+          {det.overview && <p className="mediadetail-overview">{det.overview}</p>}
+
+          <div className="mediadetail-actions">
+            {det.inArr && tvdbId != null && (
+              <>
+                <button
+                  className={`btn btn-sm ${det.monitored ? "btn-accent" : ""}`}
+                  disabled={act === "mon"}
+                  title={det.monitored ? "Снять весь сериал с мониторинга" : "Мониторить весь сериал"}
+                  onClick={() => toggleMonitor(!det.monitored)}
+                >
+                  {act === "mon" ? "…" : det.monitored ? "★ Мониторится" : "☆ Мониторить"}
                 </button>
-              ))}
-            </div>
-          )}
+                <button className="btn btn-sm" disabled={act === "find"} title="Найти все недостающие серии" onClick={() => findSeason()}>
+                  {act === "find" ? "…" : "⬇ Найти недостающие"}
+                </button>
+              </>
+            )}
+            {stuck.map((s) => (
+              <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>
+                ⚠ Импорт застрявшей раздачи
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {d.seasons.length === 0 ? (
+      {det.seasons.length === 0 ? (
         <Card icon="pulse" title="Эпизоды"><div className="empty">Эпизоды не найдены.</div></Card>
       ) : (
-        d.seasons.map((s) => {
+        det.seasons.map((s) => {
           const isOpen = openSeason === s.seasonNumber;
           const pickerOn = pickerSeason === s.seasonNumber;
           const label = s.seasonNumber === 0 ? "Спецвыпуски" : `Сезон ${s.seasonNumber}`;
+          const pct = s.totalCount > 0 ? Math.round((s.fileCount / s.totalCount) * 100) : 0;
           return (
             <div key={s.seasonNumber} className="media-season">
               <div className="media-season-head">
                 <button className="media-season-toggle" onClick={() => setOpenSeason(isOpen ? null : s.seasonNumber)}>
                   <span>{isOpen ? "▾" : "▸"} {label}</span>
-                  <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{s.fileCount}/{s.totalCount}</span>
+                  <span className="season-prog">
+                    <ProgressBar pct={pct} />
+                    <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{s.fileCount}/{s.totalCount}</span>
+                  </span>
                 </button>
-                <button
-                  className="btn btn-sm"
-                  disabled={d.tvdbId == null}
-                  title={d.tvdbId == null ? "Нет tvdbId" : "Найти раздачу для сезона"}
-                  onClick={() => setPickerSeason(pickerOn ? null : s.seasonNumber)}
-                >
-                  🔍 Раздача
-                </button>
+                <div className="media-season-actions">
+                  {det.inArr && tvdbId != null && (
+                    <>
+                      <button
+                        className={`btn btn-icon btn-sm ${s.monitored ? "btn-accent" : ""}`}
+                        disabled={act === "mon" + s.seasonNumber}
+                        title={s.monitored ? "Снять сезон с мониторинга" : "Мониторить сезон"}
+                        onClick={() => toggleMonitor(!s.monitored, s.seasonNumber)}
+                      >
+                        {act === "mon" + s.seasonNumber ? "…" : s.monitored ? "★" : "☆"}
+                      </button>
+                      <button
+                        className="btn btn-sm"
+                        disabled={act === "find" + s.seasonNumber}
+                        title="Найти весь сезон (force search)"
+                        onClick={() => findSeason(s.seasonNumber)}
+                      >
+                        {act === "find" + s.seasonNumber ? "…" : "⬇ Сезон"}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="btn btn-sm"
+                    disabled={tvdbId == null}
+                    title={tvdbId == null ? "Нет tvdbId" : "Выбрать раздачу для сезона"}
+                    onClick={() => setPickerSeason(pickerOn ? null : s.seasonNumber)}
+                  >
+                    🔍 Раздача
+                  </button>
+                </div>
               </div>
 
-              {pickerOn && d.tvdbId != null && (
-                <ReleasePicker params={{ type: "series", id: d.tvdbId, seasonNumber: s.seasonNumber }} onGrabbed={onMediaUpdate} />
+              {pickerOn && tvdbId != null && (
+                <ReleasePicker params={{ type: "series", id: tvdbId, seasonNumber: s.seasonNumber }} onGrabbed={onMediaUpdate} />
               )}
 
               {isOpen && (
                 <div className="media-ep-list">
-                  {s.episodes.map((ep) => (
-                    <div key={`${ep.seasonNumber}-${ep.episodeNumber}`} className={`mediadetail-ep ${ep.played ? "media-ep-played" : ""}`}>
-                      <span className="media-ep-num mono">{ep.episodeNumber}</span>
-                      <span className="mediadetail-ep-title" title={ep.title}>{ep.title}</span>
-                      <span className="mediadetail-ep-air mono">{fmtAir(ep.airDate)}</span>
-                      {ep.hasFile ? (
-                        <span className="rel-badge">{ep.quality ?? "есть"}{ep.size ? ` · ${fmtSize(ep.size)}` : ""}</span>
-                      ) : (
-                        <span className="mediadetail-missing">нет файла</span>
-                      )}
-                      <button
-                        className="btn btn-icon btn-sm"
-                        title={ep.jellyfinId ? "Воспроизвести" : "Файл недоступен"}
-                        disabled={!ep.jellyfinId || busy === ep.jellyfinId}
-                        onClick={() => ep.jellyfinId && play(ep.jellyfinId, `${d.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`)}
-                      >
-                        {busy === ep.jellyfinId ? "…" : "▶"}
-                      </button>
-                    </div>
-                  ))}
+                  {s.episodes.map((ep) => {
+                    const missed = !ep.hasFile && isAired(ep.airDate);
+                    return (
+                      <div key={`${ep.seasonNumber}-${ep.episodeNumber}`} className={`mediadetail-ep ${ep.played ? "media-ep-played" : ""}`}>
+                        {ep.jellyfinId ? (
+                          <img className="media-ep-thumb" src={jellyfinPosterUrl(ep.jellyfinId)} alt="" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }} />
+                        ) : (
+                          <span className="media-ep-thumb media-ep-thumb-ph" />
+                        )}
+                        <span className="media-ep-num mono">{ep.episodeNumber}</span>
+                        <span className="mediadetail-ep-title" title={ep.title}>{ep.title}</span>
+                        <span className="mediadetail-ep-air mono" title={fmtAir(ep.airDate)}>{relAir(ep.airDate)}</span>
+                        {ep.hasFile ? (
+                          <span className="rel-badge">{ep.quality ?? "есть"}{ep.size ? ` · ${fmtSize(ep.size)}` : ""}</span>
+                        ) : missed ? (
+                          <span className="mediadetail-missing media-ep-missed">пропущено</span>
+                        ) : (
+                          <span className="mediadetail-missing">нет файла</span>
+                        )}
+                        <button
+                          className="btn btn-icon btn-sm"
+                          title={ep.jellyfinId ? "Воспроизвести" : "Файл недоступен"}
+                          disabled={!ep.jellyfinId || busy === ep.jellyfinId}
+                          onClick={() => ep.jellyfinId && play(ep.jellyfinId, `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`)}
+                        >
+                          {busy === ep.jellyfinId ? "…" : "▶"}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

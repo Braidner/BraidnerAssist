@@ -5,6 +5,7 @@ import { apiRouter } from "./api/index.js";
 import { authRouter } from "./api/auth.js";
 import { versionRouter } from "./api/version.js";
 import { posterRouter } from "./api/poster.js";
+import { torrserverStreamRouter } from "./api/torrserverStream.js";
 import { jwtAuth } from "./middleware/jwtAuth.js";
 import { mcpRouter } from "./mcp/handler.js";
 import { startSampler } from "./sampler.js";
@@ -33,6 +34,9 @@ app.use("/api/version", versionRouter);
 // Постер-прокси: <img> не может слать bearer → маршрут публичный (LAN-only),
 // но жёстко ограничен по источнику (анти-SSRF). Вынесен из-под jwtAuth.
 app.use("/api/poster", posterRouter);
+// TorrServer видеопоток: <video> не шлёт bearer → публичный (LAN-only) + анти-SSRF.
+// Монтируется ДО jwtAuth, чтобы перехватить /api/media/torrserver/stream.
+app.use("/api/media/torrserver/stream", torrserverStreamRouter);
 
 // All other /api routes require valid JWT
 app.use("/api", jwtAuth, apiRouter);

@@ -187,11 +187,33 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     Radarr `/api/v3/importlist/movie` + Sonarr `/api/v3/importlist/series` (фильтр `isExisting`/`isExcluded`),
     добавление в один клик через существующий `POST /media/add`. Карточка «Подборки» на `/media`.
     Предусловие: в Radarr/Sonarr включён хотя бы один import-list (встроенный, ключ TMDB не нужен).
-    Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`/`PROWLARR_*`. MCP: `add_movie`/`add_series`
+    **TorrServer (opt-in `TORRSERVER_URL`)** — `integrations/torrserver.ts` (YouROK): мгновенный
+    стрим магнета без полной загрузки и без добавления в библиотеку. `POST /media/torrserver/add`
+    (magnet→hash+файлы, `pickVideoFile` берёт крупнейший видеофайл), `GET /media/torrserver/list`,
+    `DELETE /media/torrserver/:hash`. **Видеопоток проксируется** через `api/torrserverStream.ts` —
+    отдельный публичный роут (вне jwtAuth: `<video src>` не шлёт bearer), анти-SSRF (только hash
+    `^[a-f0-9]{40}$`), проброс `Range`→`206` (seek). Direct-play в браузере для mp4/m4v/webm; mkv/avi/HEVC
+    → «копировать ссылку / .m3u» для внешнего плеера (Player `direct`-режим). Карточка «Смотреть онлайн»
+    на `/media` + кнопка «▶ Сейчас» на Prowlarr-результатах. `media.torrserver:boolean` в `GET /media`.
+    **Расписание + удобный пайплайн сериалов**: `GET /media/calendar?days=` (Sonarr+Radarr `/calendar`,
+    `getCalendar`) → карточка «Скоро выйдет» на `/media` + страница `/media/calendar` (`MediaCalendarPage`,
+    в Sidebar `NAV_ITEMS`). На детальной странице — monitor-toggle (★/☆) сезона/сериала/фильма
+    (`POST /media/monitor` → `arrSetMonitored`, GET→patch→PUT) и **bulk-поиск** «⬇ Найти сезон / недостающие»
+    (`POST /media/season/search` → `arrTriggerSearch`: Sonarr SeasonSearch/MissingEpisodeSearch, Radarr
+    MoviesSearch). `id` = внешний tvdbId/tmdbId (резолв через `arrFindByExternalId`). **Discovery**:
+    «Продолжить просмотр» (`GET /media/continue` → Jellyfin `Items/Resume`, прогресс-плитки) и единый
+    поиск в Cmd-K (`GET /media/unified?q=` → библиотека+`arrLookup`+Prowlarr: открыть detail / добавить /
+    скачать). **UX**: тост-система (`components/Toast.tsx`, `ToastProvider` в `main.tsx`, `useToast()`) на
+    все действия; сетка с оверлеями (просмотрено✓/N непросмотренных, Jellyfin `UserData`), фильтр тип/
+    непросмотренное + сортировка + скелетоны; детальная сериала — прогресс сезона, превью эпизодов
+    (`jellyfinPosterUrl(epId)`), относительные даты, вышедшие-но-отсутствующие красным; адаптивный поллинг
+    медиа (5с при активной загрузке, иначе 15с) в `App.tsx`; mobile/a11y (focus-visible, ≤760px).
+    Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`/`PROWLARR_*`/`TORRSERVER_*`. MCP: `add_movie`/`add_series`
     (правильный пайплайн, основной), `search_releases`/`grab_release` (интерактивный выбор раздачи с
     нужной озвучкой/качеством; `grab_release` после своего `search_releases` — кеш по guid),
     `list_import_candidates`/`import_release` (разложить застрявший multi-season пак: ManualImport
     в обход реджекта; `import_release` без `fileIds` — авто-выбор по одному файлу на серию),
+    `watch_now` (мгновенный стрим магнета через TorrServer),
     `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/`get_recommendations` (Hermes).
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
@@ -203,7 +225,7 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 
 На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на
 `/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Sonarr, Radarr, Prowlarr,
-qBittorrent. Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
+qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
 `host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в
 `/srv/stack/.creds` (chmod 600) и в server `.env` дашборда — в гит не коммитятся.
 

@@ -9,6 +9,7 @@ import {
   type DownloadItem, type ReleaseOption, type ManualImportFile,
 } from "../../lib/api.ts";
 import { getToken } from "../../lib/auth.ts";
+import { useToast } from "../Toast.tsx";
 
 export function ProgressBar({ pct }: { pct: number }) {
   const color = pct >= 100 ? "var(--ok)" : "var(--accent)";
@@ -41,16 +42,31 @@ export function fmtEta(eta?: number | null): string {
   return `${m}м`;
 }
 
-// ── Встроенный HLS-плеер (hls.js + нативный fallback) ──────────────────
-export function Player({ url, title, onClose }: { url: string; title: string; onClose: () => void }) {
+// ── Встроенный плеер: HLS (Jellyfin, hls.js) либо прямой файл (TorrServer) ──
+// direct=true → <video src> с Range-стримом (TorrServer), без hls.js. Для
+// несовместимых контейнеров (mkv/avi) показываем «копировать ссылку / .m3u».
+export function Player({
+  url, title, onClose, direct = false,
+}: {
+  url: string;
+  title: string;
+  onClose: () => void;
+  direct?: boolean;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [copied, setCopied] = useState(false);
+  const absUrl = url.startsWith("http") ? url : window.location.origin + url;
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     let hls: Hls | null = null;
 
-    if (Hls.isSupported()) {
+    if (direct) {
+      // TorrServer отдаёт файл напрямую (Range/seek) — токен не нужен (роут вне jwtAuth).
+      video.src = url;
+      void video.play().catch(() => {});
+    } else if (Hls.isSupported()) {
       hls = new Hls({
         // Прикрепляем JWT к каждому сегментному запросу — роут под jwtAuth.
         xhrSetup: (xhr) => {
@@ -70,16 +86,48 @@ export function Player({ url, title, onClose }: { url: string; title: string; on
     return () => {
       hls?.destroy();
     };
-  }, [url]);
+  }, [url, direct]);
+
+  const copyLink = () => {
+    void navigator.clipboard?.writeText(absUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+
+  const openM3u = () => {
+    const playlist = `#EXTM3U\n#EXTINF:-1,${title}\n${absUrl}\n`;
+    const blob = new Blob([playlist], { type: "audio/x-mpegurl" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${title.replace(/[^\w.-]+/g, "_").slice(0, 60) || "stream"}.m3u`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5_000);
+  };
 
   return (
     <div className="cmdk-backdrop" onClick={onClose}>
       <div className="player-modal neu" onClick={(e) => e.stopPropagation()}>
         <div className="player-head">
           <span className="player-title">{title}</span>
+          {direct && (
+            <div className="player-ext">
+              <button className="btn btn-sm" onClick={copyLink} title="Скопировать прямую ссылку">
+                {copied ? "✓ Скопировано" : "🔗 Ссылка"}
+              </button>
+              <button className="btn btn-sm" onClick={openM3u} title="Открыть в внешнем плеере (VLC/Kodi/TorrServe)">
+                📺 .m3u
+              </button>
+            </div>
+          )}
           <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
         </div>
         <video ref={videoRef} controls autoPlay style={{ width: "100%", borderRadius: 12, background: "#000" }} />
+        {direct && (
+          <div className="player-hint">
+            Если видео не играет (mkv/avi/HEVC) — нажми «Ссылка» или «.m3u» и открой в VLC/Kodi/приложении TorrServe на ТВ.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -97,6 +145,7 @@ export function ReleasePicker({
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
+  const toast = useToast();
 
   useEffect(() => {
     let alive = true;
@@ -112,7 +161,10 @@ export function ReleasePicker({
     setBusyGuid(null);
     if (ok) {
       setDone((p) => ({ ...p, [r.guid]: true }));
+      toast.success("Раздача отправлена на загрузку");
       onGrabbed?.();
+    } else {
+      toast.error("Не удалось отправить раздачу");
     }
   };
 
@@ -190,6 +242,7 @@ export function ImportDrawer({
   const [files, setFiles] = useState<ManualImportFile[] | null>(null);
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     getImportCandidates({ type: kind, downloadId }).then((fs) => {
@@ -215,7 +268,8 @@ export function ImportDrawer({
     setBusy(true);
     const ok = await executeImport({ type: kind, downloadId, fileIds: [...sel] });
     setBusy(false);
-    if (ok) onDone();
+    if (ok) { toast.success(`Импортировано файлов: ${sel.size}`); onDone(); }
+    else toast.error("Импорт не удался");
   };
 
   // Группировка по сезонам (series) либо плоский список (movie).

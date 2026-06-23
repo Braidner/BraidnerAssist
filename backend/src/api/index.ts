@@ -31,7 +31,19 @@ import {
   arrReleaseGrab,
   manualImportCandidates,
   manualImportExecute,
+  getCalendar,
+  arrTriggerSearch,
+  arrSetMonitored,
+  getContinueWatching,
+  unifiedSearch,
 } from "../integrations/media.js";
+import {
+  torrserverAdd,
+  torrserverList,
+  torrserverRemove,
+  pickVideoFile,
+  isBrowserPlayable,
+} from "../integrations/torrserver.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -493,6 +505,125 @@ apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
   }
   try {
     await qbAction(hash, action);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// «Продолжить просмотр» из Jellyfin (недосмотренное с позицией).
+apiRouter.get("/media/continue", async (_req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getContinueWatching());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Единый поиск: библиотека + discover (*arr lookup) + релизы (Prowlarr).
+apiRouter.get("/media/unified", async (req, res) => {
+  if (!config.media.configured) return res.status(503).json({ configured: false });
+  const q = String(req.query.q ?? "").trim();
+  if (!q) return res.json({ inLibrary: [], discover: [], releases: [] });
+  try {
+    res.json(await unifiedSearch(q));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// ── Расписание / monitor / поиск сезона (удобный пайплайн сериалов) ──────
+apiRouter.get("/media/calendar", async (req, res) => {
+  if (!config.media.sonarr.configured && !config.media.radarr.configured) {
+    return res.status(503).json({ configured: false });
+  }
+  const days = Math.min(Math.max(Number(req.query.days ?? 14) || 14, 1), 60);
+  try {
+    res.json(await getCalendar(days));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Запустить поиск: весь сезон / недостающие серии / фильм. id = внешний (tvdbId/tmdbId).
+apiRouter.post("/media/season/search", async (req, res) => {
+  const type = req.body?.type === "movie" ? "movie" : "series";
+  const cfg = type === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const id = Number(req.body?.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
+  const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
+  try {
+    await arrTriggerSearch(type, id, seasonNumber);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Monitor toggle: сезон сериала / весь сериал / фильм.
+apiRouter.post("/media/monitor", async (req, res) => {
+  const type = req.body?.type === "movie" ? "movie" : "series";
+  const cfg = type === "movie" ? config.media.radarr : config.media.sonarr;
+  if (!cfg.configured) return res.status(503).json({ configured: false });
+  const id = Number(req.body?.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
+  const monitored = Boolean(req.body?.monitored);
+  const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
+  try {
+    await arrSetMonitored(type, id, monitored, seasonNumber);
+    res.json({ ok: true, monitored });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// ── TorrServer: мгновенный стриминг магнета без полной загрузки ──────────
+// Добавить magnet/torrent-URL → вернуть hash + лучший видеофайл (для плеера) + весь список.
+apiRouter.post("/media/torrserver/add", async (req, res) => {
+  if (!config.media.torrserver.configured) return res.status(503).json({ configured: false });
+  const link = String(req.body?.link ?? req.body?.magnet ?? "").trim();
+  if (!link) return res.status(400).json({ error: "link/magnet required" });
+  try {
+    const info = await torrserverAdd(link, req.body?.title ? String(req.body.title) : undefined);
+    const file = pickVideoFile(info.files);
+    res.json({
+      hash: info.hash,
+      title: info.title,
+      file: file ? { ...file, playable: isBrowserPlayable(file.path) } : null,
+      files: info.files.map((f) => ({ ...f, playable: isBrowserPlayable(f.path) })),
+    });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Активные раздачи TorrServer.
+apiRouter.get("/media/torrserver/list", async (_req, res) => {
+  if (!config.media.torrserver.configured) return res.status(503).json({ configured: false });
+  try {
+    const list = await torrserverList();
+    res.json(
+      list.map((t) => {
+        const file = pickVideoFile(t.files);
+        return {
+          hash: t.hash,
+          title: t.title,
+          file: file ? { ...file, playable: isBrowserPlayable(file.path) } : null,
+        };
+      }),
+    );
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Убрать раздачу из TorrServer (остановить стрим).
+apiRouter.delete("/media/torrserver/:hash", async (req, res) => {
+  if (!config.media.torrserver.configured) return res.status(503).json({ configured: false });
+  try {
+    await torrserverRemove(req.params.hash);
     res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ error: String(e) });

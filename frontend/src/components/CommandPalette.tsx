@@ -6,7 +6,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
 import { icons } from "./icons.tsx";
-import { sendHermesCommand, dockerAction, adguardProtection, type DockerContainer, type AdguardData } from "../lib/api.ts";
+import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, type DockerContainer, type AdguardData, type UnifiedSearchResult } from "../lib/api.ts";
+
+const EMPTY_MEDIA: UnifiedSearchResult = { inLibrary: [], discover: [], releases: [] };
 
 interface Action {
   id: string;
@@ -27,6 +29,7 @@ export function CommandPalette({ containers, adguard, onAddTask }: Props) {
   const [query, setQuery] = useState("");
   const [sel, setSel] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [mediaRes, setMediaRes] = useState<UnifiedSearchResult>(EMPTY_MEDIA);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Глобальный хоткей Cmd/Ctrl+K.
@@ -55,6 +58,14 @@ export function CommandPalette({ containers, adguard, onAddTask }: Props) {
 
   const close = () => setOpen(false);
   const done = (msg: string) => { setFeedback(msg); setTimeout(close, 800); };
+
+  // Единый поиск по медиа (библиотека + discover + релизы) — с дебаунсом.
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || q.length < 3) { setMediaRes(EMPTY_MEDIA); return; }
+    const t = setTimeout(() => { unifiedSearch(q).then(setMediaRes); }, 350);
+    return () => clearTimeout(t);
+  }, [query, open]);
 
   const navActions: Action[] = useMemo(
     () =>
@@ -119,6 +130,28 @@ export function CommandPalette({ containers, adguard, onAddTask }: Props) {
       ]
     : [];
 
+  // Медиа-результаты единого поиска: библиотека → detail, discover → добавить, релиз → скачать.
+  const mediaActions: Action[] = [
+    ...mediaRes.inLibrary.map((it) => ({
+      id: `lib:${it.id}`,
+      label: `${it.type === "Series" ? "📺" : "🎬"} ${it.name}${it.year ? ` (${it.year})` : ""}`,
+      hint: "В библиотеке",
+      run: () => { navigate(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`); close(); },
+    })),
+    ...mediaRes.discover.map((it) => ({
+      id: `disc:${it.kind}:${it.id}`,
+      label: `+ ${it.title}${it.year ? ` (${it.year})` : ""}`,
+      hint: it.kind === "movie" ? "Добавить фильм" : "Добавить сериал",
+      run: async () => { const ok = await addTitle(it.kind, it.id); done(ok ? "Добавлено ✓" : "Ошибка"); },
+    })),
+    ...mediaRes.releases.map((r) => ({
+      id: `rel:${r.guid}`,
+      label: `⬇ ${r.title}`,
+      hint: "Скачать",
+      run: async () => { if (r.url) { const ok = await addTorrent(r.url); done(ok ? "В qBittorrent ✓" : "Ошибка"); } },
+    })),
+  ];
+
   const match = (a: Action) => !trimmed || a.label.toLowerCase().includes(lc);
   const matchedNavActions = navActions.filter(match);
   const exactNavActions = trimmed
@@ -130,6 +163,7 @@ export function CommandPalette({ containers, adguard, onAddTask }: Props) {
   const actions = [
     ...exactNavActions,
     ...textActions,
+    ...mediaActions,
     ...dnsActions.filter(match),
     ...dockerActions.filter(match),
     ...fuzzyNavActions,

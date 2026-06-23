@@ -8,7 +8,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "../Card.tsx";
 import { Player, ReleasePicker, ImportDrawer, ProgressBar, fmtSize } from "./mediaShared.tsx";
 import {
-  getSeriesPageDetail, getMediaPlayUrl, posterUrl, jellyfinPosterUrl, seasonSearch, setMonitored,
+  getSeriesPageDetail, getSeriesDiscoverDetail, addTitle,
+  getMediaPlayUrl, posterUrl, jellyfinPosterUrl, seasonSearch, setMonitored,
   type SeriesPageDetail, type DownloadItem, type MediaData,
 } from "../../lib/api.ts";
 import { useToast } from "../Toast.tsx";
@@ -30,7 +31,7 @@ function relAir(iso: string | null): string {
 }
 const isAired = (iso: string | null) => Boolean(iso && new Date(iso).getTime() < Date.now());
 
-export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
+export function MediaSeriesPage({ media, onMediaUpdate, source = "library" }: { media: MediaData; onMediaUpdate: () => void; source?: "library" | "discover" }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const toast = useToast();
@@ -40,12 +41,17 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
   const [act, setAct] = useState<string | null>(null);
   const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
+  const [showAllPicker, setShowAllPicker] = useState(false);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
+
+  // discover-карточка резолвится по tvdbId (id = tvdbId), library — по Jellyfin-id.
+  const fetchDetail = () => (source === "discover" ? getSeriesDiscoverDetail(Number(id)) : getSeriesPageDetail(id));
 
   useEffect(() => {
     setD("loading");
-    getSeriesPageDetail(id).then((r) => setD(r));
-  }, [id]);
+    fetchDetail().then((r) => setD(r));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, source]);
 
   const play = async (jellyfinId: string, title: string) => {
     setBusy(jellyfinId);
@@ -85,6 +91,15 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
     else toast.error("Не удалось запустить поиск");
   };
 
+  const addToLib = async () => {
+    if (tvdbId == null) return;
+    setAct("add");
+    const ok = await addTitle("series", tvdbId);
+    setAct(null);
+    if (ok) { toast.success(`«${det.title}» добавлен в библиотеку — ищем релиз`); onMediaUpdate(); fetchDetail().then(setD); }
+    else toast.error("Не удалось добавить в библиотеку");
+  };
+
   const poster = det.posterRemote ? posterUrl(det.posterRemote) : jellyfinPosterUrl(det.jellyfinId);
   // Один и тот же пак приходит несколькими queue-записями → дедуп по downloadId.
   const stuck = [
@@ -102,7 +117,7 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
         <ImportDrawer
           item={importItem}
           onClose={() => setImportItem(null)}
-          onDone={() => { setImportItem(null); onMediaUpdate(); getSeriesPageDetail(id).then(setD); }}
+          onDone={() => { setImportItem(null); onMediaUpdate(); fetchDetail().then(setD); }}
         />
       )}
 
@@ -128,6 +143,11 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
           {det.overview && <p className="mediadetail-overview">{det.overview}</p>}
 
           <div className="mediadetail-actions">
+            {!det.inArr && tvdbId != null && (
+              <button className="btn btn-sm btn-accent" disabled={act === "add"} title="Добавить в Sonarr и запустить поиск" onClick={addToLib}>
+                {act === "add" ? "…" : "➕ В библиотеку"}
+              </button>
+            )}
             {det.inArr && tvdbId != null && (
               <>
                 <button
@@ -143,6 +163,11 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
                 </button>
               </>
             )}
+            {tvdbId != null && (
+              <button className="btn btn-sm" title="Поиск всех раздач сериала (включая мультисезонные паки)" onClick={() => setShowAllPicker((v) => !v)}>
+                {showAllPicker ? "Скрыть раздачи" : "🔍 Все раздачи"}
+              </button>
+            )}
             {stuck.map((s) => (
               <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>
                 ⚠ Импорт застрявшей раздачи
@@ -151,6 +176,16 @@ export function MediaSeriesPage({ media, onMediaUpdate }: { media: MediaData; on
           </div>
         </div>
       </div>
+
+      {showAllPicker && tvdbId != null && (
+        <Card icon="cloud" title="Все раздачи сериала">
+          <div className="mediadetail-facts mono" style={{ marginBottom: 8 }}>
+            Включая мультисезонные паки. Отметь нужные и нажми «Скачать выбранное». После загрузки пака
+            разложи серии по сезонам кнопкой «Импорт» в Загрузках.
+          </div>
+          <ReleasePicker params={{ type: "series", id: tvdbId }} onGrabbed={onMediaUpdate} />
+        </Card>
+      )}
 
       {det.seasons.length === 0 ? (
         <Card icon="pulse" title="Эпизоды"><div className="empty">Эпизоды не найдены.</div></Card>

@@ -16,6 +16,9 @@ import {
   getSeriesDetail,
   getSeriesPageDetail,
   getMoviePageDetail,
+  getSeriesDiscoverDetail,
+  getMovieDiscoverDetail,
+  arrLookupAll,
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
@@ -319,6 +322,44 @@ apiRouter.get("/media/detail/movie/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     res.json(await getMoviePageDetail(req.params.id));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Discovery: объединённый поиск тайтлов (фильмы + сериалы) для виджета поиска.
+apiRouter.get("/media/discover/search", async (req, res) => {
+  if (!config.media.sonarr.configured && !config.media.radarr.configured) {
+    return res.status(503).json({ configured: false });
+  }
+  const q = String(req.query.q ?? "").trim();
+  if (!q) return res.status(400).json({ error: "q required" });
+  try {
+    res.json(await arrLookupAll(q));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Discovery: детальная страница сериала по tvdbId (тайтл может быть ещё не в библиотеке).
+apiRouter.get("/media/discover/detail/series/:id", async (req, res) => {
+  if (!config.media.sonarr.configured) return res.status(503).json({ configured: false });
+  const tvdbId = Number(req.params.id);
+  if (!Number.isFinite(tvdbId) || tvdbId <= 0) return res.status(400).json({ error: "id required" });
+  try {
+    res.json(await getSeriesDiscoverDetail(tvdbId));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Discovery: детальная страница фильма по tmdbId.
+apiRouter.get("/media/discover/detail/movie/:id", async (req, res) => {
+  if (!config.media.radarr.configured) return res.status(503).json({ configured: false });
+  const tmdbId = Number(req.params.id);
+  if (!Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "id required" });
+  try {
+    res.json(await getMovieDiscoverDetail(tmdbId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

@@ -809,6 +809,38 @@ export async function getMoviePageDetail(id: string): Promise<MoviePageDetail | 
   }
 }
 
+// ── Discovery: поиск тайтлов (фильмы + сериалы) + детальные страницы по внешнему id ──
+// Карточки работают и для тайтлов, которых ещё нет в библиотеке (id = tvdbId/tmdbId).
+export async function discoverSearch(q: string): Promise<ArrLookupItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/discover/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    return (await res.json()) as ArrLookupItem[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getSeriesDiscoverDetail(tvdbId: number): Promise<SeriesPageDetail | null> {
+  try {
+    const res = await apiFetch(`/api/media/discover/detail/series/${tvdbId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as SeriesPageDetail;
+  } catch {
+    return null;
+  }
+}
+
+export async function getMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail | null> {
+  try {
+    const res = await apiFetch(`/api/media/discover/detail/movie/${tmdbId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as MoviePageDetail;
+  } catch {
+    return null;
+  }
+}
+
 // ── Расписание / monitor / поиск сезона ────────────────────────────────
 export interface CalendarItem {
   kind: "movie" | "series";

@@ -145,64 +145,112 @@ export function ReleasePicker({
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
     let alive = true;
     setReleases(null);
+    setDone({});
+    setSel(new Set());
     searchReleaseOptions(params).then((r) => { if (alive) setReleases(r); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.type, params.id, params.seasonNumber]);
 
+  // Грабим один релиз; помечаем done. Возвращаем успех (для bulk-счётчика).
+  const grabOne = async (r: ReleaseOption): Promise<boolean> => {
+    const ok = await grabRelease({ type: params.type, guid: r.guid, indexerId: r.indexerId });
+    if (ok) setDone((p) => ({ ...p, [r.guid]: true }));
+    return ok;
+  };
+
   const onGrab = async (r: ReleaseOption) => {
     setBusyGuid(r.guid);
-    const ok = await grabRelease({ type: params.type, guid: r.guid, indexerId: r.indexerId });
+    const ok = await grabOne(r);
     setBusyGuid(null);
-    if (ok) {
-      setDone((p) => ({ ...p, [r.guid]: true }));
-      toast.success("Раздача отправлена на загрузку");
-      onGrabbed?.();
-    } else {
-      toast.error("Не удалось отправить раздачу");
+    if (ok) { toast.success("Раздача отправлена на загрузку"); onGrabbed?.(); }
+    else toast.error("Не удалось отправить раздачу");
+  };
+
+  const toggle = (guid: string) => setSel((p) => {
+    const n = new Set(p);
+    n.has(guid) ? n.delete(guid) : n.add(guid);
+    return n;
+  });
+
+  const onBulk = async () => {
+    if (!releases) return;
+    setBulkBusy(true);
+    let ok = 0, fail = 0;
+    for (const r of releases.filter((x) => sel.has(x.guid) && !done[x.guid])) {
+      (await grabOne(r)) ? ok++ : fail++;
     }
+    setBulkBusy(false);
+    setSel(new Set());
+    if (ok) { toast.success(`Отправлено на загрузку: ${ok}`); onGrabbed?.(); }
+    if (fail) toast.error(`Не удалось отправить: ${fail}`);
   };
 
   if (releases === null) return <div className="empty" style={{ marginTop: 10 }}>Ищем раздачи…</div>;
   if (releases.length === 0) return <div className="empty" style={{ marginTop: 10 }}>Раздачи не найдены.</div>;
 
+  const selCount = releases.filter((x) => sel.has(x.guid) && !done[x.guid]).length;
+
   return (
-    <div className="sr-list">
-      {releases.map((r) => (
-        <div key={r.guid} className={`sr-row ${r.rejected ? "rel-rejected" : ""}`}>
-          <span className="sr-title" title={r.title}>{r.title}</span>
-          <div className="sr-foot" style={{ flexWrap: "wrap", gap: 6 }}>
-            <span className="sr-meta" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span className="rel-badge">{r.quality}</span>
-              {r.languages.map((l) => <span key={l} className="rel-lang">{l}</span>)}
-              <span>{fmtSize(r.size)}</span>
-              <span className="sr-seeds">{r.seeders ?? 0} seed</span>
-              <span>{r.indexer}</span>
-              {r.rejected && (
-                <span className="rel-reject" title={r.rejections.join("; ")}>⚠ отклонён</span>
-              )}
-            </span>
-            <button
-              className="btn btn-sm btn-accent"
-              disabled={busyGuid === r.guid || done[r.guid]}
-              onClick={() => onGrab(r)}
-            >
-              {done[r.guid] ? "✓ В очереди" : busyGuid === r.guid ? "…" : "Скачать"}
-            </button>
-          </div>
-          {done[r.guid] && /multi-season/i.test(r.rejections.join(" ")) && (
-            <div className="rel-reject" style={{ fontSize: 10.5 }}>
-              Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках, чтобы разложить серии.
+    <>
+      <div className="sr-list">
+        {releases.map((r) => (
+          <div key={r.guid} className={`sr-row ${r.rejected ? "rel-rejected" : ""}`}>
+            <label className="sr-pick">
+              <input
+                type="checkbox"
+                className="imp-check"
+                checked={sel.has(r.guid)}
+                disabled={done[r.guid]}
+                onChange={() => toggle(r.guid)}
+              />
+              <span className="sr-title" title={r.title}>{r.title}</span>
+            </label>
+            <div className="sr-foot" style={{ flexWrap: "wrap", gap: 6 }}>
+              <span className="sr-meta" style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span className="rel-badge">{r.quality}</span>
+                {r.languages.map((l) => <span key={l} className="rel-lang">{l}</span>)}
+                <span>{fmtSize(r.size)}</span>
+                <span className="sr-seeds">{r.seeders ?? 0} seed</span>
+                <span>{r.indexer}</span>
+                {r.rejected && (
+                  <span className="rel-reject" title={r.rejections.join("; ")}>⚠ отклонён</span>
+                )}
+              </span>
+              <button
+                className="btn btn-sm btn-accent"
+                disabled={busyGuid === r.guid || done[r.guid] || bulkBusy}
+                onClick={() => onGrab(r)}
+              >
+                {done[r.guid] ? "✓ В очереди" : busyGuid === r.guid ? "…" : "Скачать"}
+              </button>
             </div>
-          )}
-        </div>
-      ))}
-    </div>
+            {done[r.guid] && /multi-season/i.test(r.rejections.join(" ")) && (
+              <div className="rel-reject" style={{ fontSize: 10.5 }}>
+                Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках, чтобы разложить серии.
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {selCount > 0 && (
+        <button
+          className="btn btn-accent"
+          style={{ width: "100%", marginTop: 10 }}
+          disabled={bulkBusy}
+          onClick={onBulk}
+        >
+          {bulkBusy ? "Отправляем…" : `⬇ Скачать выбранное (${selCount})`}
+        </button>
+      )}
+    </>
   );
 }
 

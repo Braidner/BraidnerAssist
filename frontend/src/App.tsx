@@ -233,6 +233,8 @@ export function App() {
           <Route path="/media/calendar" element={<MediaCalendarPage />} />
           <Route path="/media/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/media/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
+          <Route path="/media/discover/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} source="discover" />} />
+          <Route path="/media/discover/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} source="discover" />} />
           <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -328,6 +328,45 @@ async function sonarrEpisodes(seriesId: number): Promise<Record<string, any>[]> 
 
 const ticksToMin = (t?: number): number | null => (t && t > 0 ? Math.round(t / 600_000_000) : null);
 
+// Построить сезоны с эпизодами/файлами из записи Sonarr, merged с Jellyfin-картой
+// (S{n}E{n} → { id, played }). Общий хелпер: Jellyfin-keyed детальная страница и
+// discover-страница по tvdbId используют один и тот же билдер.
+async function buildSonarrSeasons(
+  sonarr: Record<string, any>,
+  jfMap: Map<string, { id: string; played: boolean }>,
+): Promise<DetailSeason[]> {
+  const seasonMonitored = new Map<number, boolean>();
+  for (const s of (sonarr?.seasons ?? []) as any[]) {
+    seasonMonitored.set(Number(s.seasonNumber), Boolean(s.monitored));
+  }
+  const eps = await sonarrEpisodes(sonarr.id);
+  const map = new Map<number, DetailEpisode[]>();
+  for (const e of eps) {
+    const sn = Number(e.seasonNumber ?? 0);
+    const en = Number(e.episodeNumber ?? 0);
+    const jfHit = jfMap.get(`S${sn}E${en}`);
+    if (!map.has(sn)) map.set(sn, []);
+    map.get(sn)!.push({
+      seasonNumber: sn,
+      episodeNumber: en,
+      title: String(e.title ?? "—"),
+      airDate: e.airDateUtc ?? null,
+      hasFile: Boolean(e.hasFile),
+      quality: e.episodeFile?.quality?.quality?.name ?? null,
+      size: e.episodeFile?.size ?? null,
+      jellyfinId: jfHit?.id ?? null,
+      played: jfHit?.played ?? false,
+    });
+  }
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([sn, list]) => ({
+    seasonNumber: sn,
+    episodes: list.sort((a, b) => a.episodeNumber - b.episodeNumber),
+    fileCount: list.filter((x) => x.hasFile).length,
+    totalCount: list.length,
+    monitored: seasonMonitored.get(sn) ?? false,
+  }));
+}
+
 // Детальная страница сериала: Sonarr (метаданные + полный список эпизодов с
 // файлом/качеством/датой) merged с Jellyfin (played + id для плеера).
 export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPageDetail> {
@@ -351,39 +390,8 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
   const sonarr = tvdbId ? await arrFindByExternalId("series", tvdbId) : null;
   let seasons: DetailSeason[] = [];
 
-  // карта monitored по сезонам из записи Sonarr (seasons[].monitored).
-  const seasonMonitored = new Map<number, boolean>();
-  for (const s of (sonarr?.seasons ?? []) as any[]) {
-    seasonMonitored.set(Number(s.seasonNumber), Boolean(s.monitored));
-  }
-
   if (sonarr) {
-    const eps = await sonarrEpisodes(sonarr.id);
-    const map = new Map<number, DetailEpisode[]>();
-    for (const e of eps) {
-      const sn = Number(e.seasonNumber ?? 0);
-      const en = Number(e.episodeNumber ?? 0);
-      const jfHit = jfMap.get(`S${sn}E${en}`);
-      if (!map.has(sn)) map.set(sn, []);
-      map.get(sn)!.push({
-        seasonNumber: sn,
-        episodeNumber: en,
-        title: String(e.title ?? "—"),
-        airDate: e.airDateUtc ?? null,
-        hasFile: Boolean(e.hasFile),
-        quality: e.episodeFile?.quality?.quality?.name ?? null,
-        size: e.episodeFile?.size ?? null,
-        jellyfinId: jfHit?.id ?? null,
-        played: jfHit?.played ?? false,
-      });
-    }
-    seasons = [...map.entries()].sort((a, b) => a[0] - b[0]).map(([sn, list]) => ({
-      seasonNumber: sn,
-      episodes: list.sort((a, b) => a.episodeNumber - b.episodeNumber),
-      fileCount: list.filter((x) => x.hasFile).length,
-      totalCount: list.length,
-      monitored: seasonMonitored.get(sn) ?? false,
-    }));
+    seasons = await buildSonarrSeasons(sonarr, jfMap);
   } else if (jfDetail) {
     // Fallback: только Jellyfin.
     seasons = jfDetail.seasons.map((s) => ({
@@ -440,6 +448,70 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
     runtime: radarr?.runtime ?? ticksToMin(jf?.RunTimeTicks),
     rating: radarr?.ratings?.value ?? radarr?.ratings?.tmdb?.value ?? jf?.CommunityRating ?? null,
     posterRemote: radarr ? arrPoster(radarr.images) : null,
+    tmdbId,
+    inArr: Boolean(radarr),
+    monitored: Boolean(radarr?.monitored),
+    hasFile: Boolean(radarr?.hasFile),
+    quality: radarr?.movieFile?.quality?.quality?.name ?? null,
+    size: radarr?.movieFile?.size ?? null,
+  };
+}
+
+// Детальная страница сериала по внешнему tvdbId (discovery — тайтл может быть ещё НЕ
+// в библиотеке). Если в Sonarr → реальные сезоны/эпизоды/файлы; иначе — скелет сезонов
+// из lookup-записи. jellyfinId пустой: плеер для новых тайтлов не нужен (деградация).
+export async function getSeriesDiscoverDetail(tvdbId: number): Promise<SeriesPageDetail> {
+  if (!config.media.sonarr.configured) throw new Error("Sonarr не настроен");
+  const sonarr = await arrFindByExternalId("series", tvdbId);
+  const rec = sonarr ?? (await arrLookupRecordByExternalId("series", tvdbId));
+  if (!rec) throw new Error(`series не найден (tvdb ${tvdbId})`);
+  const seasons: DetailSeason[] = sonarr
+    ? await buildSonarrSeasons(sonarr, new Map())
+    : ((rec.seasons ?? []) as any[])
+        .map((s) => ({
+          seasonNumber: Number(s.seasonNumber ?? 0),
+          episodes: [],
+          fileCount: 0,
+          totalCount: 0,
+          monitored: Boolean(s.monitored),
+        }))
+        .sort((a, b) => a.seasonNumber - b.seasonNumber);
+  return {
+    jellyfinId: "",
+    title: String(rec.title ?? "—"),
+    year: rec.year ?? null,
+    overview: rec.overview ?? null,
+    genres: rec.genres ?? [],
+    network: rec.network ?? null,
+    status: rec.status ?? null,
+    runtime: rec.runtime ?? null,
+    rating: rec.ratings?.value ?? null,
+    posterRemote: arrPoster(rec.images),
+    tvdbId,
+    inArr: Boolean(sonarr),
+    monitored: Boolean(sonarr?.monitored),
+    seasons,
+  };
+}
+
+// Детальная страница фильма по внешнему tmdbId (discovery). Если в Radarr → статус
+// файла; иначе — метаданные из lookup-записи (inArr:false, файла нет).
+export async function getMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail> {
+  if (!config.media.radarr.configured) throw new Error("Radarr не настроен");
+  const radarr = await arrFindByExternalId("movie", tmdbId);
+  const rec = radarr ?? (await arrLookupRecordByExternalId("movie", tmdbId));
+  if (!rec) throw new Error(`movie не найден (tmdb ${tmdbId})`);
+  return {
+    jellyfinId: "",
+    title: String(rec.title ?? "—"),
+    year: rec.year ?? null,
+    overview: rec.overview ?? null,
+    genres: rec.genres ?? [],
+    studio: rec.studio ?? null,
+    status: rec.status ?? null,
+    runtime: rec.runtime ?? null,
+    rating: radarr?.ratings?.value ?? radarr?.ratings?.tmdb?.value ?? rec.ratings?.value ?? null,
+    posterRemote: arrPoster(rec.images),
     tmdbId,
     inArr: Boolean(radarr),
     monitored: Boolean(radarr?.monitored),
@@ -918,6 +990,38 @@ export async function arrLookup(kind: "movie" | "series", term: string): Promise
   }));
 }
 
+// Объединённый поиск тайтла по фильмам и сериалам (для виджета discovery).
+// Сериалы идут первыми, затем фильмы. Источники изолированы (allSettled).
+export async function arrLookupAll(term: string): Promise<ArrLookupItem[]> {
+  const [series, movies] = await Promise.allSettled([
+    arrLookup("series", term),
+    arrLookup("movie", term),
+  ]);
+  return [
+    ...(series.status === "fulfilled" ? series.value : []),
+    ...(movies.status === "fulfilled" ? movies.value : []),
+  ];
+}
+
+// Полная raw-запись тайтла из *arr lookup по внешнему id (term=tmdb:|tvdb:).
+// Несёт всё для POST (arrEnsureAdded) и для скелета discover-страницы (seasons/images/overview).
+async function arrLookupRecordByExternalId(
+  kind: "movie" | "series",
+  id: number,
+): Promise<(ArrLookupRecord & Record<string, any>) | null> {
+  const cfg = arrCfg(kind);
+  if (!cfg.configured || !id) return null;
+  const path = kind === "movie" ? "movie" : "series";
+  const idScheme = kind === "movie" ? "tmdb" : "tvdb";
+  const res = await fetch(`${cfg.url}/api/v3/${path}/lookup?term=${idScheme}:${id}`, {
+    headers: { "X-Api-Key": cfg.apiKey! },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return null;
+  const arr = (await res.json()) as (ArrLookupRecord & Record<string, any>)[];
+  return Array.isArray(arr) && arr.length > 0 ? arr[0] : null;
+}
+
 // Обеспечить присутствие тайтла в библиотеке *arr и вернуть внутренний id.
 // Если тайтл уже добавлен — lookup по id вернёт found.id>0, отдаём его без POST.
 // autoSearch=true (ручка «Добавить») сразу запускает поиск релиза; false («Выбрать
@@ -945,13 +1049,7 @@ async function arrEnsureAdded(
 
   // Полный объект тайтла для POST берём из lookup по идентификатору.
   const path = kind === "movie" ? "movie" : "series";
-  const idScheme = kind === "movie" ? "tmdb" : "tvdb";
-  const lkRes = await fetch(`${cfg.url}/api/v3/${path}/lookup?term=${idScheme}:${id}`, {
-    headers,
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!lkRes.ok) throw new Error(`${kind} lookup ${lkRes.status}`);
-  const found = ((await lkRes.json()) as (ArrLookupRecord & Record<string, unknown>)[])[0];
+  const found = await arrLookupRecordByExternalId(kind, id);
   if (!found) throw new Error(`${kind}: не найдено (id ${id})`);
   if (found.id && found.id > 0) {
     return { id: found.id, title: found.title ?? "—", alreadyInLibrary: true };

@@ -7,7 +7,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "../Card.tsx";
 import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./mediaShared.tsx";
 import {
-  getMoviePageDetail, getMediaPlayUrl, getMediaDevices, playOnDevice, posterUrl, jellyfinPosterUrl,
+  getMoviePageDetail, getMovieDiscoverDetail, addTitle,
+  getMediaPlayUrl, getMediaDevices, playOnDevice, posterUrl, jellyfinPosterUrl,
   seasonSearch, setMonitored,
   type MoviePageDetail, type DownloadItem, type MediaData, type PlayDevice,
 } from "../../lib/api.ts";
@@ -15,7 +16,7 @@ import { useToast } from "../Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 
-export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
+export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { media: MediaData; onMediaUpdate: () => void; source?: "library" | "discover" }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const toast = useToast();
@@ -28,11 +29,15 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
   const [devices, setDevices] = useState<PlayDevice[]>([]);
   const [castOpen, setCastOpen] = useState(false);
 
+  // discover-карточка резолвится по tmdbId (id = tmdbId), library — по Jellyfin-id.
+  const fetchDetail = () => (source === "discover" ? getMovieDiscoverDetail(Number(id)) : getMoviePageDetail(id));
+
   useEffect(() => {
     setD("loading");
-    getMoviePageDetail(id).then((r) => setD(r));
+    fetchDetail().then((r) => setD(r));
     getMediaDevices().then(setDevices);
-  }, [id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, source]);
 
   const play = async () => {
     setBusy(true);
@@ -61,6 +66,14 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
     if (ok) toast.success("Поиск фильма запущен");
     else toast.error("Не удалось запустить поиск");
   };
+  const addToLib = async () => {
+    if (det.tmdbId == null) return;
+    setAct("add");
+    const ok = await addTitle("movie", det.tmdbId);
+    setAct(null);
+    if (ok) { toast.success(`«${det.title}» добавлен в библиотеку — ищем релиз`); onMediaUpdate(); fetchDetail().then(setD); }
+    else toast.error("Не удалось добавить в библиотеку");
+  };
 
   const poster = d.posterRemote ? posterUrl(d.posterRemote) : jellyfinPosterUrl(d.jellyfinId);
   const stuck = [
@@ -78,7 +91,7 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
         <ImportDrawer
           item={importItem}
           onClose={() => setImportItem(null)}
-          onDone={() => { setImportItem(null); onMediaUpdate(); getMoviePageDetail(id).then(setD); }}
+          onDone={() => { setImportItem(null); onMediaUpdate(); fetchDetail().then(setD); }}
         />
       )}
 
@@ -125,6 +138,11 @@ export function MediaMoviePage({ media, onMediaUpdate }: { media: MediaData; onM
                   </div>
                 )}
               </div>
+            )}
+            {!det.inArr && det.tmdbId != null && (
+              <button className="btn btn-sm btn-accent" disabled={act === "add"} title="Добавить в Radarr и запустить поиск" onClick={addToLib}>
+                {act === "add" ? "…" : "➕ В библиотеку"}
+              </button>
             )}
             {det.inArr && det.tmdbId != null && (
               <>

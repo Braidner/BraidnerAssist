@@ -8,7 +8,7 @@ import { Card } from "../Card.tsx";
 import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, searchReleases, addTorrent, torrentAction, refreshJellyfin,
-  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getRecommendations,
+  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getRecommendations, discoverSearch,
   torrserverAdd, torrserverList, torrserverRemove, torrserverStreamUrl, getCalendar,
   getContinueWatching, getMediaPlayUrl,
   type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
@@ -291,6 +291,20 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     if (media.configured) getRecommendations().then(setRecs);
   }, [media.configured]);
 
+  // Discovery-поиск: ищем по всем тайтлам Sonarr/Radarr (фильмы + сериалы), дебаунс 350мс.
+  const [dq, setDq] = useState("");
+  const [dres, setDres] = useState<ArrLookupItem[]>([]);
+  const [dsearching, setDsearching] = useState(false);
+  useEffect(() => {
+    const q = dq.trim();
+    if (q.length < 2) { setDres([]); setDsearching(false); return; }
+    setDsearching(true);
+    const t = setTimeout(() => {
+      discoverSearch(q).then((r) => { setDres(r); setDsearching(false); });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [dq]);
+
   const [calendar, setCalendar] = useState<CalendarItem[]>([]);
   useEffect(() => {
     if (media.configured) getCalendar(14).then(setCalendar);
@@ -358,6 +372,10 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   const openDetail = (it: LibraryItem) =>
     nav(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`);
 
+  // Клик по результату discovery → детальная карточка по внешнему id (tvdb/tmdb).
+  const openDiscover = (it: ArrLookupItem) =>
+    nav(`/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`);
+
   const onAdd = async (url: string, key: string) => {
     setBusy(key);
     const ok = await addTorrent(url);
@@ -424,29 +442,6 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
               </div>
             </Card>
           )}
-
-          {/* Что играет */}
-          <Card icon="pulse" title="Сейчас играет" action={<span className="panel-count">{media.nowPlaying.length}</span>}>
-            {media.nowPlaying.length === 0 ? (
-              <div className="empty">Ничего не воспроизводится.</div>
-            ) : (
-              <div className="sys-vm-list" style={{ marginTop: 8 }}>
-                {media.nowPlaying.map((np, i) => (
-                  <div key={i} className="sys-vm-row" style={{ gap: 10, flexWrap: "wrap" }}>
-                    <span className="dot-led" style={{ background: "var(--accent)", boxShadow: "0 0 8px color-mix(in srgb, var(--accent) 70%, transparent)" }} />
-                    <span className="sys-vm-name" style={{ minWidth: 160 }}>{np.title}</span>
-                    <span className="sys-vm-type mono" style={{ color: "var(--muted)", fontSize: 11 }}>{np.user} · {np.client}</span>
-                    {np.positionPct !== null && (
-                      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, minWidth: 120, flex: 1 }}>
-                        <ProgressBar pct={np.positionPct} />
-                        <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>{np.positionPct}%</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
 
           {/* Библиотека */}
           <Card
@@ -525,9 +520,62 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             )}
           </Card>
 
-          {/* Подборки — ещё не в библиотеке */}
-          {recs.length > 0 && (
-            <Card icon="pulse" title="Подборки" action={<span className="panel-count">{recs.length}</span>}>
+          {/* Найти и добавить — поиск по всем тайтлам Sonarr/Radarr; пусто → подборки */}
+          <Card
+            icon="pulse"
+            title="Найти и добавить"
+            action={<span className="panel-count">{dq.trim() ? dres.length : recs.length}</span>}
+          >
+            <div className="add-field" style={{ marginTop: 4 }}>
+              <input
+                className="neu-in mc-input"
+                placeholder="Поиск фильмов и сериалов…"
+                value={dq}
+                onChange={(e) => setDq(e.target.value)}
+              />
+              {dq && <button className="btn btn-icon btn-sm" title="Очистить" onClick={() => setDq("")}>✕</button>}
+            </div>
+
+            {dq.trim() ? (
+              dsearching && dres.length === 0 ? (
+                <div className="media-grid">
+                  {Array.from({ length: 6 }).map((_, i) => <div key={i} className="neu-in media-skel" />)}
+                </div>
+              ) : dres.length === 0 ? (
+                <div className="empty" style={{ marginTop: 10 }}>Ничего не найдено.</div>
+              ) : (
+                <div className="media-grid">
+                  {dres.map((it) => (
+                    <button
+                      key={it.kind + it.id}
+                      className="neu media-item"
+                      title={it.title}
+                      onClick={() => openDiscover(it)}
+                    >
+                      <span className="media-poster-box">
+                        {it.poster ? (
+                          <img
+                            className="media-item-poster"
+                            src={posterUrl(it.poster)}
+                            alt=""
+                            loading="lazy"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <span className="media-item-poster lk-poster-ph">{it.kind === "movie" ? "🎬" : "📺"}</span>
+                        )}
+                        {it.added && <span className="media-badge media-badge-seen" title="Уже в библиотеке">✓</span>}
+                      </span>
+                      <span className="media-item-name">{it.title}</span>
+                      <span className="media-item-meta mono">
+                        {it.kind === "movie" ? "🎬 фильм" : "📺 сериал"}{it.year ? ` · ${it.year}` : ""}
+                      </span>
+                      <span className="media-item-play">›</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : recs.length > 0 ? (
               <div className="media-grid">
                 {recs.map((r) => {
                   const key = "rec" + r.kind + r.id;
@@ -559,8 +607,10 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
                   );
                 })}
               </div>
-            </Card>
-          )}
+            ) : (
+              <div className="empty" style={{ marginTop: 10 }}>Введи название фильма или сериала, чтобы найти и открыть карточку.</div>
+            )}
+          </Card>
 
           {/* Скоро выйдет — ближайшие эпизоды/релизы (полное — на /media/calendar) */}
           {calendar.length > 0 && (

@@ -140,3 +140,18 @@ services:
       - ./jackett/config:/config
       - ./media/downloads:/downloads
     restart: unless-stopped
+
+  # TorrServer (YouROK) — мгновенный стриминг торрентов без полной загрузки.
+  # Дашборд (/media «Смотреть онлайн») ходит сюда через host.docker.internal:8090,
+  # видеопоток проксируется бэкендом (токен/Range). Auth не включён (LAN-only).
+  torrserver:
+    image: ghcr.io/yourok/torrserver:latest
+    container_name: torrserver
+    networks: [stack]
+    environment:
+      - TZ=${TZ}
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./torrserver:/opt/ts
+    restart: unless-stopped

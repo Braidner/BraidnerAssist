@@ -85,6 +85,14 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 `docker-compose.prod.yml` (с `image:` из GHCR) — для сервера.
 `.env` создаётся на сервере из `.env.example` (в гит не коммитится).
 
+**nginx-прокси (`frontend/nginx.conf`, ВАЖНО):** `location /api/` — это REST + HLS-прокси
+(Jellyfin/TorrServer), **без WebSocket**. НЕ ставить здесь `Upgrade`/`Connection "upgrade"`:
+безусловные upgrade-заголовки переводят keep-alive соединение в tunnel-режим и **обрезают
+большие тела ответа** (длинные HLS-плейлисты фильмов ~1.5МБ резались на ~144КБ → в браузере
+`ERR_CONTENT_LENGTH_MISMATCH`, плеер висит; короткие плейлисты сериалов укладывались и играли).
+Должно быть `Connection ""` + `proxy_buffering off` (исправлено в 151ba1c). Диагностика обрезки —
+nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` маскирует баг.
+
 ## Модули (виджеты)
 
 1. **Tasks Hub** — GitLab issues/MRs + локальные задачи (SQLite), CRUD, клик → drawer с деталями.
@@ -276,8 +284,18 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   бэкенд-прокси, токен не утекает), библиотека Jellyfin, добавление торрентов (magnet +
   поиск Prowlarr), управление очередью qBittorrent (pause/resume/delete + speed/ETA/seeds),
   Cmd-K действия (рестарт контейнера, пауза DNS, создать задачу), MCP `add_torrent`/
-  `get_media_status`/`get_dns_stats`. Env: добавлен `PROWLARR_*`.
-- **Отложено**: drag-and-drop виджетов (react-grid-layout); Sonarr/Radarr interactive search
-  (авто-раскладка файлов в библиотеки Jellyfin) — кандидат на отдельную партию.
+  `get_media_status`/`get_dns_stats`. Env: добавлен `PROWLARR_*`. ✅ ГОТОВО
+- **Batch v5 — *arr пайплайн + детальные страницы**: правильный пайплайн в медиатеку
+  (`arrLookup`/`arrAdd`), группировка библиотеки Series/Movie, роутовые детальные страницы
+  `/media/series|movie/:id`, интерактивный release-picker (force-grab), ручной импорт застрявших
+  multi-season паков (ManualImport), постер-прокси. ✅ ГОТОВО
+- **Batch v6 — TorrServer + пайплайн сериалов + UX/UI** (2026-06-23, 280c866+e5a089f): TorrServer
+  стриминг (мгновенный просмотр магнета, прокси с Range вне jwtAuth), расписание `/media/calendar`,
+  monitor-toggle + bulk-поиск сезона/недостающих, «Продолжить просмотр» (Jellyfin Resume), единый
+  поиск в Cmd-K, тост-система, полиш сетки/детальной/мобилки. Env: добавлен `TORRSERVER_*`. ✅ ГОТОВО
+- **Batch v6.1 — фикс воспроизведения** (151ba1c): nginx `/api/` резал большие HLS-плейлисты из-за
+  upgrade-заголовков → убраны, `Connection ""`+`proxy_buffering off`. См. раздел «Деплой». ✅ ГОТОВО
+- **Отложено**: drag-and-drop виджетов (react-grid-layout); аппаратный транскод для тяжёлых
+  4K/HEVC 10-bit (софт-транскод 4K→h264 грузит CPU VM, может тормозить).
 
 Подробный трекинг — в `TASKS.md`.

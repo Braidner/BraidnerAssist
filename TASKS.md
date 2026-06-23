@@ -246,8 +246,32 @@
 - [x] **UX**: тост-система (`Toast.tsx`/`ToastProvider`/`useToast`) на все действия; сетка с
       оверлеями (просмотрено/N, `UserData`)+фильтр/сортировка/скелетоны; детальная сериала —
       прогресс сезона/превью/относительные даты/missed; адаптивный поллинг (5с/15с); mobile/a11y
-- [ ] **Деплой**: TorrServer в `/srv/stack` (порт 8090) + `TORRSERVER_URL` в server `.env`;
-      пуш образов GHCR → `docker compose -f docker-compose.prod.yml pull/up -d`; e2e верификация
+- [x] **Деплой** (commits 280c866 + e5a089f): TorrServer развёрнут в `/srv/stack` (`ghcr.io/yourok/
+      torrserver` :8090, `/echo`→MatriX.141.5) + `TORRSERVER_URL` в server `.env`; образы GHCR запулены
+      и контейнеры пересозданы. e2e: `/api/media` `torrserver:true`; add Big Buck Bunny → стрим **206
+      video/mp4** (Range/seek) → DELETE 200; стрим-роут анти-SSRF 400/400; resume=2; deep-link
+      `/media/calendar` 200. Календарь сейчас пуст (нет анонсов в 14 дн — ожидаемо).
+
+## Batch v6.1 — фикс воспроизведения (nginx truncation) (2026-06-23, commit 151ba1c, deployed)
+
+Симптом (юзер): «перестали запускаться все скачанные фильмы» — в браузере `net::ERR_CONTENT_LENGTH_MISMATCH`
+на `main.m3u8`, плеер висит на 0:00; короткие серии сериалов ещё играли.
+
+- [x] Диагностика: сервер здоров (curl: master→variant→транскод-сегмент `0.ts` 200, 2.5МБ; диск 16%;
+      Jellyfin Up 8 дней — деплой его не трогал). Код плеера не менялся (HLS-ветка `Player` byte-identical).
+      Ключ: nginx-лог `body_bytes_sent` для `main.m3u8` = **144015** при `Content-Length` **1514237** → обрезка.
+- [x] ROOT CAUSE (досталось из initial commit, не из этой партии): `frontend/nginx.conf` `location /api/`
+      безусловно слал `Upgrade $http_upgrade; Connection "upgrade"`. На keep-alive HTTP/1.1 из браузера это
+      переводило соединение в tunnel-режим и резало большие тела. Длинные плейлисты фильмов (~1.5МБ)
+      обрывались на ~144КБ → mismatch; короткие плейлисты сериалов укладывались → играли.
+- [x] ФИКС: `/api` = REST + HLS-прокси, WebSocket нет → убрал upgrade-заголовки, `Connection ""` +
+      `proxy_buffering off` + `proxy_request_buffering off`. Проверено на hermes.lan: `main.m3u8` теперь
+      `200 / 1514237` (было 144015). Образ собран в GHCR и задеплоен (контейнер несёт исправленный конфиг).
+- ПОЧЕМУ ПРЯТАЛОСЬ: `curl` одиночным `Connection: close` всегда брал полное тело → сервер «выглядел ок»;
+      резал только keep-alive браузера. Диагностика: nginx `body_bytes_sent` vs `Content-Length`.
+- ОТЛАДОЧНАЯ ЗАМЕТКА: расширение Claude-in-Chrome блокирует URL с токеном/query-данными (Jellyfin
+      `ApiKey`/`DeviceId`/`PlaySessionId`) — показывает «[BLOCKED]»/503 даже когда nginx вернул 200.
+      Путает in-browser репро — проверять на уровне nginx/curl.
 
 ---
 

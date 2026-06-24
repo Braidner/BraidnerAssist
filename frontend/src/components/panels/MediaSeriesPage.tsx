@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "../Card.tsx";
 import { Player, ReleasePicker, ImportDrawer, ProgressBar, fmtSize } from "./mediaShared.tsx";
+import { TorrentFilePicker, ContentTorrents } from "./mediaPick.tsx";
 import {
   getSeriesPageDetail, getSeriesDiscoverDetail, addTitle,
   getMediaPlayUrl, posterUrl, jellyfinPosterUrl, seasonSearch, setMonitored,
@@ -42,6 +43,8 @@ export function MediaSeriesPage({ media, onMediaUpdate, source = "library" }: { 
   const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
   const [showAllPicker, setShowAllPicker] = useState(false);
+  const [showPick, setShowPick] = useState(false);
+  const [pickReload, setPickReload] = useState(0);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
 
   // discover-карточка резолвится по tvdbId (id = tvdbId), library — по Jellyfin-id.
@@ -176,6 +179,22 @@ export function MediaSeriesPage({ media, onMediaUpdate, source = "library" }: { 
           </div>
         </div>
       </div>
+
+      {/* Качается из торрента (Media v2) — прогресс по сериям + докачать ещё */}
+      <ContentTorrents contentType="series" tvdbId={tvdbId} reloadKey={pickReload} />
+
+      {/* Пофайловый выбор серий из торрента (Media v2) */}
+      <Card
+        icon="cloud"
+        title="Скачать по сериям (торрент)"
+        action={<button className="btn btn-sm" onClick={() => setShowPick((v) => !v)}>{showPick ? "Скрыть" : "🔍 Выбрать серии"}</button>}
+      >
+        {showPick ? (
+          <TorrentFilePicker contentType="series" tvdbId={tvdbId} title={det.title} onGrabbed={() => setPickReload((n) => n + 1)} />
+        ) : (
+          <div className="empty">Найди раздачу и отметь галками нужные серии — качаем только их.</div>
+        )}
+      </Card>
 
       {showAllPicker && tvdbId != null && (
         <Card icon="cloud" title="Все раздачи сериала">

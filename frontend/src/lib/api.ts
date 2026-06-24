@@ -615,6 +615,7 @@ export interface ManualImportFile {
 export interface MediaData {
   configured: boolean;
   torrserver: boolean;
+  tmdb: boolean;
   nowPlaying: NowPlaying[];
   downloads: DownloadItem[];
 }
@@ -622,10 +623,54 @@ export interface MediaData {
 export async function getMedia(): Promise<MediaData> {
   try {
     const res = await apiFetch("/api/media");
-    if (!res.ok) return { configured: false, torrserver: false, nowPlaying: [], downloads: [] };
+    if (!res.ok) return { configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] };
     return (await res.json()) as MediaData;
   } catch {
-    return { configured: false, torrserver: false, nowPlaying: [], downloads: [] };
+    return { configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] };
+  }
+}
+
+// ── Media v2: TMDB дискавери ────────────────────────────────────────────
+export interface TmdbItem {
+  kind: "movie" | "series";
+  tmdbId: number;
+  title: string;
+  year: number | null;
+  overview: string;
+  poster: string | null;
+  rating: number | null;
+}
+
+export async function tmdbSearch(q: string): Promise<TmdbItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/tmdb/search?q=${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    return (await res.json()) as TmdbItem[];
+  } catch {
+    return [];
+  }
+}
+
+// kind пусто → тренды недели (микс); "movie"/"series" → популярное по типу.
+export async function tmdbTrending(kind?: "movie" | "series"): Promise<TmdbItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/tmdb/trending${kind ? `?kind=${kind}` : ""}`);
+    if (!res.ok) return [];
+    return (await res.json()) as TmdbItem[];
+  } catch {
+    return [];
+  }
+}
+
+// tmdbId сериала → tvdbId (для перехода в карточку сериала).
+export async function tmdbResolveTvdb(tmdbId: number): Promise<number | null> {
+  try {
+    const res = await apiFetch(`/api/media/tmdb/resolve?tmdbId=${tmdbId}`);
+    if (!res.ok) return null;
+    const body = (await res.json()) as { tvdbId: number | null };
+    return body.tvdbId ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -1051,6 +1096,107 @@ export async function searchReleases(q: string): Promise<SearchResult[]> {
     const res = await apiFetch(`/api/media/search?q=${encodeURIComponent(q)}`);
     if (!res.ok) return [];
     return (await res.json()) as SearchResult[];
+  } catch {
+    return [];
+  }
+}
+
+// ── Media v2: пофайловый выбор серий (preview → grab selected) ──────────
+export interface PickFile {
+  fileIndex: number;
+  path: string;
+  length: number;
+  isVideo: boolean;
+  season: number | null;
+  episodes: number[];
+}
+export interface TorrentPreview {
+  infohash: string;
+  title: string;
+  files: PickFile[];
+}
+
+// Предпросмотр файлов торрента (через TorrServer, без скачивания).
+export async function previewTorrentFiles(source: string): Promise<TorrentPreview | null> {
+  try {
+    const res = await apiFetch("/api/media/pick/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as TorrentPreview;
+  } catch {
+    return null;
+  }
+}
+
+// Скачать только выбранные файлы + сохранить привязку торрент↔контент.
+export async function grabSelectedFiles(input: {
+  contentType: "movie" | "series";
+  tmdbId?: number | null;
+  tvdbId?: number | null;
+  title: string;
+  source: string;
+  infohash: string;
+  files: PickFile[];
+  wantedIndexes: number[];
+}): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/pick/grab", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Докачать ещё файлы через тот же торрент.
+export async function pickMoreFiles(infohash: string, addIndexes: number[]): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/media/pick/more", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ infohash, addIndexes }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export interface ContentTorrentFile {
+  fileIndex: number;
+  path: string;
+  length: number;
+  wanted: boolean;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  progress: number; // 0..1
+}
+export interface ContentTorrent {
+  infohash: string;
+  title: string;
+  magnet: string | null;
+  files: ContentTorrentFile[];
+}
+
+// Торренты, привязанные к тайтлу (секция «Уже качается из этого торрента»).
+export async function getContentTorrents(p: {
+  type: "movie" | "series";
+  tmdbId?: number | null;
+  tvdbId?: number | null;
+}): Promise<ContentTorrent[]> {
+  try {
+    const qs = new URLSearchParams({ type: p.type });
+    if (p.tmdbId) qs.set("tmdbId", String(p.tmdbId));
+    if (p.tvdbId) qs.set("tvdbId", String(p.tvdbId));
+    const res = await apiFetch(`/api/media/pick/torrents?${qs.toString()}`);
+    if (!res.ok) return [];
+    return (await res.json()) as ContentTorrent[];
   } catch {
     return [];
   }

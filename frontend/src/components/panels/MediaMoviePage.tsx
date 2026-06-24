@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card } from "../Card.tsx";
 import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./mediaShared.tsx";
+import { TorrentFilePicker, ContentTorrents } from "./mediaPick.tsx";
 import {
   getMoviePageDetail, getMovieDiscoverDetail, addTitle,
   getMediaPlayUrl, getMediaDevices, playOnDevice, posterUrl, jellyfinPosterUrl,
@@ -25,6 +26,8 @@ export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { m
   const [busy, setBusy] = useState(false);
   const [act, setAct] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showPick, setShowPick] = useState(false);
+  const [pickReload, setPickReload] = useState(0);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const [devices, setDevices] = useState<PlayDevice[]>([]);
   const [castOpen, setCastOpen] = useState(false);
@@ -181,6 +184,22 @@ export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { m
           <ReleasePicker params={{ type: "movie", id: d.tmdbId }} onGrabbed={onMediaUpdate} />
         ) : (
           <div className="empty">Нажми «Найти», чтобы искать раздачи с нужной озвучкой/качеством.</div>
+        )}
+      </Card>
+
+      {/* Качается из торрента (Media v2) */}
+      <ContentTorrents contentType="movie" tmdbId={d.tmdbId} reloadKey={pickReload} />
+
+      {/* Пофайловый выбор файла из торрента (Media v2) */}
+      <Card
+        icon="cloud"
+        title="Скачать из торрента"
+        action={<button className="btn btn-sm" onClick={() => setShowPick((v) => !v)}>{showPick ? "Скрыть" : "🔍 Выбрать файл"}</button>}
+      >
+        {showPick ? (
+          <TorrentFilePicker contentType="movie" tmdbId={d.tmdbId} title={d.title} onGrabbed={() => setPickReload((n) => n + 1)} />
+        ) : (
+          <div className="empty">Найди раздачу и скачай только нужный файл (без лишнего из пака).</div>
         )}
       </Card>
     </div>

@@ -3,16 +3,17 @@
 // (прямой magnet + поиск через Prowlarr — в выезжающем дравере у загрузок).
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "../Card.tsx";
 import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, searchReleases, addTorrent, torrentAction, refreshJellyfin,
   lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getRecommendations, discoverSearch,
+  tmdbSearch, tmdbTrending, tmdbResolveTvdb,
   torrserverAdd, torrserverList, torrserverRemove, torrserverStreamUrl, getCalendar,
   getContinueWatching, getMediaPlayUrl,
   type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
-  type Recommendation, type TorrServerStream, type CalendarItem, type ResumeItem,
+  type Recommendation, type TorrServerStream, type CalendarItem, type ResumeItem, type TmdbItem,
 } from "../../lib/api.ts";
 import {
   ReleasePicker, ImportDrawer, ProgressBar, Player, fmtSize, fmtSpeed, fmtEta,
@@ -258,9 +259,14 @@ function AddTorrentDrawer({
   );
 }
 
+type MediaTab = "library" | "discover" | "system";
+
 export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
   const nav = useNavigate();
   const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  const tab = ((params.get("tab") as MediaTab) || "library");
+  const setTab = (t: MediaTab) => setParams(t === "library" ? {} : { tab: t }, { replace: true });
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [importFor, setImportFor] = useState<DownloadItem | null>(null);
@@ -291,19 +297,64 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     if (media.configured) getRecommendations().then(setRecs);
   }, [media.configured]);
 
-  // Discovery-поиск: ищем по всем тайтлам Sonarr/Radarr (фильмы + сериалы), дебаунс 350мс.
+  // Discovery-поиск: TMDB (если настроен) или *arr lookup. Дебаунс 350мс.
   const [dq, setDq] = useState("");
   const [dres, setDres] = useState<ArrLookupItem[]>([]);
+  const [tmRes, setTmRes] = useState<TmdbItem[]>([]);
+  const [trending, setTrending] = useState<TmdbItem[]>([]);
   const [dsearching, setDsearching] = useState(false);
   useEffect(() => {
     const q = dq.trim();
-    if (q.length < 2) { setDres([]); setDsearching(false); return; }
+    if (q.length < 2) { setDres([]); setTmRes([]); setDsearching(false); return; }
     setDsearching(true);
     const t = setTimeout(() => {
-      discoverSearch(q).then((r) => { setDres(r); setDsearching(false); });
+      if (media.tmdb) tmdbSearch(q).then((r) => { setTmRes(r); setDsearching(false); });
+      else discoverSearch(q).then((r) => { setDres(r); setDsearching(false); });
     }, 350);
     return () => clearTimeout(t);
-  }, [dq]);
+  }, [dq, media.tmdb]);
+
+  // Тренды TMDB для пустого запроса (подборки).
+  useEffect(() => {
+    if (media.tmdb) tmdbTrending().then(setTrending);
+  }, [media.tmdb]);
+
+  // Переход в карточку из TMDB: фильм — по tmdbId; сериал — резолвим tvdbId.
+  const openTmdb = async (it: TmdbItem) => {
+    if (it.kind === "movie") { nav(`/media/discover/movie/${it.tmdbId}`); return; }
+    setBusy("tmdb" + it.tmdbId);
+    const tvdb = await tmdbResolveTvdb(it.tmdbId);
+    setBusy(null);
+    if (tvdb) nav(`/media/discover/series/${tvdb}`);
+    else toast.error("Не удалось определить tvdbId сериала (нет в Sonarr/TVDB)");
+  };
+
+  const renderTmdbGrid = (items: TmdbItem[]) => (
+    <div className="media-grid">
+      {items.map((it) => (
+        <button
+          key={it.kind + it.tmdbId}
+          className="neu media-item"
+          title={it.title}
+          disabled={busy === "tmdb" + it.tmdbId}
+          onClick={() => openTmdb(it)}
+        >
+          <span className="media-poster-box">
+            {it.poster ? (
+              <img className="media-item-poster" src={posterUrl(it.poster)} alt="" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <span className="media-item-poster lk-poster-ph">{it.kind === "movie" ? "🎬" : "📺"}</span>
+            )}
+          </span>
+          <span className="media-item-name">{it.title}</span>
+          <span className="media-item-meta mono">
+            {it.kind === "movie" ? "🎬 фильм" : "📺 сериал"}{it.year ? ` · ${it.year}` : ""}
+          </span>
+          <span className="media-item-play">{busy === "tmdb" + it.tmdbId ? "…" : "›"}</span>
+        </button>
+      ))}
+    </div>
+  );
 
   const [calendar, setCalendar] = useState<CalendarItem[]>([]);
   useEffect(() => {
@@ -425,7 +476,13 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
         />
       )}
 
-      <div className="page-cols">
+      <div className="media-tabs">
+        <button className={`media-tab-btn ${tab === "library" ? "active" : ""}`} onClick={() => setTab("library")}>Библиотека</button>
+        <button className={`media-tab-btn ${tab === "discover" ? "active" : ""}`} onClick={() => setTab("discover")}>Дискавери</button>
+        <button className={`media-tab-btn ${tab === "system" ? "active" : ""}`} onClick={() => setTab("system")}>Система</button>
+      </div>
+
+      {tab === "library" && (
         <div className="page-col-main">
           {/* Продолжить просмотр (Jellyfin Resume) */}
           {resume.length > 0 && (
@@ -519,12 +576,16 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
               </div>
             )}
           </Card>
+        </div>
+      )}
 
+      {tab === "discover" && (
+        <div className="page-col-main">
           {/* Найти и добавить — поиск по всем тайтлам Sonarr/Radarr; пусто → подборки */}
           <Card
             icon="pulse"
             title="Найти и добавить"
-            action={<span className="panel-count">{dq.trim() ? dres.length : recs.length}</span>}
+            action={<span className="panel-count">{dq.trim() ? (media.tmdb ? tmRes.length : dres.length) : (media.tmdb ? trending.length : recs.length)}</span>}
           >
             <div className="add-field" style={{ marginTop: 4 }}>
               <input
@@ -536,7 +597,23 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
               {dq && <button className="btn btn-icon btn-sm" title="Очистить" onClick={() => setDq("")}>✕</button>}
             </div>
 
-            {dq.trim() ? (
+            {media.tmdb ? (
+              dq.trim() ? (
+                dsearching && tmRes.length === 0 ? (
+                  <div className="media-grid">
+                    {Array.from({ length: 6 }).map((_, i) => <div key={i} className="neu-in media-skel" />)}
+                  </div>
+                ) : tmRes.length === 0 ? (
+                  <div className="empty" style={{ marginTop: 10 }}>Ничего не найдено.</div>
+                ) : (
+                  renderTmdbGrid(tmRes)
+                )
+              ) : trending.length > 0 ? (
+                renderTmdbGrid(trending)
+              ) : (
+                <div className="empty" style={{ marginTop: 10 }}>Введи название, чтобы найти фильм или сериал.</div>
+              )
+            ) : dq.trim() ? (
               dsearching && dres.length === 0 ? (
                 <div className="media-grid">
                   {Array.from({ length: 6 }).map((_, i) => <div key={i} className="neu-in media-skel" />)}
@@ -636,8 +713,10 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             </Card>
           )}
         </div>
+      )}
 
-        <div className="page-col-side">
+      {tab === "system" && (
+        <div className="page-col-main">
           {/* Смотреть онлайн через TorrServer — мгновенный стрим без полной загрузки */}
           {media.torrserver && (
             <Card icon="pulse" title="Смотреть онлайн" action={<span className="panel-count">{tsStreams.length}</span>}>
@@ -753,7 +832,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             )}
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }

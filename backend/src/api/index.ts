@@ -47,6 +47,14 @@ import {
   pickVideoFile,
   isBrowserPlayable,
 } from "../integrations/torrserver.js";
+import {
+  previewTorrent,
+  grabSelected,
+  setWantedFiles,
+  listContentTorrents,
+  type ContentType,
+} from "../integrations/torrentPick.js";
+import { tmdbSearch, tmdbTrending, tmdbPopular, tmdbTvToTvdb } from "../integrations/tmdb.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -532,6 +540,107 @@ apiRouter.post("/media/torrent", async (req, res) => {
   try {
     await qbAdd(url);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// ── Media v2: TMDB дискавери ────────────────────────────────────────────
+apiRouter.get("/media/tmdb/search", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const q = String(req.query.q ?? "").trim();
+  if (!q) return res.status(400).json({ error: "q required" });
+  try {
+    res.json(await tmdbSearch(q));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.get("/media/tmdb/trending", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const kind = String(req.query.kind ?? "");
+  try {
+    if (kind === "movie" || kind === "series") res.json(await tmdbPopular(kind));
+    else res.json(await tmdbTrending());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// tmdbId сериала → tvdbId (для перехода в карточку сериала).
+apiRouter.get("/media/tmdb/resolve", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const tmdbId = Number(req.query.tmdbId);
+  if (!Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "tmdbId required" });
+  try {
+    res.json({ tvdbId: await tmdbTvToTvdb(tmdbId) });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// ── Media v2: пофайловый выбор серий ───────────────────────────────────
+// Предпросмотр файлов торрента (без скачивания) — дерево с распарсенными сериями.
+apiRouter.post("/media/pick/preview", async (req, res) => {
+  if (!config.media.torrserver.configured) return res.status(503).json({ configured: false });
+  const source = String(req.body?.source ?? "").trim();
+  if (!source) return res.status(400).json({ error: "source required" });
+  try {
+    res.json(await previewTorrent(source));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Грабим выбранные файлы (качаем только их) + сохраняем привязку торрент↔контент.
+apiRouter.post("/media/pick/grab", async (req, res) => {
+  if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
+  const b = req.body ?? {};
+  const contentType: ContentType = b.contentType === "series" ? "series" : "movie";
+  const source = String(b.source ?? "").trim();
+  const infohash = String(b.infohash ?? "").trim();
+  const files = Array.isArray(b.files) ? b.files : [];
+  const wantedIndexes = Array.isArray(b.wantedIndexes) ? b.wantedIndexes.map(Number) : [];
+  if (!infohash || !source || files.length === 0) {
+    return res.status(400).json({ error: "infohash, source, files required" });
+  }
+  try {
+    res.json(await grabSelected({
+      contentType,
+      tmdbId: b.tmdbId != null ? Number(b.tmdbId) : null,
+      tvdbId: b.tvdbId != null ? Number(b.tvdbId) : null,
+      title: String(b.title ?? "—"),
+      source,
+      infohash,
+      files,
+      wantedIndexes,
+    }));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Докачать ещё файлы через уже добавленный торрент (тот же infohash).
+apiRouter.post("/media/pick/more", async (req, res) => {
+  if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
+  const infohash = String(req.body?.infohash ?? "").trim();
+  const addIndexes = Array.isArray(req.body?.addIndexes) ? req.body.addIndexes.map(Number) : [];
+  if (!infohash || addIndexes.length === 0) return res.status(400).json({ error: "infohash, addIndexes required" });
+  try {
+    res.json(await setWantedFiles(infohash, addIndexes));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Торренты, привязанные к тайтлу (для секции «Уже качается из этого торрента»).
+apiRouter.get("/media/pick/torrents", async (req, res) => {
+  const contentType: ContentType = String(req.query.type ?? "") === "series" ? "series" : "movie";
+  const tmdbId = req.query.tmdbId != null ? Number(req.query.tmdbId) : null;
+  const tvdbId = req.query.tvdbId != null ? Number(req.query.tvdbId) : null;
+  try {
+    res.json(await listContentTorrents({ contentType, tmdbId, tvdbId }));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

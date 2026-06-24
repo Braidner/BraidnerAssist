@@ -74,6 +74,39 @@ model ServiceCheck {
   @@index([name, createdAt])
 }
 
+// Media v2: привязка торрент → контент. Качаем пофайлово через qBittorrent
+// (filePrio), чтобы тянуть только выбранные серии. Один торрент на тайтл —
+// позже докачиваем ещё серии/сезон, меняя приоритет файлов (без re-add).
+model MediaTorrent {
+  id          String             @id @default(cuid())
+  contentType String             // movie | series
+  tmdbId      Int?
+  tvdbId      Int?
+  title       String
+  infohash    String             @unique // qB/TorrServer hash (lowercase hex)
+  magnet      String?
+  savePath    String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  files       MediaTorrentFile[]
+}
+
+// Файл внутри торрента + его маппинг на серию (распарсенный из имени).
+// wanted=true → качаем (qB prio>0); false → пропущен (prio 0).
+model MediaTorrentFile {
+  id            String       @id @default(cuid())
+  torrentId     String
+  torrent       MediaTorrent @relation(fields: [torrentId], references: [id], onDelete: Cascade)
+  fileIndex     Int
+  path          String
+  length        Float        @default(0) // байты (Float — чтобы влезли файлы > 2 ГБ)
+  wanted        Boolean      @default(false)
+  seasonNumber  Int?
+  episodeNumber Int?
+
+  @@unique([torrentId, fileIndex])
+}
+
 // Локальные события календаря (если нет CalDAV).
 model CalendarEvent {
   id          String   @id @default(cuid())

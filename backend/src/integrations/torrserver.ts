@@ -76,6 +76,28 @@ export async function torrserverAdd(link: string, title?: string): Promise<TorrI
   };
 }
 
+// Предпросмотр файлов магнета БЕЗ сохранения (save_to_db:false) — для пофайлового
+// выбора серий ДО скачивания. Возвращает hash (== infohash, lowercase hex) + все
+// файлы. Метаданные могут прийти не сразу — добираем коротким поллингом.
+export async function torrserverFiles(link: string): Promise<TorrInfo> {
+  const added = await tsPost({ action: "add", link, save_to_db: false });
+  const hash = String(added.hash ?? "");
+  if (!hash) throw new Error("TorrServer не вернул hash");
+  let info = added;
+  let files = mapFiles(added.file_stats);
+  for (let i = 0; i < 8 && files.length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 700));
+    info = await tsPost({ action: "get", hash });
+    files = mapFiles(info.file_stats);
+  }
+  return {
+    hash: hash.toLowerCase(),
+    title: String(info.title ?? added.title ?? "—"),
+    poster: info.poster ?? added.poster ?? null,
+    files,
+  };
+}
+
 // Активные раздачи TorrServer.
 export async function torrserverList(): Promise<TorrInfo[]> {
   const list = await tsPost({ action: "list" });

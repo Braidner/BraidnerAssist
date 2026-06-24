@@ -31,6 +31,7 @@ export interface DownloadItem {
 export interface MediaData {
   configured: boolean;
   torrserver: boolean; // TorrServer настроен → фронт показывает блок «Смотреть онлайн»
+  tmdb: boolean; // TMDB настроен → дискавери через TMDB
   nowPlaying: NowPlaying[];
   downloads: DownloadItem[];
 }
@@ -803,20 +804,29 @@ async function assertQbAdded(res: Response): Promise<void> {
   }
 }
 
-// Добавить торрент в qBittorrent (magnet или http(s) .torrent URL).
-export async function qbAdd(urlOrMagnet: string): Promise<void> {
+// Добавить торрент в qBittorrent с опциями (paused/category/savePath). Базовый
+// метод — qbAdd и пофайловый граб (qbApplySelection) идут через него.
+async function qbAddRaw(
+  urlOrMagnet: string,
+  opts: { paused?: boolean; category?: string; savePath?: string } = {},
+): Promise<void> {
   if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
   const sid = await qbLogin();
   const addUrl = `${config.media.qbittorrent.url}/api/v2/torrents/add`;
-
   const resolved = await resolveTorrent(urlOrMagnet);
+
+  // Доп. поля: paused (4.x) + stopped (5.x), category, savepath.
+  const extra: Record<string, string> = {};
+  if (opts.paused) { extra.paused = "true"; extra.stopped = "true"; }
+  if (opts.category) extra.category = opts.category;
+  if (opts.savePath) extra.savepath = opts.savePath;
 
   let res: Response;
   if (resolved.magnet) {
     res = await fetch(addUrl, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
-      body: new URLSearchParams({ urls: resolved.magnet }),
+      body: new URLSearchParams({ urls: resolved.magnet, ...extra }),
       signal: AbortSignal.timeout(15_000),
     });
   } else {
@@ -828,6 +838,7 @@ export async function qbAdd(urlOrMagnet: string): Promise<void> {
       new Blob([resolved.bytes!], { type: "application/x-bittorrent" }),
       "file.torrent",
     );
+    for (const [k, v] of Object.entries(extra)) fd.append(k, v);
     res = await fetch(addUrl, {
       method: "POST",
       headers: { ...(sid ? { Cookie: sid } : {}) },
@@ -837,6 +848,100 @@ export async function qbAdd(urlOrMagnet: string): Promise<void> {
   }
   await assertQbAdded(res);
   cache = null;
+}
+
+// Добавить торрент в qBittorrent (magnet или http(s) .torrent URL).
+export async function qbAdd(urlOrMagnet: string): Promise<void> {
+  await qbAddRaw(urlOrMagnet);
+}
+
+// ── qBittorrent: пофайловый контроль (Media v2) ──────────────────────────
+export interface QbFile { index: number; name: string; size: number; priority: number; progress: number; }
+
+// Список файлов торрента. Пустой массив = торрента нет или метаданные ещё не пришли.
+// Старые qB не отдают index → берём позицию в массиве (== порядок файлов в торренте).
+export async function qbFiles(hash: string): Promise<QbFile[]> {
+  if (!config.media.qbittorrent.configured) return [];
+  const sid = await qbLogin();
+  const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/files?hash=${hash}`, {
+    headers: sid ? { Cookie: sid } : {},
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`qBittorrent files ${res.status}`);
+  const arr = (await res.json()) as any[];
+  if (!Array.isArray(arr)) return [];
+  return arr.map((f, i) => ({
+    index: Number.isFinite(f.index) ? Number(f.index) : i,
+    name: String(f.name ?? ""),
+    size: Number(f.size ?? 0),
+    priority: Number(f.priority ?? 1),
+    progress: Number(f.progress ?? 0),
+  }));
+}
+
+// Выставить приоритет файлам (0 = не качать, 1 = обычный). Индексы — qB file ids.
+export async function qbSetFilePrio(hash: string, indexes: number[], priority: number): Promise<void> {
+  if (!indexes.length) return;
+  if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
+  const sid = await qbLogin();
+  const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/filePrio`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
+    body: new URLSearchParams({ hash, id: indexes.join("|"), priority: String(priority) }),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) throw new Error(`qBittorrent filePrio ${res.status}`);
+}
+
+const qbBasename = (p: string) => p.replace(/\\/g, "/").split("/").pop() ?? p;
+
+// Применить пофайловый выбор: качаем только wanted-файлы (остальные prio 0).
+// Если торрента нет в qB — добавляем на паузе, ждём метаданные, ставим приоритеты,
+// затем resume. wantedIndexes — индексы из предпросмотра (files[].fileIndex).
+export async function qbApplySelection(params: {
+  infohash: string;
+  source?: string;
+  files: { fileIndex: number; path: string }[];
+  wantedIndexes: number[];
+  category?: string;
+  savePath?: string;
+}): Promise<{ infohash: string; added: boolean }> {
+  if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
+  const hash = params.infohash.toLowerCase();
+  let qf = await qbFiles(hash);
+  let added = false;
+
+  if (qf.length === 0) {
+    if (!params.source) throw new Error("Торрент не найден в qBittorrent и нет источника для добавления");
+    await qbAddRaw(params.source, { paused: true, category: params.category, savePath: params.savePath });
+    added = true;
+    for (let i = 0; i < 25 && qf.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      qf = await qbFiles(hash);
+    }
+    if (qf.length === 0) {
+      await qbAction(hash, "resume").catch(() => {});
+      throw new Error("qBittorrent ещё не получил метаданные торрента — повтори выбор через минуту");
+    }
+  }
+
+  // Сопоставляем выбранные preview-пути с файлами qB (точное совпадение → basename).
+  const wantedPaths = new Set(
+    params.files.filter((f) => params.wantedIndexes.includes(f.fileIndex)).map((f) => f.path),
+  );
+  const wantedBase = new Set([...wantedPaths].map(qbBasename));
+  const wanted: number[] = [];
+  const unwanted: number[] = [];
+  for (const f of qf) {
+    const hit = wantedPaths.has(f.name) || wantedBase.has(qbBasename(f.name));
+    (hit ? wanted : unwanted).push(f.index);
+  }
+  if (unwanted.length) await qbSetFilePrio(hash, unwanted, 0);
+  if (wanted.length) await qbSetFilePrio(hash, wanted, 1);
+  await qbAction(hash, "resume").catch(() => {});
+  cache = null;
+  return { infohash: hash, added };
 }
 
 // qBittorrent 5.x (WebAPI ≥2.11) переименовал pause/resume → stop/start, старые ручки
@@ -1615,7 +1720,7 @@ export async function unifiedSearch(q: string): Promise<UnifiedSearch> {
 // ── Сводка ────────────────────────────────────────────────────────────────
 export async function getMedia(): Promise<MediaData> {
   if (!config.media.configured) {
-    return { configured: false, torrserver: false, nowPlaying: [], downloads: [] };
+    return { configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] };
   }
   if (cache && Date.now() - cache.at < 8_000) return cache.data;
 
@@ -1636,6 +1741,7 @@ export async function getMedia(): Promise<MediaData> {
   const data: MediaData = {
     configured: true,
     torrserver: config.media.torrserver.configured,
+    tmdb: config.media.tmdb.configured,
     nowPlaying,
     downloads,
   };

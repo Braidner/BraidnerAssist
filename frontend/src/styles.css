@@ -613,6 +613,15 @@ body.sb-locked { overflow: hidden; }
   box-shadow: calc(2px*var(--depth)) calc(2px*var(--depth)) calc(4px*var(--depth)) var(--sd); }
 .seg-btn:not(.on):hover { color: var(--ink); }
 
+/* Media page tabs (Библиотека / Дискавери / Система) */
+.media-tabs { display: flex; gap: 8px; padding: 6px; border-radius: 14px; background: var(--surface);
+  box-shadow: inset calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd), inset calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(5px*var(--depth)) var(--sl); }
+.media-tab-btn { flex: 1; height: 40px; border: none; cursor: pointer; border-radius: 11px; background: transparent; color: var(--muted);
+  font-family: var(--font-ui); font-size: 13.5px; font-weight: 500; letter-spacing: .01em; transition: color .14s, box-shadow .14s, background .14s; }
+.media-tab-btn.active { color: var(--accent-ink); background: var(--accent);
+  box-shadow: calc(2px*var(--depth)) calc(2px*var(--depth)) calc(4px*var(--depth)) var(--sd); }
+.media-tab-btn:not(.active):hover { color: var(--ink); }
+
 /* Title lookup results (Radarr/Sonarr) */
 .lk-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
 .lk-row { display: flex; gap: 11px; align-items: center; padding: 10px 12px; border-radius: calc(var(--radius) * 0.6); background: var(--surface);

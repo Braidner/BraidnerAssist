@@ -53,7 +53,7 @@ export function App() {
   const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
   const [metrics, setMetrics] = useState<UptimeSeries[]>([]);
   const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
-  const [media, setMedia] = useState<MediaData>({ configured: false, torrserver: false, nowPlaying: [], downloads: [] });
+  const [media, setMedia] = useState<MediaData>({ configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);

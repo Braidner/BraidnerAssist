@@ -128,6 +128,11 @@ export const config = {
       password: env("TORRSERVER_PASSWORD"),
       get configured() { return Boolean(this.url); },
     },
+    // TMDB — метаданные/дискавери напрямую (Media v2). Бесплатный API-ключ (v3).
+    tmdb: {
+      apiKey: env("TMDB_API_KEY"),
+      get configured() { return Boolean(this.apiKey); },
+    },
     get configured() {
       return (
         this.jellyfin.configured ||
@@ -135,7 +140,8 @@ export const config = {
         this.radarr.configured ||
         this.qbittorrent.configured ||
         this.prowlarr.configured ||
-        this.torrserver.configured
+        this.torrserver.configured ||
+        this.tmdb.configured
       );
     },
   },

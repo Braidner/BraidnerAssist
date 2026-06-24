@@ -18,6 +18,7 @@ import {
 import {
   ReleasePicker, ImportDrawer, ProgressBar, Player, fmtSize, fmtSpeed, fmtEta,
 } from "./mediaShared.tsx";
+import { FileBrowser } from "./FileBrowser.tsx";
 import { useToast } from "../Toast.tsx";
 
 const SOURCE_LABEL: Record<DownloadItem["source"], string> = {
@@ -831,6 +832,9 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
               </div>
             )}
           </Card>
+
+          {/* Файловый менеджер медиатеки (Media v2 — если задан MEDIA_ROOT) */}
+          <FileBrowser />
         </div>
       )}
     </div>

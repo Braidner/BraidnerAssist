@@ -146,6 +146,17 @@ export const config = {
     },
   },
 
+  // Media v2 (Фаза 3): файл-браузер + органайзер. MEDIA_ROOT — корень медиатеки
+  // внутри контейнера (тот же том, что у Jellyfin/qB). Подпапки downloads/tv/movies
+  // переопределяемы. Не задан MEDIA_ROOT → файл-браузер/органайзер выключены.
+  mediaFs: {
+    root: env("MEDIA_ROOT"),
+    downloads: env("MEDIA_DOWNLOADS") ?? "downloads",
+    tv: env("MEDIA_TV") ?? "tv",
+    movies: env("MEDIA_MOVIES") ?? "movies",
+    get configured() { return Boolean(this.root); },
+  },
+
   servicesFile: env("SERVICES_FILE") ?? (nodeEnv === "production" ? "/data/services.json" : "data/services.json"),
 
   health: {

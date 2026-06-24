@@ -1184,6 +1184,60 @@ export interface ContentTorrent {
   files: ContentTorrentFile[];
 }
 
+// Разложить скачанные файлы торрента в библиотеку (свой органайзер).
+export async function organizeTorrent(infohash: string): Promise<{ organized: number; skipped: number } | null> {
+  try {
+    const res = await apiFetch("/api/media/pick/organize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ infohash }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { organized: number; skipped: number };
+  } catch {
+    return null;
+  }
+}
+
+// ── Media v2 (Фаза 3): файловый менеджер медиатеки ──────────────────────
+export interface FileEntry {
+  name: string;
+  path: string;
+  type: "dir" | "file";
+  size: number;
+  mtime: number;
+  ext: string;
+}
+export interface FileListing { path: string; entries: FileEntry[]; }
+
+// null → файл-браузер не настроен (нет MEDIA_ROOT) либо ошибка.
+export async function listFiles(path = ""): Promise<FileListing | null> {
+  try {
+    const res = await apiFetch(`/api/media/files?path=${encodeURIComponent(path)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as FileListing;
+  } catch {
+    return null;
+  }
+}
+
+async function fsAction(endpoint: string, body: Record<string, string>): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/api/media/files/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+export const fsMkdir = (path: string, name: string) => fsAction("mkdir", { path, name });
+export const fsRename = (path: string, name: string) => fsAction("rename", { path, name });
+export const fsMove = (src: string, dest: string) => fsAction("move", { src, dest });
+export const fsDelete = (path: string) => fsAction("delete", { path });
+
 // Торренты, привязанные к тайтлу (секция «Уже качается из этого торрента»).
 export async function getContentTorrents(p: {
   type: "movie" | "series";

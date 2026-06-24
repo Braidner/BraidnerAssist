@@ -55,6 +55,9 @@ import {
   type ContentType,
 } from "../integrations/torrentPick.js";
 import { tmdbSearch, tmdbTrending, tmdbPopular, tmdbTvToTvdb } from "../integrations/tmdb.js";
+import {
+  listDir, makeDir, renameEntry, moveEntry, removeEntry, organizeTorrent,
+} from "../integrations/files.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -618,6 +621,68 @@ apiRouter.post("/media/pick/grab", async (req, res) => {
     }));
   } catch (e) {
     res.status(502).json({ error: String(e) });
+  }
+});
+
+// Разложить скачанные файлы торрента в библиотеку (свой органайзер вместо *arr).
+apiRouter.post("/media/pick/organize", async (req, res) => {
+  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
+  const infohash = String(req.body?.infohash ?? "").trim();
+  if (!infohash) return res.status(400).json({ error: "infohash required" });
+  try {
+    res.json(await organizeTorrent(infohash));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// ── Media v2 (Фаза 3): файловый менеджер медиатеки (заперт в MEDIA_ROOT) ──
+apiRouter.get("/media/files", async (req, res) => {
+  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await listDir(String(req.query.path ?? "")));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+apiRouter.post("/media/files/mkdir", async (req, res) => {
+  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
+  try {
+    await makeDir(String(req.body?.path ?? ""), String(req.body?.name ?? ""));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+apiRouter.post("/media/files/rename", async (req, res) => {
+  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
+  try {
+    await renameEntry(String(req.body?.path ?? ""), String(req.body?.name ?? ""));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+apiRouter.post("/media/files/move", async (req, res) => {
+  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
+  try {
+    await moveEntry(String(req.body?.src ?? ""), String(req.body?.dest ?? ""));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+apiRouter.post("/media/files/delete", async (req, res) => {
+  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
+  try {
+    await removeEntry(String(req.body?.path ?? ""));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
   }
 });
 

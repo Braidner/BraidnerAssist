@@ -15,10 +15,16 @@ services:
       # Docker Engine API (opt-in включён): backend читает контейнеры через этот сокет.
       # ВНИМАНИЕ: docker.sock = root-эквивалент на хосте — осознанный риск (LAN-only, bearer).
       DOCKER_SOCKET: /var/run/docker.sock
+      # Media v2: корень медиатеки внутри контейнера (файл-браузер + органайзер).
+      # Тот же том, что у Jellyfin/qB → органайзер делает hardlink downloads→library.
+      MEDIA_ROOT: /media
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - ./data:/data
+      # Медиатека (downloads/movies/tv) на 1ТБ-диске. На hermes.lan это /srv/stack/media;
+      # переопределяется MEDIA_HOST_PATH в .env. rw — нужен для органайзера/файл-браузера.
+      - ${MEDIA_HOST_PATH:-/srv/stack/media}:/media:rw
       # Docker-интеграция (rw для start/stop/restart):
       - /var/run/docker.sock:/var/run/docker.sock:rw
     # Hermes Agent API крутится на хосте (hermes.lan) — открываем доступ к нему

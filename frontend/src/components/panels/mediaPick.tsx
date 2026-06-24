@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import {
-  searchReleases, previewTorrentFiles, grabSelectedFiles, getContentTorrents, pickMoreFiles,
+  searchReleases, previewTorrentFiles, grabSelectedFiles, getContentTorrents, pickMoreFiles, organizeTorrent,
   type SearchResult, type PickFile, type TorrentPreview, type ContentTorrent,
 } from "../../lib/api.ts";
 import { fmtSize, ProgressBar } from "./mediaShared.tsx";
@@ -210,6 +210,14 @@ export function ContentTorrents({ contentType, tmdbId, tvdbId, reloadKey }: { co
     else toast.error("Не удалось докачать");
   };
 
+  const onOrganize = async (hash: string) => {
+    setBusy("org" + hash);
+    const r = await organizeTorrent(hash);
+    setBusy(null);
+    if (r) toast.success(`Разложено в библиотеку: ${r.organized}${r.skipped ? ` (пропущено ${r.skipped})` : ""}`);
+    else toast.error("Не удалось разложить (нужен файл-браузер/MEDIA_ROOT и скачанные файлы)");
+  };
+
   if (torrents.length === 0) return null;
 
   return (
@@ -218,7 +226,12 @@ export function ContentTorrents({ contentType, tmdbId, tvdbId, reloadKey }: { co
         const sel = addSel[t.infohash] ?? new Set<number>();
         return (
           <div key={t.infohash} style={{ marginBottom: 14 }}>
-            <div className="mediadetail-facts mono" style={{ marginBottom: 6 }} title={t.title}>📦 {t.title}</div>
+            <div className="add-field" style={{ alignItems: "center", marginBottom: 6 }}>
+              <span className="mediadetail-facts mono" style={{ flex: 1 }} title={t.title}>📦 {t.title}</span>
+              <button className="btn btn-sm" disabled={busy === "org" + t.infohash} title="Разложить скачанное в библиотеку (hardlink + Jellyfin scan)" onClick={() => onOrganize(t.infohash)}>
+                {busy === "org" + t.infohash ? "…" : "🗂 Разложить"}
+              </button>
+            </div>
             {groupBySeasonFiles(t.files).map((g) => (
               <div key={g.key} className="media-season">
                 <div className="media-season-head">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
@@ -167,6 +167,26 @@ export function App() {
     });
   };
 
+  // ── Route-aware TopBar ───────────────────────────────────────────
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const isMediaList = location.pathname === '/media';
+  const isDetailPage = /\/media\/(series|movie)\//.test(location.pathname);
+
+  const topBarTabs = isMediaList ? ['Библиотека', 'Дискавери', 'Система'] : [];
+  const mediaTabStr = searchParams.get('tab') ?? 'library';
+  const topBarActiveTab = isMediaList
+    ? Math.max(0, ['library', 'discover', 'system'].indexOf(mediaTabStr))
+    : 0;
+  const topBarOnTabChange = isMediaList
+    ? (i: number) => {
+        const keys = ['library', 'discover', 'system'];
+        navigate(`/media${i > 0 ? `?tab=${keys[i]}` : ''}`);
+      }
+    : undefined;
+
   // ── Render ────────────────────────────────────────────────────────
   if (!authed) {
     return (
@@ -205,17 +225,22 @@ export function App() {
       <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
 
       <div className="main">
-        <TopBar
-          clock={clock}
-          backend={backend}
-          theme={theme}
-          onToggleTheme={toggle}
-          onLogout={onLogout}
-          onSettings={() => setShowSettings(true)}
-          onLogs={() => setShowLogs(true)}
-          onMenu={() => setSbOpen(true)}
-          versionData={versionData}
-        />
+        {!isDetailPage && (
+          <TopBar
+            clock={clock}
+            backend={backend}
+            theme={theme}
+            onToggleTheme={toggle}
+            onLogout={onLogout}
+            onSettings={() => setShowSettings(true)}
+            onLogs={() => setShowLogs(true)}
+            onMenu={() => setSbOpen(true)}
+            versionData={versionData}
+            tabs={topBarTabs}
+            activeTab={topBarActiveTab}
+            onTabChange={topBarOnTabChange}
+          />
+        )}
 
         <Routes>
           <Route path="/" element={overview} />

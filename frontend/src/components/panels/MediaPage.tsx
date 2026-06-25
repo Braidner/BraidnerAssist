@@ -8,7 +8,7 @@ import { Card } from "../Card.tsx";
 import { Placeholder } from "./Placeholder.tsx";
 import {
   getMediaLibrary, searchReleases, addTorrent, torrentAction, refreshJellyfin,
-  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, getRecommendations, discoverSearch,
+  lookupTitle, addTitle, posterUrl, jellyfinPosterUrl, jellyfinBackdropUrl, getRecommendations, discoverSearch,
   tmdbSearch, tmdbTrending, tmdbResolveTvdb,
   torrserverAdd, torrserverList, torrserverRemove, torrserverStreamUrl, getCalendar,
   getContinueWatching, getMediaPlayUrl,
@@ -265,9 +265,8 @@ type MediaTab = "library" | "discover" | "system";
 export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
   const nav = useNavigate();
   const toast = useToast();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const tab = ((params.get("tab") as MediaTab) || "library");
-  const setTab = (t: MediaTab) => setParams(t === "library" ? {} : { tab: t }, { replace: true });
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [importFor, setImportFor] = useState<DownloadItem | null>(null);
@@ -477,16 +476,6 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
         />
       )}
 
-      <div className="lib-nav-sticky">
-        <div className="lib-nav-bar">
-          <div className="lnb-tabs">
-            <button className={`lib-nav-tab${tab === "library" ? " lnt-on" : ""}`} onClick={() => setTab("library")}>Библиотека</button>
-            <button className={`lib-nav-tab${tab === "discover" ? " lnt-on" : ""}`} onClick={() => setTab("discover")}>Дискавери</button>
-            <button className={`lib-nav-tab${tab === "system" ? " lnt-on" : ""}`} onClick={() => setTab("system")}>Система</button>
-          </div>
-        </div>
-      </div>
-
       {tab === "library" && (
         <div className="lib-page">
 
@@ -509,7 +498,14 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
             };
             return (
               <div className="lib-hero" style={{ cursor: 'pointer' }} onClick={handleHeroPlay}>
-                <div className="lib-hero-bg" style={{ background: bg }}/>
+                <div className="lib-hero-bg" style={{ background: bg }}>
+                  <img
+                    src={jellyfinBackdropUrl(heroItem.id)}
+                    alt=""
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
                 <div className="lib-hero-glow" style={{ background: `radial-gradient(ellipse at 74% 50%, ${accent}40 0%, transparent 58%)` }}/>
                 <div className="lib-hero-grain"/>
                 <div className="lib-hero-vignette"/>

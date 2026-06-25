@@ -1070,6 +1070,11 @@ export function jellyfinPosterUrl(id: string): string {
   return `/api/poster?jf=${encodeURIComponent(id)}`;
 }
 
+// Backdrop image from Jellyfin (wide crop for hero backgrounds).
+export function jellyfinBackdropUrl(id: string): string {
+  return `/api/poster?jf=${encodeURIComponent(id)}&type=Backdrop`;
+}
+
 // Получить HLS-путь (под бэкенд-прокси) для воспроизведения элемента.
 export async function getMediaPlayUrl(id: string): Promise<string | null> {
   try {

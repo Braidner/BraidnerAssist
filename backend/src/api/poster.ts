@@ -34,7 +34,9 @@ posterRouter.get("/", async (req, res) => {
     } else if (jf) {
       if (!config.media.jellyfin.configured) return res.status(503).end();
       if (!/^[a-f0-9]{8,}$/i.test(jf)) return res.status(400).end("bad id");
-      const url = `${config.media.jellyfin.url}/Items/${jf}/Images/Primary?maxWidth=342`;
+      const imgType = req.query.type === 'Backdrop' ? 'Backdrop/0' : 'Primary';
+      const fillParam = imgType.startsWith('Backdrop') ? 'fillHeight=600' : 'maxWidth=342';
+      const url = `${config.media.jellyfin.url}/Items/${jf}/Images/${imgType}?${fillParam}`;
       upstream = await fetch(url, {
         headers: { "X-Emby-Token": config.media.jellyfin.apiKey! },
         signal: AbortSignal.timeout(15_000),

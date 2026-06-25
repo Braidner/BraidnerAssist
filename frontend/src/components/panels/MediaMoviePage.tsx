@@ -4,24 +4,27 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card } from "../Card.tsx";
 import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./mediaShared.tsx";
 import { TorrentFilePicker, ContentTorrents } from "./mediaPick.tsx";
 import {
   getMoviePageDetail, getMovieDiscoverDetail, addTitle,
-  getMediaPlayUrl, getMediaDevices, playOnDevice, posterUrl, jellyfinPosterUrl,
-  seasonSearch, setMonitored,
-  type MoviePageDetail, type DownloadItem, type MediaData, type PlayDevice,
+  getMediaPlayUrl, getMediaDevices, playOnDevice, jellyfinPosterUrl, jellyfinBackdropUrl, posterUrl,
+  seasonSearch, setMonitored, getMediaLibrary,
+  type MoviePageDetail, type DownloadItem, type MediaData, type PlayDevice, type LibraryItem,
 } from "../../lib/api.ts";
 import { useToast } from "../Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
+
+const ACCENT_COLORS = ['#cc3300', '#0077dd', '#00aaee', '#8833ff', '#ffaa00', '#00b8ae'];
+const titleAccent = (title: string) => ACCENT_COLORS[title.charCodeAt(0) % ACCENT_COLORS.length];
 
 export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { media: MediaData; onMediaUpdate: () => void; source?: "library" | "discover" }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
   const toast = useToast();
   const [d, setD] = useState<MoviePageDetail | null | "loading">("loading");
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [player, setPlayer] = useState<{ url: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [act, setAct] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { m
     setD("loading");
     fetchDetail().then((r) => setD(r));
     getMediaDevices().then(setDevices);
+    getMediaLibrary().then(setLibrary);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, source]);
 
@@ -53,6 +57,10 @@ export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { m
   if (!d) return <div className="page"><div className="empty" style={{ marginTop: 40 }}>Не удалось загрузить фильм.</div></div>;
 
   const det = d;
+
+  const accent = titleAccent(det.title);
+  const accentGradient = `radial-gradient(ellipse at 60% 40%, ${accent}88 0%, ${accent}22 50%, #050508 100%)`;
+
   const toggleMonitor = async (val: boolean) => {
     if (det.tmdbId == null) return;
     setAct("mon");
@@ -78,14 +86,19 @@ export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { m
     else toast.error("Не удалось добавить в библиотеку");
   };
 
-  const poster = d.posterRemote ? posterUrl(d.posterRemote) : jellyfinPosterUrl(d.jellyfinId);
+  const posterSrc = det.posterRemote ? posterUrl(det.posterRemote) : jellyfinPosterUrl(det.jellyfinId);
   const stuck = [
     ...new Map(
       media.downloads
-        .filter((x) => x.importPending && x.source === "radarr" && norm(x.title).includes(norm(d.title)))
+        .filter((x) => x.importPending && x.source === "radarr" && norm(x.title).includes(norm(det.title)))
         .map((x) => [x.downloadId ?? x.hash, x]),
     ).values(),
   ];
+
+  // Похожие — из библиотеки (фильмы)
+  const similarItems = library
+    .filter((x) => x.id !== id && x.type === "Movie")
+    .slice(0, 8);
 
   return (
     <div className="page">
@@ -98,110 +111,201 @@ export function MediaMoviePage({ media, onMediaUpdate, source = "library" }: { m
         />
       )}
 
-      <button className="btn btn-sm mediadetail-back" onClick={() => nav("/media")}>← Медиатека</button>
+      {/* det-topbar */}
+      <div className="det-topbar">
+        <button className="det-back" onClick={() => nav('/media')}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>НАЗАД</span>
+        </button>
+        <span className="det-topbar-title lmono">{det.title}</span>
+        <button className="det-queue-btn" onClick={() => setShowPicker((v) => !v)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+          </svg>
+          В очередь
+        </button>
+      </div>
 
-      <div className="card neu mediadetail-head">
-        {poster && (
-          <img className="mediadetail-poster" src={poster} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-        )}
-        <div className="mediadetail-info">
-          <div className="mediadetail-titlerow">
-            <h1 className="mediadetail-title">{d.title}</h1>
-            {d.year && <span className="mediadetail-year mono">{d.year}</span>}
-          </div>
-          <div className="mediadetail-badges">
-            {d.status && <span className="rel-badge">{d.status}</span>}
-            {!d.inArr && <span className="rel-reject" title="Нет в Radarr — данные из Jellyfin">только Jellyfin</span>}
-            {d.genres.slice(0, 5).map((g) => <span key={g} className="rel-lang">{g}</span>)}
-          </div>
-          <div className="mediadetail-facts mono">
-            {[d.studio, d.runtime ? `${d.runtime} мин` : "", d.rating ? `★ ${d.rating.toFixed(1)}` : ""].filter(Boolean).join("  ·  ")}
-          </div>
-          {d.overview && <p className="mediadetail-overview">{d.overview}</p>}
-
-          <div className="mediadetail-filerow">
-            {d.hasFile ? (
-              <span className="rel-badge">{d.quality ?? "файл есть"}{d.size ? ` · ${fmtSize(d.size)}` : ""}</span>
-            ) : (
-              <span className="mediadetail-missing">Файл отсутствует</span>
-            )}
-            {d.hasFile && (
-              <button className="btn btn-sm btn-accent" disabled={busy} onClick={play}>{busy ? "…" : "▶ Смотреть"}</button>
-            )}
-            {d.hasFile && devices.length > 0 && (
-              <div className="media-cast">
-                <button className="btn btn-icon btn-sm" title="Играть на устройстве" onClick={() => setCastOpen((v) => !v)}>📺</button>
-                {castOpen && (
-                  <div className="media-cast-menu neu">
-                    {devices.map((dev) => (
-                      <button key={dev.id} className="media-cast-item" onClick={() => { playOnDevice(dev.id, d.jellyfinId); setCastOpen(false); }}>
-                        {dev.deviceName}
-                      </button>
-                    ))}
-                  </div>
-                )}
+      {/* det-hero */}
+      <div className="det-hero">
+        <div className="det-hero-bg" style={{ background: accentGradient }}>
+          <img
+            src={jellyfinBackdropUrl(det.jellyfinId)}
+            alt=""
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+        <div className="det-hero-glow" style={{ background: `radial-gradient(ellipse at 55% 40%, ${accent}50 0%, transparent 65%)` }} />
+        <div className="det-hero-noise" />
+        <div className="det-hero-vignette" />
+        <div className="det-hero-content">
+          <div className="det-hero-info">
+            <div className="det-eyebrow lmono">ФИЛЬМ</div>
+            <h1 className="det-title">{det.title}</h1>
+            <div className="det-meta lmono">
+              {det.year && <span>{det.year}</span>}
+              {det.runtime && <><span className="det-sep">·</span><span>{det.runtime} мин</span></>}
+              {det.rating && <><span className="det-sep">·</span><span>★ {det.rating.toFixed(1)}</span></>}
+            </div>
+            {det.genres?.length > 0 && (
+              <div className="det-genres">
+                {det.genres.slice(0, 4).map(g => <span key={g} className="det-genre-chip">{g}</span>)}
               </div>
             )}
-            {!det.inArr && det.tmdbId != null && (
-              <button className="btn btn-sm btn-accent" disabled={act === "add"} title="Добавить в Radarr и запустить поиск" onClick={addToLib}>
-                {act === "add" ? "…" : "➕ В библиотеку"}
-              </button>
-            )}
-            {det.inArr && det.tmdbId != null && (
-              <>
-                <button
-                  className={`btn btn-sm ${det.monitored ? "btn-accent" : ""}`}
-                  disabled={act === "mon"}
-                  title={det.monitored ? "Снять с мониторинга" : "Мониторить"}
-                  onClick={() => toggleMonitor(!det.monitored)}
-                >
-                  {act === "mon" ? "…" : det.monitored ? "★ Мониторится" : "☆ Мониторить"}
-                </button>
-                {!det.hasFile && (
-                  <button className="btn btn-sm" disabled={act === "find"} title="Найти фильм (force search)" onClick={findMovie}>
-                    {act === "find" ? "…" : "⬇ Найти"}
-                  </button>
-                )}
-              </>
-            )}
-            {stuck.map((s) => (
-              <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>⚠ Импорт застрявшей</button>
-            ))}
+          </div>
+          <div className="det-poster-wrap">
+            <div className="det-poster-art">
+              <div style={{ position: 'absolute', inset: 0, background: accentGradient }} />
+              <img
+                src={posterSrc}
+                alt=""
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <Card
-        icon="cloud"
-        title="Раздачи"
-        action={
-          <button className="btn btn-sm" disabled={d.tmdbId == null} title={d.tmdbId == null ? "Нет tmdbId" : ""} onClick={() => setShowPicker((v) => !v)}>
-            {showPicker ? "Скрыть" : "🔍 Найти"}
+      {/* det-body */}
+      <div className="det-body">
+        {det.overview && <p className="det-desc">{det.overview}</p>}
+
+        {/* Status badges */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          {det.status && <span className="rel-badge">{det.status}</span>}
+          {!det.inArr && <span className="rel-reject" title="Нет в Radarr — данные из Jellyfin">только Jellyfin</span>}
+          {det.studio && <span className="rel-lang">{det.studio}</span>}
+          {det.hasFile ? (
+            <span className="rel-badge">{det.quality ?? "файл есть"}{det.size ? ` · ${fmtSize(det.size)}` : ""}</span>
+          ) : (
+            <span className="mediadetail-missing">Файл отсутствует</span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="det-actions">
+          {det.hasFile && (
+            <button className="det-btn-play" style={{ '--bc': accent } as React.CSSProperties}
+              disabled={busy} onClick={play}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 21,12 6,21"/></svg>
+              {busy ? "…" : "Смотреть"}
+            </button>
+          )}
+          {det.hasFile && devices.length > 0 && (
+            <div className="media-cast" style={{ position: 'relative' }}>
+              <button className="btn btn-icon btn-sm" title="Играть на устройстве" onClick={() => setCastOpen((v) => !v)}>📺</button>
+              {castOpen && (
+                <div className="media-cast-menu neu">
+                  {devices.map((dev) => (
+                    <button key={dev.id} className="media-cast-item" onClick={() => { playOnDevice(dev.id, det.jellyfinId); setCastOpen(false); }}>
+                      {dev.deviceName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!det.inArr && det.tmdbId != null && (
+            <button className="btn btn-sm btn-accent" disabled={act === "add"} title="Добавить в Radarr и запустить поиск" onClick={addToLib}>
+              {act === "add" ? "…" : "➕ В библиотеку"}
+            </button>
+          )}
+          {det.inArr && det.tmdbId != null && (
+            <>
+              <button
+                className={`btn btn-sm ${det.monitored ? "btn-accent" : ""}`}
+                disabled={act === "mon"}
+                title={det.monitored ? "Снять с мониторинга" : "Мониторить"}
+                onClick={() => toggleMonitor(!det.monitored)}
+              >
+                {act === "mon" ? "…" : det.monitored ? "★ Мониторится" : "☆ Мониторить"}
+              </button>
+              {!det.hasFile && (
+                <button className="btn btn-sm" disabled={act === "find"} title="Найти фильм (force search)" onClick={findMovie}>
+                  {act === "find" ? "…" : "⬇ Найти"}
+                </button>
+              )}
+            </>
+          )}
+          {stuck.map((s) => (
+            <button key={s.downloadId ?? s.hash} className="btn btn-sm mediadetail-import" title={s.importMessage} onClick={() => setImportItem(s)}>
+              ⚠ Импорт застрявшей
+            </button>
+          ))}
+        </div>
+
+        {/* Раздачи */}
+        <div style={{ marginTop: 20 }}>
+          <div className="det-sec-label">РАЗДАЧИ</div>
+          <button
+            className="btn btn-sm"
+            disabled={det.tmdbId == null}
+            title={det.tmdbId == null ? "Нет tmdbId" : ""}
+            onClick={() => setShowPicker((v) => !v)}
+            style={{ marginBottom: 8 }}
+          >
+            {showPicker ? "Скрыть" : "🔍 Найти раздачу"}
           </button>
-        }
-      >
-        {showPicker && d.tmdbId != null ? (
-          <ReleasePicker params={{ type: "movie", id: d.tmdbId }} onGrabbed={onMediaUpdate} />
-        ) : (
-          <div className="empty">Нажми «Найти», чтобы искать раздачи с нужной озвучкой/качеством.</div>
-        )}
-      </Card>
+          {showPicker && det.tmdbId != null ? (
+            <ReleasePicker params={{ type: "movie", id: det.tmdbId }} onGrabbed={onMediaUpdate} />
+          ) : (
+            !showPicker && <div className="empty">Нажми «Найти», чтобы искать раздачи с нужной озвучкой/качеством.</div>
+          )}
+        </div>
 
-      {/* Качается из торрента (Media v2) */}
-      <ContentTorrents contentType="movie" tmdbId={d.tmdbId} reloadKey={pickReload} />
+        {/* Качается из торрента (Media v2) */}
+        <ContentTorrents contentType="movie" tmdbId={det.tmdbId} reloadKey={pickReload} />
 
-      {/* Пофайловый выбор файла из торрента (Media v2) */}
-      <Card
-        icon="cloud"
-        title="Скачать из торрента"
-        action={<button className="btn btn-sm" onClick={() => setShowPick((v) => !v)}>{showPick ? "Скрыть" : "🔍 Выбрать файл"}</button>}
-      >
-        {showPick ? (
-          <TorrentFilePicker contentType="movie" tmdbId={d.tmdbId} title={d.title} onGrabbed={() => setPickReload((n) => n + 1)} />
-        ) : (
-          <div className="empty">Найди раздачу и скачай только нужный файл (без лишнего из пака).</div>
+        {/* Пофайловый выбор файла из торрента (Media v2) */}
+        <div style={{ marginTop: 16 }}>
+          <button className="btn btn-sm" onClick={() => setShowPick((v) => !v)} style={{ marginBottom: 8 }}>
+            {showPick ? "Скрыть торрент" : "🔍 Скачать из торрента"}
+          </button>
+          {showPick && (
+            <TorrentFilePicker contentType="movie" tmdbId={det.tmdbId} title={det.title} onGrabbed={() => setPickReload((n) => n + 1)} />
+          )}
+        </div>
+
+        {/* ПОХОЖИЕ */}
+        {similarItems.length > 0 && (
+          <div style={{ marginTop: 32 }}>
+            <div className="det-sec-label">ПОХОЖИЕ</div>
+            <div className="lib-h-track lib-poster-row">
+              {similarItems.map(item => {
+                const a = titleAccent(item.name);
+                const aGrad = `radial-gradient(ellipse at 60% 40%, ${a}88 0%, ${a}22 50%, #050508 100%)`;
+                return (
+                  <div key={item.id} className="poster-card"
+                    onClick={() => nav(`/media/${item.type === 'Series' ? 'series' : 'movie'}/${item.id}`)}>
+                    <div className="poster-art" style={{ '--pa': a } as React.CSSProperties}>
+                      <div style={{ position: 'absolute', inset: 0, background: aGrad, zIndex: 0 }} />
+                      <img
+                        src={jellyfinPosterUrl(item.id)}
+                        alt=""
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                      />
+                      <div className="poster-overlay" style={{ position: 'absolute', inset: 0, zIndex: 3, display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', padding: 8 }}>
+                        <div className="poster-play-btn">
+                          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 21,12 6,21"/></svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="poster-info">
+                      <div className="poster-title">{item.name}</div>
+                      <div className="poster-sub lmono">{item.type === 'Series' ? 'сериал' : 'фильм'}{item.year ? ` · ${item.year}` : ''}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

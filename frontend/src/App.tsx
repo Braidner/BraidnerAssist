@@ -182,12 +182,9 @@ export function App() {
       <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 24px 0', flexShrink: 0 }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 24px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* @ts-ignore */}
           <TasksPanel flat tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
-          {/* @ts-ignore */}
           <HermesLogPanel flat data={hermes} tasks={hermesTasks} />
         </div>
-        {/* @ts-ignore */}
         <HomeAssistantPanel flat data={hass} onToggle={onToggleAutomation} />
       </div>
     </div>

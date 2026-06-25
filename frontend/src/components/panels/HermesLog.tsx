@@ -16,7 +16,7 @@ function ledClass(status: string): string {
 }
 
 // Hermes · агент — task-центричный виджет: список взятых задач + проваливание в их логи.
-export function HermesLogPanel({ data, tasks }: { data: HermesData; tasks: HermesTask[] }) {
+export function HermesLogPanel({ data, tasks, flat }: { data: HermesData; tasks: HermesTask[]; flat?: boolean }) {
   const [selected, setSelected] = useState<HermesTask | null>(null);
   const [logs, setLogs] = useState<PanelLogLine[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,12 +39,8 @@ export function HermesLogPanel({ data, tasks }: { data: HermesData; tasks: Herme
   const current = selected ? tasks.find((t) => t.id === selected.id) ?? selected : null;
   const statusClass = data.status === "active" ? "busy" : data.status === "error" ? "error" : "";
 
-  return (
-    <Card
-      icon="bot"
-      title="Hermes · агент"
-      action={<span className="panel-count">{tasks.length} в работе · {totalLogs} зап.</span>}
-    >
+  const innerContent = (
+    <>
       <div className={`ag-status ${statusClass}`}>
         <span className="ag-pulse" />
         <span className="ag-txt">
@@ -106,6 +102,31 @@ export function HermesLogPanel({ data, tasks }: { data: HermesData; tasks: Herme
           </div>
         )}
       </div>
+    </>
+  );
+
+  if (flat) {
+    return (
+      <div className="fcard" style={{ padding: 16 }}>
+        <div className="ov-sec">
+          <span className="ov-sec-icon">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          </span>
+          <span className="ov-sec-label">Hermes</span>
+          <span className="ov-sec-count">{tasks.filter(t => t.status === "in_progress").length} активных</span>
+        </div>
+        {innerContent}
+      </div>
+    );
+  }
+
+  return (
+    <Card
+      icon="bot"
+      title="Hermes · агент"
+      action={<span className="panel-count">{tasks.length} в работе · {totalLogs} зап.</span>}
+    >
+      {innerContent}
     </Card>
   );
 }

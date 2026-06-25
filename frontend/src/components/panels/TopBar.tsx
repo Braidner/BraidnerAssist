@@ -1,4 +1,4 @@
-import { icons } from "../icons.tsx";
+import { useState, useEffect } from 'react';
 import type { Theme } from "../../theme.ts";
 import type { VersionData } from "../../lib/api.ts";
 
@@ -14,75 +14,84 @@ interface TopBarProps {
   onLogs: () => void;
   onMenu: () => void;
   versionData: VersionData | null;
+  // tab navigation
+  tabs?: string[];
+  activeTab?: number;
+  onTabChange?: (i: number) => void;
 }
 
-const DOW = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
-const MONTH = [
-  "января", "февраля", "марта", "апреля", "мая", "июня",
-  "июля", "августа", "сентября", "октября", "ноября", "декабря",
-];
+const days = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-function fmtTime(d: Date): string {
-  return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-}
-function fmtDate(d: Date): string {
-  return `${DOW[d.getDay()]} · ${d.getDate()} ${MONTH[d.getMonth()]} ${d.getFullYear()}`;
-}
+export function TopBar({ theme, onToggleTheme, onLogout, onSettings, versionData, tabs, activeTab, onTabChange }: TopBarProps) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 20000);
+    return () => clearInterval(t);
+  }, []);
 
-export function TopBar({ clock, backend, theme, onToggleTheme, onLogout, onSettings, onLogs, onMenu, versionData }: TopBarProps) {
-  const linkDot = backend === "up" ? "ok" : backend === "down" ? "bad" : "idle";
-  const linkText = backend === "up" ? "LINK OK" : backend === "down" ? "NO LINK" : "…";
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+
+  const versionLabel = versionData
+    ? `v${versionData.version}${versionData.sha ? ' ' + versionData.sha.slice(0, 7) : ''}`
+    : '';
 
   return (
-    <div className="topbar anim">
-      <div className="tb-left">
-        <button className="menu-btn" onClick={onMenu} aria-label="Меню">
-          <icons.menu style={{ width: 22, height: 22 }} />
-        </button>
-        <button className="tb-brand" onClick={onLogs} title="Открыть логи бэкенда">
-          <div>
-            <div className="tb-name">Mission Control</div>
-            <div className="tb-sub mono">braidner · self-hosted · LAN-only</div>
-          </div>
-        </button>
-      </div>
-
-      <div className="tb-right">
-        {versionData && (
-          <span
-            className={`chip${versionData.hasUpdate ? " version-warn" : ""}`}
-            title={`${versionData.version} · ${versionData.sha}`}
-          >
-            {versionData.hasUpdate ? (
-              <>
-                v{versionData.version}
-                <span style={{ opacity: 0.55, margin: "0 1px" }}>→</span>
-                v{versionData.latest}
-              </>
+    <div className="lib-nav-sticky">
+      <div className="lib-nav-bar">
+        <div className="lnb-tabs">
+          {(tabs ?? []).map((tab, i) => (
+            <button
+              key={tab}
+              className={`lib-nav-tab${activeTab === i ? ' lnt-on' : ''}`}
+              onClick={() => onTabChange?.(i)}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="lnb-right">
+          {versionLabel && (
+            <span
+              className={`lnb-chip${versionData?.hasUpdate ? ' version-warn' : ''}`}
+              title={versionData ? `${versionData.version} · ${versionData.sha}` : ''}
+            >
+              {versionData?.hasUpdate ? (
+                <>v{versionData.version}<span style={{ opacity: 0.55, margin: '0 2px' }}>→</span>v{versionData.latest}</>
+              ) : versionLabel}
+            </span>
+          )}
+          <div className="lnb-divider"/>
+          <button className="lnb-icobtn" title="Настройки" onClick={onSettings}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <circle cx="7" cy="7" r="2.3" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="16" cy="17" r="2.3" stroke="currentColor" strokeWidth="2"/>
+              <path d="M9.3 7H21M3 7h1.7M3 17h10.7M18.3 17H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <button className="lnb-icobtn lnb-icobtn-theme" title="Тема" onClick={onToggleTheme}>
+            {theme === 'dark' ? (
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="4.2" stroke="currentColor" strokeWidth="2"/>
+                <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
             ) : (
-              <>
-                v{versionData.version}
-                <span className="mono" style={{ fontSize: 10, opacity: 0.55, marginLeft: 2 }}>{versionData.sha}</span>
-              </>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <path d="M7 18a4 4 0 010-8 5 5 0 019.6-1.3A3.8 3.8 0 0117.5 18H7z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+              </svg>
             )}
-          </span>
-        )}
-        <span className="chip" title="Статус связи с backend">
-          <span className={`dot-led ${linkDot}`} />
-          {linkText}
-        </span>
-        <button className="iconbtn" onClick={onSettings} title="Настройки">
-          <icons.gear style={{ width: 20, height: 20 }} />
-        </button>
-        <button className="iconbtn" onClick={onToggleTheme} title="Переключить тему">
-          {theme === "dark" ? <icons.sun style={{ width: 20, height: 20 }} /> : <icons.moon style={{ width: 20, height: 20 }} />}
-        </button>
-        <button className="iconbtn" onClick={onLogout} title="Выйти">
-          <icons.logout style={{ width: 18, height: 18 }} />
-        </button>
-        <div className="tb-clock">
-          <div className="tb-time">{fmtTime(clock)}</div>
-          <div className="tb-date mono">{fmtDate(clock)}</div>
+          </button>
+          <button className="lnb-icobtn" title="Выход" onClick={onLogout}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M14 4.5H6.5A1.5 1.5 0 005 6v12a1.5 1.5 0 001.5 1.5H14M17 8l4 4-4 4M21 12H9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <div className="lnb-divider"/>
+          <div className="lnb-clock">
+            <span className="lnb-time">{hh}:{mm}</span>
+            <span className="lnb-date">{days[now.getDay()]} · {now.getDate()} {months[now.getMonth()]}</span>
+          </div>
         </div>
       </div>
     </div>

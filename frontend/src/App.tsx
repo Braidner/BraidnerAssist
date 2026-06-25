@@ -14,7 +14,7 @@ import { LoginForm } from "./components/LoginForm.tsx";
 import { Drawer } from "./components/Drawer.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TopBar } from "./components/panels/TopBar.tsx";
-import { StatStrip } from "./components/panels/StatStrip.tsx";
+import { MiniWidgets } from "./components/panels/StatStrip.tsx";
 import { TasksPanel } from "./components/panels/Tasks.tsx";
 import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
 import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
@@ -178,7 +178,7 @@ export function App() {
 
   const overview = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      <StatStrip weather={weather} proxmox={proxmox} services={servicesData} />
+      <MiniWidgets weather={weather} proxmox={proxmox} services={servicesData} tasks={tasks} />
       <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 24px 0', flexShrink: 0 }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 24px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

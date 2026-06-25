@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from "react";
-import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
+import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource, PanelTask } from "../../lib/api.ts";
 
 const WMO_SHORT: Record<number, string> = {
   0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
@@ -198,4 +198,141 @@ export function StatStrip({ weather, proxmox, services }: StatStripProps) {
   });
 
   return <Carousel>{tiles}</Carousel>;
+}
+
+// ---------------------------------------------------------------------------
+// MiniWidgets — flat strip of summary cards for the overview layout
+// ---------------------------------------------------------------------------
+
+interface MiniWidgetsProps {
+  weather: WeatherData | null;
+  proxmox: ProxmoxData | null;
+  services: ServicesData | null;
+  tasks: PanelTask[];
+}
+
+export function MiniWidgets({ weather, proxmox, services, tasks }: MiniWidgetsProps) {
+  const activeCount = tasks.filter(t => !t.done).length;
+  const serviceList = services?.services ?? [];
+  const onlineCount = serviceList.filter(s => s.status === 'ok').length;
+
+  const ramPct = proxmox?.resource ? Math.round(proxmox.resource.memPct) : 0;
+  const diskPct = proxmox?.resource ? Math.round(proxmox.resource.diskPct) : 0;
+  const ramVal = proxmox?.resource
+    ? `${Math.round(proxmox.resource.memUsed / 1024)}/${Math.round(proxmox.resource.memTotal / 1024)}G`
+    : '—';
+  const diskVal = proxmox?.resource
+    ? `${Math.round(proxmox.resource.diskUsed / 1024 / 1024)}/${Math.round(proxmox.resource.diskTotal / 1024 / 1024)}G`
+    : '—';
+
+  // weather code → emoji
+  const wxIcon = (code: number) => {
+    if (code === 0) return '☀️';
+    if (code <= 2) return '⛅';
+    if (code <= 48) return '🌫️';
+    if (code <= 67) return '🌧️';
+    if (code <= 77) return '❄️';
+    if (code <= 82) return '🌦️';
+    return '⛈️';
+  };
+
+  const days = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+
+  return (
+    <div className="mini-widgets">
+      {/* Weather */}
+      <div className="mw-card">
+        <div className="mw-label">Погода</div>
+        {weather?.current ? (
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 36, fontWeight: 700, color: 'var(--ink)', lineHeight: 1 }}>
+                {Math.round(weather.current.temp)}<sup style={{ fontSize: 14, verticalAlign: 'super', fontWeight: 400 }}>°</sup>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', marginTop: 4, letterSpacing: '0.04em' }}>
+                ВЕТЕР {weather.current.wind} м/с
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+              {weather.forecast.slice(0, 3).map((d) => {
+                const date = new Date(d.date);
+                return (
+                  <div key={d.date} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', width: 18 }}>{days[date.getDay()]}</span>
+                    <span style={{ fontSize: 11 }}>{wxIcon(d.code)}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--ink-soft)' }}>{Math.round(d.max)}°</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>—</div>
+        )}
+      </div>
+
+      {/* Proxmox */}
+      <div className="mw-card">
+        <div className="mw-label">Proxmox</div>
+        {proxmox?.resource ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { k: 'CPU',  pct: proxmox.resource.cpuPct, val: Math.round(proxmox.resource.cpuPct) + '%' },
+              { k: 'RAM',  pct: ramPct, val: ramVal },
+              { k: 'DISK', pct: diskPct, val: diskVal },
+            ].map(r => (
+              <div key={r.k} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', width: 28, flexShrink: 0 }}>{r.k}</span>
+                <div className="mw-fbar">
+                  <i style={{ width: Math.min(r.pct, 100) + '%', background: r.pct > 80 ? 'var(--bad)' : 'var(--accent)' }}/>
+                </div>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--ink-soft)', width: 58, textAlign: 'right', flexShrink: 0 }}>{r.val}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>—</div>
+        )}
+      </div>
+
+      {/* Services */}
+      <div className="mw-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div className="mw-label" style={{ marginBottom: 0 }}>Сервисы</div>
+          {serviceList.length > 0 && (
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--accent)' }}>
+              {onlineCount}/{serviceList.length} online
+            </div>
+          )}
+        </div>
+        {serviceList.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {serviceList.slice(0, 5).map(s => (
+              <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                  background: s.status === 'ok' ? 'var(--accent)' : s.status === 'warn' ? 'var(--warn)' : 'var(--bad)',
+                  boxShadow: `0 0 5px ${s.status === 'ok' ? 'var(--accent)' : s.status === 'warn' ? 'var(--warn)' : 'var(--bad)'}`,
+                }}/>
+                <span style={{ fontFamily: 'var(--font)', fontSize: 11, color: 'var(--ink-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {s.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>—</div>
+        )}
+      </div>
+
+      {/* Active task count */}
+      <div className="mw-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 90 }}>
+        <div className="mw-label">Задачи</div>
+        <div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 48, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{activeCount}</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--muted)', marginTop: 4, letterSpacing: '0.04em' }}>АКТИВНЫХ</div>
+        </div>
+      </div>
+    </div>
+  );
 }

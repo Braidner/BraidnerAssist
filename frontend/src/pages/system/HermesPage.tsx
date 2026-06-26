@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "../../components/ui/Card.tsx";
 import { fmtUpdated } from "../../lib/format.ts";
 import {
+  getHermes,
+  getHermesTasks,
   getHermesCommands,
   sendHermesCommand,
   type HermesData,
@@ -114,13 +116,21 @@ function CommandConsole() {
   );
 }
 
-interface HermesPageProps {
-  data: HermesData;
-  tasks: HermesTask[];
-}
-
 // /hermes — полная страница: статус + фид + командная консоль + задачи в работе.
-export function HermesPage({ data, tasks }: HermesPageProps) {
+export function HermesPage() {
+  const [data, setData] = useState<HermesData>({ status: "idle", message: null, log: [] });
+  const [tasks, setTasks] = useState<HermesTask[]>([]);
+
+  useEffect(() => {
+    getHermes().then(setData);
+    getHermesTasks().then(setTasks);
+    const t = setInterval(() => {
+      getHermes().then(setData);
+      getHermesTasks().then(setTasks);
+    }, 60_000);
+    return () => clearInterval(t);
+  }, []);
+
   const totalLogs = tasks.reduce((s, t) => s + t.logCount, 0);
 
   return (

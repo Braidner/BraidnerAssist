@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "../../components/ui/Card.tsx";
 import { Ring } from "../../components/ui/Ring.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import type { ProxmoxData, ServicesData, DockerData, DockerContainer, AdguardData } from "../../lib/api.ts";
-import { dockerAction, getDocker } from "../../lib/api.ts";
+import { dockerAction, getDocker, getAdguard, getProxmox, getServices } from "../../lib/api.ts";
 
 const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
   ok: "var(--ok)",
@@ -143,19 +143,26 @@ function AdguardCard({ adguard }: { adguard: AdguardData }) {
 }
 
 // /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов, Docker, AdGuard.
-export function SystemPage({
-  proxmox,
-  servicesData,
-  docker,
-  onDockerUpdate,
-  adguard,
-}: {
-  proxmox: ProxmoxData;
-  servicesData: ServicesData;
-  docker: DockerData;
-  onDockerUpdate: (d: DockerData) => void;
-  adguard: AdguardData;
-}) {
+export function SystemPage() {
+  const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
+  const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
+  const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
+  const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
+
+  useEffect(() => {
+    getProxmox().then(setProxmox);
+    getServices().then(setServicesData);
+    getDocker().then(setDocker);
+    getAdguard().then(setAdguard);
+    const fastTimer = setInterval(() => {
+      getProxmox().then(setProxmox);
+      getDocker().then(setDocker);
+      getAdguard().then(setAdguard);
+    }, 30_000);
+    const slowTimer = setInterval(() => getServices().then(setServicesData), 60_000);
+    return () => { clearInterval(fastTimer); clearInterval(slowTimer); };
+  }, []);
+
   return (
     <div className="page">
       <div className="page-cols">
@@ -272,7 +279,7 @@ export function SystemPage({
           )}
 
           {/* Docker */}
-          <DockerCard docker={docker} onRefresh={onDockerUpdate} />
+          <DockerCard docker={docker} onRefresh={setDocker} />
 
           {/* AdGuard DNS */}
           <AdguardCard adguard={adguard} />

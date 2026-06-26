@@ -1,15 +1,27 @@
+import { useState, useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { MediaPage } from "./MediaPage.tsx";
 import { MediaSeriesPage } from "./MediaSeriesPage.tsx";
 import { MediaMoviePage } from "./MediaMoviePage.tsx";
-import type { MediaData } from "../../lib/api.ts";
+import { getMedia, type MediaData } from "../../lib/api.ts";
 
-interface MediaRoutesProps {
-  media: MediaData;
-  onMediaUpdate: () => void;
-}
+const DEFAULT_MEDIA: MediaData = { configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] };
 
-export function MediaRoutes({ media, onMediaUpdate }: MediaRoutesProps) {
+export function MediaRoutes() {
+  const [media, setMedia] = useState<MediaData>(DEFAULT_MEDIA);
+
+  const dlActive = media.downloads.some(
+    (d) => d.progress < 100 && !/paused|stopped|completed|error/i.test(d.state),
+  );
+
+  useEffect(() => {
+    getMedia().then(setMedia);
+    const t = setInterval(() => getMedia().then(setMedia), dlActive ? 5_000 : 15_000);
+    return () => clearInterval(t);
+  }, [dlActive]);
+
+  const onMediaUpdate = () => getMedia().then(setMedia);
+
   return (
     <Routes>
       <Route path="/" element={<MediaPage media={media} onMediaUpdate={onMediaUpdate} />} />

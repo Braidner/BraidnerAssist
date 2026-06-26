@@ -9,14 +9,9 @@ interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: "/", icon: "grid", label: "Обзор" },
-  { to: "/tasks", icon: "list", label: "Задачи" },
-  { to: "/home-assistant", icon: "home", label: "Home Assistant" },
+  { to: "/media", icon: "pulse", label: "Медиа" },
   { to: "/hermes", icon: "bot", label: "Hermes" },
   { to: "/system", icon: "server", label: "Система" },
-  { to: "/metrics", icon: "chart", label: "Метрики" },
-  { to: "/media", icon: "pulse", label: "Медиа" },
-  { to: "/media/calendar", icon: "chart", label: "Расписание" },
-  { to: "/notes", icon: "note", label: "Заметки" },
 ];
 
 interface SidebarProps {

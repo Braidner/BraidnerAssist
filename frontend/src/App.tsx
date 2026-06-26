@@ -3,9 +3,9 @@ import { Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } fr
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
-  getHassAutomations, toggleHassAutomation, getDocker, getMetrics, getAdguard, getMedia,
+  getHassAutomations, toggleHassAutomation, getDocker, getAdguard, getMedia,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type UptimeSeries, type AdguardData, type MediaData,
+  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type AdguardData, type MediaData,
 } from "./lib/api.ts";
 import { SettingsPanel } from "./components/overlays/SettingsPanel.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
@@ -20,12 +20,9 @@ import { HermesLogPanel } from "./pages/overview/panels/HermesLogPanel.tsx";
 import { HomeAssistantPanel } from "./pages/overview/panels/HAssistantPanel.tsx";
 import { HermesPage } from "./pages/system/HermesPage.tsx";
 import { SystemPage } from "./pages/system/SystemPage.tsx";
-import { MetricsPage } from "./pages/system/MetricsPage.tsx";
 import { MediaPage } from "./pages/media/MediaPage.tsx";
 import { MediaSeriesPage } from "./pages/media/MediaSeriesPage.tsx";
 import { MediaMoviePage } from "./pages/media/MediaMoviePage.tsx";
-import { MediaCalendarPage } from "./pages/media/MediaCalendarPage.tsx";
-import { StubPage } from "./components/panels/StubPage.tsx";
 import { CommandPalette } from "./components/layout/CommandPalette.tsx";
 
 type Backend = "up" | "down" | "checking";
@@ -51,7 +48,6 @@ export function App() {
   const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
   const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
   const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
-  const [metrics, setMetrics] = useState<UptimeSeries[]>([]);
   const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
   const [media, setMedia] = useState<MediaData>({ configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] });
   const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
@@ -84,7 +80,6 @@ export function App() {
     getWeather().then(setWeather);
     getProxmox().then(setProxmox);
     getDocker().then(setDocker);
-    getMetrics().then(setMetrics);
     getAdguard().then(setAdguard);
     getMedia().then(setMedia);
     getHassAutomations().then(setHass);
@@ -94,7 +89,6 @@ export function App() {
     const weatherTimer = setInterval(() => getWeather().then(setWeather), 1_800_000);
     const proxmoxTimer = setInterval(() => getProxmox().then(setProxmox), 30_000);
     const dockerTimer = setInterval(() => getDocker().then(setDocker), 30_000);
-    const metricsTimer = setInterval(() => getMetrics().then(setMetrics), 60_000);
     const adguardTimer = setInterval(() => getAdguard().then(setAdguard), 30_000);
     const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
@@ -108,7 +102,6 @@ export function App() {
       clearInterval(weatherTimer);
       clearInterval(proxmoxTimer);
       clearInterval(dockerTimer);
-      clearInterval(metricsTimer);
       clearInterval(adguardTimer);
       clearInterval(tasksTimer);
       clearInterval(hassTimer);
@@ -244,26 +237,13 @@ export function App() {
 
         <Routes>
           <Route path="/" element={overview} />
-          <Route path="/tasks" element={
-            <div className="page">
-              <TasksPanel tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
-            </div>
-          } />
-          <Route path="/home-assistant" element={
-            <div className="page">
-              <HomeAssistantPanel data={hass} onToggle={onToggleAutomation} />
-            </div>
-          } />
           <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
           <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
-          <Route path="/metrics" element={<MetricsPage metrics={metrics} />} />
           <Route path="/media" element={<MediaPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
-          <Route path="/media/calendar" element={<MediaCalendarPage />} />
           <Route path="/media/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/media/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
           <Route path="/media/discover/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} source="discover" />} />
           <Route path="/media/discover/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} source="discover" />} />
-          <Route path="/notes" element={<StubPage icon="note" title="Заметки" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

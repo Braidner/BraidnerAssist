@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useRegisterTabs } from "../../lib/tabsContext.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import {
   getMediaLibrary, addTorrent, torrentAction, refreshJellyfin,
@@ -250,6 +251,13 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   const toast = useToast();
   const [params] = useSearchParams();
   const tab = ((params.get("tab") as MediaTab) || "library");
+
+  const TAB_KEYS: MediaTab[] = ["library", "discover", "system"];
+  useRegisterTabs(
+    ['Библиотека', 'Дискавери', 'Система'],
+    Math.max(0, TAB_KEYS.indexOf(tab)),
+    (i: number) => nav(`/media${i > 0 ? `?tab=${TAB_KEYS[i]}` : ''}`),
+  );
 
   // ── Shared state ──────────────────────────────────────────────────────────
   const [library, setLibrary] = useState<LibraryItem[]>([]);

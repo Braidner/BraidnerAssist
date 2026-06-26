@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate, useLocation, useSearchParams, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
@@ -7,6 +7,7 @@ import {
   setUnauthorizedHandler,
   type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type AdguardData, type MediaData,
 } from "./lib/api.ts";
+import { TabsProvider } from "./lib/tabsContext.tsx";
 import { SettingsPanel } from "./components/overlays/SettingsPanel.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
@@ -14,15 +15,10 @@ import { LoginForm } from "./components/overlays/LoginForm.tsx";
 import { Drawer } from "./components/layout/Drawer.tsx";
 import { Sidebar } from "./components/layout/Sidebar.tsx";
 import { TopBar } from "./components/layout/TopBar.tsx";
-import { MiniWidgets } from "./components/panels/StatStrip.tsx";
-import { TasksPanel } from "./pages/overview/panels/TasksPanel.tsx";
-import { HermesLogPanel } from "./pages/overview/panels/HermesLogPanel.tsx";
-import { HomeAssistantPanel } from "./pages/overview/panels/HAssistantPanel.tsx";
 import { HermesPage } from "./pages/system/HermesPage.tsx";
 import { SystemPage } from "./pages/system/SystemPage.tsx";
-import { MediaPage } from "./pages/media/MediaPage.tsx";
-import { MediaSeriesPage } from "./pages/media/MediaSeriesPage.tsx";
-import { MediaMoviePage } from "./pages/media/MediaMoviePage.tsx";
+import { MediaRoutes } from "./pages/media/MediaRoutes.tsx";
+import { OverviewPage } from "./pages/overview/OverviewPage.tsx";
 import { CommandPalette } from "./components/layout/CommandPalette.tsx";
 
 type Backend = "up" | "down" | "checking";
@@ -160,25 +156,9 @@ export function App() {
     });
   };
 
-  // ── Route-aware TopBar ───────────────────────────────────────────
+  // ── Detail page check (hides TopBar) ─────────────────────────────
   const location = useLocation();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-
-  const isMediaList = location.pathname === '/media';
   const isDetailPage = /\/media\/(series|movie)\//.test(location.pathname);
-
-  const topBarTabs = isMediaList ? ['Библиотека', 'Дискавери', 'Система'] : [];
-  const mediaTabStr = searchParams.get('tab') ?? 'library';
-  const topBarActiveTab = isMediaList
-    ? Math.max(0, ['library', 'discover', 'system'].indexOf(mediaTabStr))
-    : 0;
-  const topBarOnTabChange = isMediaList
-    ? (i: number) => {
-        const keys = ['library', 'discover', 'system'];
-        navigate(`/media${i > 0 ? `?tab=${keys[i]}` : ''}`);
-      }
-    : undefined;
 
   // ── Render ────────────────────────────────────────────────────────
   if (!authed) {
@@ -189,64 +169,60 @@ export function App() {
     );
   }
 
-  const overview = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      <MiniWidgets weather={weather} proxmox={proxmox} services={servicesData} tasks={tasks} />
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 24px 0', flexShrink: 0 }} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 24px 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <TasksPanel flat tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
-          <HermesLogPanel flat data={hermes} tasks={hermesTasks} />
-        </div>
-        <HomeAssistantPanel flat data={hass} onToggle={onToggleAutomation} />
-      </div>
-    </div>
-  );
-
   return (
-    <div className="mc" data-theme={theme}>
-      {showSettings && (
-        <SettingsPanel
-          onClose={() => setShowSettings(false)}
-          onSave={() => { setShowSettings(false); getServices().then(setServicesData); }}
-        />
-      )}
-      {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
-      <CommandPalette containers={docker.containers} adguard={adguard} onAddTask={onAddTask} />
-      <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
-
-      <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
-
-      <div className="main">
-        {!isDetailPage && (
-          <TopBar
-            clock={clock}
-            backend={backend}
-            theme={theme}
-            onToggleTheme={toggle}
-            onLogout={onLogout}
-            onSettings={() => setShowSettings(true)}
-            onLogs={() => setShowLogs(true)}
-            onMenu={() => setSbOpen(true)}
-            versionData={versionData}
-            tabs={topBarTabs}
-            activeTab={topBarActiveTab}
-            onTabChange={topBarOnTabChange}
+    <TabsProvider>
+      <div className="mc" data-theme={theme}>
+        {showSettings && (
+          <SettingsPanel
+            onClose={() => setShowSettings(false)}
+            onSave={() => { setShowSettings(false); getServices().then(setServicesData); }}
           />
         )}
+        {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
+        <CommandPalette containers={docker.containers} adguard={adguard} onAddTask={onAddTask} />
+        <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
 
-        <Routes>
-          <Route path="/" element={overview} />
-          <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
-          <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
-          <Route path="/media" element={<MediaPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
-          <Route path="/media/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
-          <Route path="/media/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
-          <Route path="/media/discover/series/:id" element={<MediaSeriesPage media={media} onMediaUpdate={() => getMedia().then(setMedia)} source="discover" />} />
-          <Route path="/media/discover/movie/:id" element={<MediaMoviePage media={media} onMediaUpdate={() => getMedia().then(setMedia)} source="discover" />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
+
+        <div className="main">
+          {!isDetailPage && (
+            <TopBar
+              clock={clock}
+              backend={backend}
+              theme={theme}
+              onToggleTheme={toggle}
+              onLogout={onLogout}
+              onSettings={() => setShowSettings(true)}
+              onLogs={() => setShowLogs(true)}
+              onMenu={() => setSbOpen(true)}
+              versionData={versionData}
+            />
+          )}
+
+          <Routes>
+            <Route path="/" element={
+              <OverviewPage
+                weather={weather}
+                proxmox={proxmox}
+                services={servicesData}
+                tasks={tasks}
+                hermes={hermes}
+                hermesTasks={hermesTasks}
+                hass={hass}
+                onToggleTask={onToggleTask}
+                onAddTask={onAddTask}
+                onSelectTask={onSelectTask}
+                onDeleteTask={onDeleteTask}
+                onToggleAutomation={onToggleAutomation}
+              />
+            } />
+            <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />
+            <Route path="/system" element={<SystemPage proxmox={proxmox} servicesData={servicesData} docker={docker} onDockerUpdate={setDocker} adguard={adguard} />} />
+            <Route path="/media/*" element={<MediaRoutes media={media} onMediaUpdate={() => getMedia().then(setMedia)} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </div>
-    </div>
+    </TabsProvider>
   );
 }

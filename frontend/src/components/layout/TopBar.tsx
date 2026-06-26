@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Theme } from "../../theme.ts";
 import type { VersionData } from "../../lib/api.ts";
+import { useTabsState } from "../../lib/tabsContext.tsx";
 
 type Backend = "up" | "down" | "checking";
 
@@ -14,16 +15,13 @@ interface TopBarProps {
   onLogs: () => void;
   onMenu: () => void;
   versionData: VersionData | null;
-  // tab navigation
-  tabs?: string[];
-  activeTab?: number;
-  onTabChange?: (i: number) => void;
 }
 
 const days = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
 const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
-export function TopBar({ theme, onToggleTheme, onLogout, onSettings, versionData, tabs, activeTab, onTabChange }: TopBarProps) {
+export function TopBar({ theme, onToggleTheme, onLogout, onSettings, versionData }: TopBarProps) {
+  const { tabs, activeTab, onTabChange } = useTabsState();
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 20000);

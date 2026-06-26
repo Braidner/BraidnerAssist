@@ -47,42 +47,22 @@ export function HomeAssistantPanel({ data, onToggle, flat }: Props) {
         {data.automations.length === 0 ? (
           <div className="empty">Автоматизаций не найдено</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="ov-grid-2">
             {data.automations.map((x) => {
               const isOn = x.state === "on";
               return (
                 <div
                   key={x.entityId}
                   onClick={() => onToggle(x.entityId)}
-                  style={{
-                    padding: '11px 12px', borderRadius: 8, cursor: 'pointer',
-                    background: isOn ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${isOn ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.045)'}`,
-                    transition: 'background 0.18s, border-color 0.18s',
-                    display: 'flex', flexDirection: 'column', gap: 8
-                  }}
+                  className={`ov-toggle-card${isOn ? " on" : ""}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{
-                      width: 7, height: 7, borderRadius: '50%',
-                      background: isOn ? 'var(--accent)' : 'var(--muted)',
-                      boxShadow: isOn ? '0 0 8px var(--accent)' : 'none',
-                      transition: 'all 0.2s', flexShrink: 0
-                    }}/>
-                    <div style={{
-                      width: 30, height: 16, borderRadius: 8, position: 'relative',
-                      background: isOn ? 'var(--accent)' : 'rgba(255,255,255,0.1)',
-                      border: '1px solid rgba(255,255,255,0.08)', transition: 'background 0.22s'
-                    }}>
-                      <span style={{
-                        position: 'absolute', top: 1,
-                        left: isOn ? 13 : 1,
-                        width: 12, height: 12, borderRadius: '50%',
-                        background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)', transition: 'left 0.22s'
-                      }}/>
+                  <div className="flex-between">
+                    <span className={`ov-dot${isOn ? " on" : ""}`}/>
+                    <div className={`ov-mini-toggle${isOn ? " on" : ""}`}>
+                      <span className="ov-mini-knob" style={{ left: isOn ? 13 : 1 }}/>
                     </div>
                   </div>
-                  <div style={{ fontFamily: 'var(--font)', fontSize: 11, color: isOn ? 'var(--ink)' : 'var(--ink-soft)', lineHeight: 1.3 }}>
+                  <div className={`ov-card-name${isOn ? " on" : ""}`}>
                     {x.name ?? x.entityId}
                   </div>
                 </div>

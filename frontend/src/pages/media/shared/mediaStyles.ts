@@ -61,7 +61,7 @@ export const media = {
   calendarEp: "font-mono text-accent",
   calendarWhen: "flex-none font-mono text-data text-muted",
   libPage: "pb-[72px]",
-  libHero: "relative mb-[52px] h-[500px] cursor-pointer overflow-hidden",
+  libHero: "relative mb-[52px] h-[500px] overflow-hidden",
   libHeroBg: "absolute inset-0",
   libHeroGlow: "pointer-events-none absolute inset-0",
   libHeroGrain:

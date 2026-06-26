@@ -17,6 +17,24 @@ Desktop (Proxmox VM). Используется человеком И AI-аген
 ```
 mission-control/
 ├── frontend/          # React + TS + Vite
+│   └── src/
+│       ├── App.tsx                    # auth + routing + UI chrome (lean)
+│       ├── main.tsx
+│       ├── lib/
+│       │   ├── api.ts                 # все REST-вызовы к бэкенду
+│       │   ├── auth.ts                # JWT-токен
+│       │   ├── tabsContext.tsx        # TabsContext (медиа-табы)
+│       │   ├── tasksContext.tsx       # TasksContext — shared tasks state (TasksPanel, Drawer, CommandPalette)
+│       │   └── format.ts
+│       ├── components/
+│       │   ├── layout/                # TopBar, Sidebar, Drawer, CommandPalette
+│       │   ├── overlays/              # LoginForm, SettingsPanel, LogsPanel
+│       │   ├── panels/                # StatStrip (MiniWidgets), Placeholder
+│       │   └── ui/                    # Card, Ring, Toast
+│       └── pages/
+│           ├── overview/              # OverviewPage + panels (TasksPanel, HermesLogPanel, HAssistantPanel)
+│           ├── system/                # HermesPage, SystemPage
+│           └── media/                 # MediaRoutes + MediaPage + detail pages
 ├── backend/
 │   ├── src/
 │   │   ├── api/           # REST endpoints
@@ -248,12 +266,23 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   Тема ставится на обёртку `.mc` (не на `:root`); переключатель в `theme.ts`.
 - **Примитивы теней**: `.neu` (выпуклый), `.neu-in` (вдавленный), `.neu-sm` (мелкий).
 - **Компоненты**: `frontend/src/components/` — `Card`, `Ring`, `icons` (SVG-набор) +
-  `panels/` (TopBar, StatStrip, Tasks, HomeAssistant, HermesLog, Placeholder).
+  `panels/` (StatStrip/MiniWidgets, Placeholder) + `layout/` (TopBar, Sidebar, Drawer, CommandPalette).
   Раскладка — **вариант C (three columns)**: полоса мини-статов + 3 колонки.
   - Левая (`col-fill`): Tasks
   - Средняя (`col`): HomeAssistant
   - Правая (`col-fill`): HermesLog
-- **Данные**: Tasks (local + GitLab), Hermes (сессии), Services, Weather, HomeAssistant, Proxmox — реальные.
+- **Архитектура данных (self-contained widgets)**: `App.tsx` не хранит доменные данные.
+  Каждый виджет/страница самостоятельно делает fetch и polling:
+  - `TasksContext` (`lib/tasksContext.tsx`) — единственное исключение: shared state tasks+selectedTask,
+    т.к. используется в `TasksPanel`, `Drawer` и `CommandPalette`. Оборачивает дерево в `App.tsx`.
+  - `MiniWidgets` (StatStrip) — weather/proxmox/services + `useTasksCtx()` для счётчика задач
+  - `TasksPanel` — `useTasksCtx()` для данных и хендлеров
+  - `Drawer` — `useTasksCtx()` для `selectedTask`/`clearSelection`
+  - `HermesLogPanel` — hermes+hermesTasks (60с поллинг)
+  - `HomeAssistantPanel` — hass automations (30с поллинг)
+  - `CommandPalette` — docker+adguard (30с) + `useTasksCtx()` для `onAddTask`
+  - `HermesPage`, `SystemPage`, `MediaRoutes` — каждая страница своя (polling внутри)
+  - `App.tsx` (~120 строк): только auth, clock, backend health, version, UI-флаги (sidebar/settings/logs)
 - **StatStrip**: одна горизонтальная полоса мини-тайлов с прокруткой — погода (широкий) +
   один объединённый Proxmox-тайл (CPU/RAM/DISK гейджи в ряд, диск/RAM в ГБ) + по тайлу на
   каждую VM/LXC (cpu/ram/статус) + по тайлу на каждый сервис. Панель «Статус системы»
@@ -295,6 +324,11 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   поиск в Cmd-K, тост-система, полиш сетки/детальной/мобилки. Env: добавлен `TORRSERVER_*`. ✅ ГОТОВО
 - **Batch v6.1 — фикс воспроизведения** (151ba1c): nginx `/api/` резал большие HLS-плейлисты из-за
   upgrade-заголовков → убраны, `Connection ""`+`proxy_buffering off`. См. раздел «Деплой». ✅ ГОТОВО
+- **Refactor — self-contained widgets + TabsContext** (fa19b5d → 20e7658): `App.tsx` split на
+  domain-файлы (`TabsContext`, `OverviewPage`, `MediaRoutes`); затем полный рефакторинг — каждый виджет
+  самостоятельно делает fetch/polling, `App.tsx` стал lean (~120 строк, только auth+routing+UI chrome).
+  `TasksContext` (`lib/tasksContext.tsx`) — единственный shared context (tasks/selectedTask/handlers).
+  `OverviewPage` стала prop-free (20 строк). ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); аппаратный транскод для тяжёлых
   4K/HEVC 10-bit (софт-транскод 4K→h264 грузит CPU VM, может тормозить).
 

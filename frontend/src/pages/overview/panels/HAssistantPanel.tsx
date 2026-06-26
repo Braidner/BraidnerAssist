@@ -25,10 +25,10 @@ function AutomationRow({
           isOn && "bg-accent",
         )}
       />
-      <span className={cn("min-w-0 flex-1 truncate font-mono text-[13.5px] text-ink-soft", isOn && "text-ink")}>
+      <span className={cn("min-w-0 flex-1 truncate font-mono text-row text-ink-soft", isOn && "text-ink")}>
         {auto.name}
       </span>
-      <span className={cn("font-mono text-[10.5px] tracking-[0.08em] text-muted", isOn && "text-accent")}>
+      <span className={cn("font-mono text-label tracking-3 text-muted", isOn && "text-accent")}>
         {isOn ? "ВКЛ" : "ВЫКЛ"}
       </span>
       <span
@@ -83,9 +83,9 @@ export function HomeAssistantPanel({ flat }: { flat?: boolean }) {
   if (flat) {
     return (
       <div className={cn(ui.panel, "p-4")}>
-        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-[0.16em]">
+        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-5">
           <span className="text-accent">⌂</span>
-          <span className="text-[12.5px] text-ink">Home Assistant</span>
+          <span className="text-cell text-ink">Home Assistant</span>
           <span className={cn(ui.panelCount, "rounded border border-hair bg-surface px-2 py-1")}>
             {onCount} активно
           </span>
@@ -116,7 +116,7 @@ export function HomeAssistantPanel({ flat }: { flat?: boolean }) {
                       />
                     </div>
                   </div>
-                  <div className={cn("line-clamp-2 text-[13px] font-medium text-ink-soft", isOn && "text-ink")}>
+                  <div className={cn("line-clamp-2 text-body font-medium text-ink-soft", isOn && "text-ink")}>
                     {x.name ?? x.entityId}
                   </div>
                 </div>

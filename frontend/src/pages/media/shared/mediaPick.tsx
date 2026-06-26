@@ -225,11 +225,11 @@ export function TorrentFilePicker({
               {groupBySeason(preview.files.filter((f) => f.isVideo)).map(
                 (g) => (
                   <div key={g.key} className="mt-2.5 rounded-xl bg-surface">
-                    <div className="flex items-center gap-2 px-2.5 py-2 max-[760px]:flex-wrap">
-                      <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-[13px] font-medium text-ink">
+                    <div className="flex items-center gap-2 px-2.5 py-2 max-narrow:flex-wrap">
+                      <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-body font-medium text-ink">
                         {g.label}
                       </span>
-                      <span className="font-mono text-[11px] text-muted">
+                      <span className="font-mono text-data text-muted">
                         {g.files.length} файл.
                       </span>
                     </div>
@@ -245,15 +245,15 @@ export function TorrentFilePicker({
                             checked={checked.has(f.fileIndex)}
                             onChange={() => toggle(f.fileIndex)}
                           />
-                          <span className="w-[26px] flex-none text-center font-mono text-[11px] text-muted">
+                          <span className="w-[26px] flex-none text-center font-mono text-data text-muted">
                             {epLabel(f)}
                           </span>
                           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-[10px] text-muted">
+                            <span className="font-mono text-2xs text-muted">
                               {fmtSize(f.length)}
                             </span>
                             <span
-                              className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-[10px] text-muted"
+                              className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-2xs text-muted"
                               title={f.path}
                             >
                               {f.path.split("/").pop()}
@@ -353,7 +353,7 @@ export function ContentTorrents({
           <div key={t.infohash} style={{ marginBottom: 14 }}>
             <div className={cn(media.field, "mb-1.5 items-center")}>
               <span
-                className="flex-1 font-mono text-[11.5px] text-muted"
+                className="flex-1 font-mono text-pill text-muted"
                 title={t.title}
               >
                 📦 {t.title}
@@ -369,8 +369,8 @@ export function ContentTorrents({
             </div>
             {groupBySeasonFiles(t.files).map((g) => (
               <div key={g.key} className="mt-2.5 rounded-xl bg-surface">
-                <div className="flex items-center gap-2 px-2.5 py-2 max-[760px]:flex-wrap">
-                  <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-[13px] font-medium text-ink">
+                <div className="flex items-center gap-2 px-2.5 py-2 max-narrow:flex-wrap">
+                  <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-body font-medium text-ink">
                     {g.label}
                   </span>
                 </div>
@@ -405,22 +405,22 @@ export function ContentTorrents({
                             title="Докачать"
                           />
                         )}
-                        <span className="w-[26px] flex-none text-center font-mono text-[11px] text-muted">
+                        <span className="w-[26px] flex-none text-center font-mono text-data text-muted">
                           {label}
                         </span>
                         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                          <span className="font-mono text-[10px] text-muted">
+                          <span className="font-mono text-2xs text-muted">
                             {fmtSize(f.length)}
                           </span>
                           {f.wanted ? (
                             <span className="flex min-w-[90px] flex-1 items-center gap-1.5">
                               <ProgressBar pct={pct} />
-                              <span className="font-mono text-[10px] text-muted">
+                              <span className="font-mono text-2xs text-muted">
                                 {pct}%
                               </span>
                             </span>
                           ) : (
-                            <span className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-[10px] text-muted">
+                            <span className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-2xs text-muted">
                               не качается
                             </span>
                           )}

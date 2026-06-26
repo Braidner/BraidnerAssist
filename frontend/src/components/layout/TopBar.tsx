@@ -64,7 +64,7 @@ export function TopBar({
             <button
               key={tab}
               className={cn(
-                "relative h-9 flex-none rounded-full border border-transparent px-3.5 font-mono text-[11px] uppercase tracking-[0.14em] text-muted transition-colors hover:border-hair hover:bg-surface hover:text-ink-soft",
+                "relative h-9 flex-none rounded-full border border-transparent px-3.5 font-mono text-data uppercase tracking-4 text-muted transition-colors hover:border-hair hover:bg-surface hover:text-ink-soft",
                 activeTab === i &&
                   "border-hair bg-surface-2 text-ink after:absolute after:inset-x-4 after:-bottom-[13px] after:h-0.5 after:rounded-full after:bg-accent",
               )}
@@ -78,7 +78,7 @@ export function TopBar({
           {versionLabel && (
             <span
               className={cn(
-                "hidden rounded-lg border border-hair bg-surface px-2.5 py-1 font-mono text-[10.5px] tracking-[0.03em] text-muted sm:inline-flex",
+                "hidden rounded-lg border border-hair bg-surface px-2.5 py-1 font-mono text-label tracking-1 text-muted sm:inline-flex",
                 versionData?.hasUpdate && "border-warn/50 text-warn",
               )}
               title={
@@ -166,10 +166,10 @@ export function TopBar({
           </button>
           <div className="hidden h-6 w-px bg-hair sm:block" />
           <div className="hidden min-w-[70px] flex-col items-end leading-none sm:flex">
-            <span className="font-mono text-[18px] font-bold tracking-[0.02em] text-ink">
+            <span className="font-mono text-title font-bold tracking-1 text-ink">
               {hh}:{mm}
             </span>
-            <span className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted">
+            <span className="mt-1 font-mono text-tiny uppercase tracking-4 text-muted">
               {days[now.getDay()]} · {now.getDate()} {months[now.getMonth()]}
             </span>
           </div>

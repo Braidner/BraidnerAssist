@@ -23,43 +23,43 @@ export const media = {
   },
   seg: "mb-3 flex gap-1.5 rounded-xl bg-surface p-1",
   segButton:
-    "h-8 flex-1 rounded-[9px] border-0 bg-transparent text-[12.5px] font-medium text-muted transition-colors hover:text-ink",
+    "h-8 flex-1 rounded-[9px] border-0 bg-transparent text-cell font-medium text-muted transition-colors hover:text-ink",
   segButtonOn: "bg-accent text-accent-ink hover:text-accent-ink",
-  label: "mb-1.5 mt-[18px] font-mono text-[11px] text-muted",
+  label: "mb-1.5 mt-[18px] font-mono text-data text-muted",
   subtleToggle:
-    "mt-[22px] w-full border-0 bg-transparent py-2 text-left font-mono text-[11.5px] text-muted transition-colors hover:text-ink",
+    "mt-[22px] w-full border-0 bg-transparent py-2 text-left font-mono text-pill text-muted transition-colors hover:text-ink",
   list: "mt-3.5 flex flex-col gap-[9px]",
   row: "flex flex-col gap-2 rounded-xl border border-hair bg-surface p-3",
   rowTitle:
-    "line-clamp-2 text-[12.5px] leading-[1.35] text-ink [font-family:var(--font-ui)]",
+    "line-clamp-2 text-cell leading-[1.35] text-ink [font-family:var(--font-ui)]",
   rowFoot: "flex items-center gap-2.5",
   rowMeta:
-    "min-w-0 flex-1 truncate whitespace-nowrap font-mono text-[10.5px] text-muted",
+    "min-w-0 flex-1 truncate whitespace-nowrap font-mono text-label text-muted",
   okText: "text-ok",
   badge:
-    "whitespace-nowrap rounded-full bg-accent px-2 py-0.5 font-mono text-[10px] text-accent-ink",
-  lang: "whitespace-nowrap rounded-full bg-info/15 px-2 py-0.5 font-mono text-[10px] text-info",
-  reject: "whitespace-nowrap font-mono text-[10px] text-bad",
+    "whitespace-nowrap rounded-full bg-accent px-2 py-0.5 font-mono text-2xs text-accent-ink",
+  lang: "whitespace-nowrap rounded-full bg-info/15 px-2 py-0.5 font-mono text-2xs text-info",
+  reject: "whitespace-nowrap font-mono text-2xs text-bad",
   checkbox: "size-[15px] flex-none cursor-pointer accent-accent",
   progress: "h-1.5 min-w-20 flex-1 overflow-hidden rounded bg-groove",
   progressFill: "h-full rounded bg-accent",
-  grid: "mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 max-[760px]:grid-cols-[repeat(auto-fill,minmax(116px,1fr))] max-[760px]:gap-2",
+  grid: "mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5 max-narrow:grid-cols-[repeat(auto-fill,minmax(116px,1fr))] max-narrow:gap-2",
   item: "relative flex min-h-[76px] cursor-pointer flex-col gap-1 overflow-hidden rounded-xl border border-hair bg-raise p-3 pt-0 text-left text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60",
   posterBox: "relative -mx-3 mb-2 block w-[calc(100%+24px)]",
   itemPoster: "mb-2 aspect-[2/3] w-full bg-groove object-cover",
-  itemName: "line-clamp-2 text-[12.5px] leading-[1.3]",
-  itemMeta: "font-mono text-[10px] text-muted",
+  itemName: "line-clamp-2 text-cell leading-[1.3]",
+  itemMeta: "font-mono text-2xs text-muted",
   itemPlay: "absolute bottom-2.5 right-2.5 text-sm text-accent",
   seenBadge:
-    "absolute right-1.5 top-1.5 grid h-5 min-w-5 place-items-center rounded-[10px] bg-ok px-1.5 text-[11px] font-bold text-[#06241a]",
+    "absolute right-1.5 top-1.5 grid h-5 min-w-5 place-items-center rounded-[10px] bg-ok px-1.5 text-data font-bold text-[#06241a]",
   skeleton:
     "aspect-[2/3] animate-[skel-pulse_1.4s_ease-in-out_infinite] rounded-xl bg-surface",
   calendarRows: "mt-2 flex flex-col gap-1.5",
   calendarRow: "flex items-center gap-[9px] rounded-[10px] px-2.5 py-[7px]",
   calendarKind: "flex-none text-sm",
-  calendarTitle: "min-w-0 flex-1 truncate whitespace-nowrap text-[12.5px]",
+  calendarTitle: "min-w-0 flex-1 truncate whitespace-nowrap text-cell",
   calendarEp: "font-mono text-accent",
-  calendarWhen: "flex-none font-mono text-[11px] text-muted",
+  calendarWhen: "flex-none font-mono text-data text-muted",
   libPage: "pb-[72px]",
   libHero: "relative mb-[52px] h-[500px] cursor-pointer overflow-hidden",
   libHeroBg: "absolute inset-0",
@@ -69,30 +69,30 @@ export const media = {
   libHeroVignette:
     "absolute inset-0 bg-[linear-gradient(to_right,rgba(9,9,13,0.97)_0%,rgba(9,9,13,0.65)_42%,rgba(9,9,13,0.06)_72%,transparent_100%),linear-gradient(to_top,rgba(0,0,0,0.6)_0%,transparent_30%),linear-gradient(to_bottom,rgba(0,0,0,0.25)_0%,transparent_18%)]",
   libHeroBody:
-    "relative z-[1] flex h-full max-w-[660px] flex-col justify-end px-[52px] pb-12 max-[760px]:px-6",
+    "relative z-[1] flex h-full max-w-[660px] flex-col justify-end px-[52px] pb-12 max-narrow:px-6",
   libEyebrow:
-    "mb-2.5 flex items-center gap-[9px] [font-family:Syne,var(--font)] text-[10px] font-extrabold uppercase tracking-[0.24em] text-white/40",
+    "mb-2.5 flex items-center gap-[9px] [font-family:Syne,var(--font)] text-2xs font-extrabold uppercase tracking-6 text-white/40",
   libHeroTitle:
-    "mb-3.5 [font-family:Oswald,var(--font)] text-[84px] font-bold leading-[0.92] text-white max-[760px]:text-5xl",
+    "mb-3.5 [font-family:Oswald,var(--font)] text-hero font-bold leading-[0.92] text-white max-narrow:text-5xl",
   libHeroMeta: "mb-3.5 flex flex-wrap items-center gap-2",
   libActions: "mb-6 flex gap-3",
   playButton:
-    "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-[13px] font-bold tracking-[0.05em] text-white transition-colors",
+    "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white transition-colors",
   progRow: "flex max-w-[360px] items-center gap-3",
   progTrack: "h-1 flex-1 overflow-hidden rounded bg-white/15",
   progFill: "h-full rounded",
-  progLabel: "text-[11px] text-white/50",
+  progLabel: "text-data text-white/50",
   section: "mt-8",
   sectionHead: "mb-3 flex items-center gap-3",
   sectionTitle:
-    "[font-family:Syne,var(--font)] text-xs font-extrabold uppercase tracking-[0.18em] text-ink",
+    "[font-family:Syne,var(--font)] text-xs font-extrabold uppercase tracking-5 text-ink",
   countBadge:
-    "rounded-full bg-surface px-2 py-0.5 font-mono text-[10px] text-muted",
+    "rounded-full bg-surface px-2 py-0.5 font-mono text-2xs text-muted",
   hTrack:
     "flex gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   posterRow: "gap-5",
   scanButton:
-    "ml-auto flex cursor-pointer items-center gap-1.5 rounded-[7px] border border-hair bg-raise px-3 py-2 [font-family:Syne,var(--font)] text-[11px] font-bold uppercase tracking-[0.08em] text-muted transition-colors hover:text-ink",
+    "ml-auto flex cursor-pointer items-center gap-1.5 rounded-[7px] border border-hair bg-raise px-3 py-2 [font-family:Syne,var(--font)] text-data font-bold uppercase tracking-3 text-muted transition-colors hover:text-ink",
   filterTabs: "mb-4 flex flex-wrap gap-2",
   filterTab:
     "rounded-full border border-hair bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink",
@@ -108,17 +108,17 @@ export const media = {
   watchProg: "absolute bottom-0 left-0 right-0 h-1 bg-white/20",
   watchInfo: "mt-2",
   watchTitle: "truncate text-sm font-semibold text-ink",
-  watchMeta: "mt-1 font-mono text-[10px]",
+  watchMeta: "mt-1 font-mono text-2xs",
   posterCard: "w-40 flex-none cursor-pointer",
   posterArt:
     "relative aspect-[2/3] overflow-hidden rounded-[10px] bg-groove transition-transform hover:-translate-y-1",
   posterBadge:
-    "absolute right-2 top-2 z-[2] rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white",
+    "absolute right-2 top-2 z-[2] rounded-full bg-black/70 px-2 py-1 text-2xs font-semibold text-white",
   posterOverlay:
     "absolute inset-0 z-[3] flex items-end justify-end p-2 opacity-0 transition-opacity hover:opacity-100",
   posterGenres:
-    "absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-[10px] text-white",
+    "absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-2xs text-white",
   posterInfo: "mt-2",
   posterTitle: "truncate text-sm font-semibold text-ink",
-  posterSub: "mt-1 font-mono text-[10px] text-muted",
+  posterSub: "mt-1 font-mono text-2xs text-muted",
 };

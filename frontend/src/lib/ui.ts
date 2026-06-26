@@ -8,18 +8,18 @@ export const ui = {
   shell:
     "mc min-h-screen bg-page text-ink antialiased [font-family:var(--font-ui)]",
   main:
-    "flex min-w-0 flex-1 flex-col px-[30px] pb-9 pt-[26px] max-[860px]:gap-[18px] max-[860px]:px-4 max-[860px]:pb-[30px] max-[860px]:pt-[18px] max-[480px]:px-3",
+    "flex min-w-0 flex-1 flex-col px-[30px] pb-9 pt-[26px] max-mob:gap-[18px] max-mob:px-4 max-mob:pb-[30px] max-mob:pt-[18px] max-[480px]:px-3",
   surface:
     "rounded-card border border-hair bg-raise transition-colors duration-150",
   panel:
-    "rounded-card border border-hair bg-raise p-6 min-w-0 max-[860px]:px-[18px] max-[860px]:py-5",
+    "rounded-card border border-hair bg-raise p-6 min-w-0 max-mob:px-[18px] max-mob:py-5",
   panelHead: "mb-4 flex items-center justify-between gap-3",
   panelTitle:
-    "flex items-center gap-2.5 font-mono text-[12.5px] font-medium uppercase tracking-[0.16em] text-muted",
-  panelCount: "whitespace-nowrap font-mono text-[11.5px] text-muted",
+    "flex items-center gap-2.5 font-mono text-cell font-medium uppercase tracking-5 text-muted",
+  panelCount: "whitespace-nowrap font-mono text-pill text-muted",
   button: {
     base: cn(
-      "inline-flex h-9 flex-none cursor-pointer items-center justify-center gap-[7px] whitespace-nowrap rounded-xl border border-hair bg-raise px-4 text-[13px] font-medium leading-none text-ink-soft transition-[background-color,border-color,color,transform] duration-150",
+      "inline-flex h-9 flex-none cursor-pointer items-center justify-center gap-[7px] whitespace-nowrap rounded-xl border border-hair bg-raise px-4 text-body font-medium leading-none text-ink-soft transition-[background-color,border-color,color,transform] duration-150",
       "hover:border-accent/40 hover:bg-surface-2 hover:text-ink hover:-translate-y-px",
       "active:translate-y-0 active:border-accent/60 active:text-accent disabled:cursor-default disabled:opacity-45",
       focus,
@@ -31,7 +31,7 @@ export const ui = {
       "border-accent/70 bg-accent text-accent-ink hover:bg-accent hover:text-accent-ink active:text-accent-ink",
   },
   input: cn(
-    "min-w-0 rounded-[10px] border border-hair bg-surface px-3 py-2 text-[13px] text-ink outline-none transition-colors placeholder:text-muted",
+    "min-w-0 rounded-[10px] border border-hair bg-surface px-3 py-2 text-body text-ink outline-none transition-colors placeholder:text-muted",
     "focus:border-accent/60 focus:outline focus:outline-2 focus:outline-accent/20 focus:outline-offset-1",
   ),
   iconButton: cn(
@@ -51,5 +51,5 @@ export const ui = {
   drawerInner: "flex h-full flex-col overflow-y-auto px-[22px] pb-7 pt-6",
   drawerHead: "mb-4 flex items-center justify-between gap-3",
   drawerKind:
-    "flex min-w-0 items-center gap-[7px] font-mono text-[11.5px] text-muted",
+    "flex min-w-0 items-center gap-[7px] font-mono text-pill text-muted",
 };

@@ -16,8 +16,8 @@ export function Placeholder({ icon, title, phase }: PlaceholderProps) {
         <span className="mb-2 grid size-[42px] place-items-center rounded-[13px] border border-hair bg-surface text-muted">
           <Ic />
         </span>
-        <span className="text-[13px] text-ink-soft">Не подключено</span>
-        <span className="font-mono text-[11px] tracking-[0.04em] text-muted">
+        <span className="text-body text-ink-soft">Не подключено</span>
+        <span className="font-mono text-data tracking-1 text-muted">
           {phase}
         </span>
       </div>

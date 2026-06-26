@@ -77,7 +77,7 @@ export function LogsPanel({ onClose }: LogsPanelProps) {
             <div className={ui.drawerKind}>
               <icons.list style={{ width: 14, height: 14 }} />
               <span>Логи бэкенда</span>
-              <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-[11px] text-muted">
+              <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-data text-muted">
                 обновляется каждые 5с
               </span>
             </div>
@@ -124,22 +124,22 @@ export function LogsPanel({ onClose }: LogsPanelProps) {
                 style={{ cursor: e.detail ? "pointer" : "default" }}
               >
                 <span
-                  className="font-mono text-[10.5px] font-bold"
+                  className="font-mono text-label font-bold"
                   style={{ color: levelColor(e.level) }}
                 >
                   {levelLabel(e.level)}
                 </span>
-                <span className="font-mono text-[10.5px] text-muted">
+                <span className="font-mono text-label text-muted">
                   {fmtTime(e.t)}
                 </span>
-                <span className="truncate font-mono text-[10.5px] text-muted">
+                <span className="truncate font-mono text-label text-muted">
                   {e.ctx}
                 </span>
-                <span className="min-w-0 text-[12.5px] leading-snug text-ink-soft">
+                <span className="min-w-0 text-cell leading-snug text-ink-soft">
                   {e.msg}
                 </span>
                 {e.detail && expanded.has(i) && (
-                  <pre className="col-span-4 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-hair bg-surface p-3 font-mono text-[11px] leading-relaxed text-ink-soft">
+                  <pre className="col-span-4 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-hair bg-surface p-3 font-mono text-data leading-relaxed text-ink-soft">
                     {e.detail}
                   </pre>
                 )}

@@ -115,7 +115,7 @@ export function MediaSystemTab({
                   className="flex items-center gap-2 rounded-[11px] border border-hair bg-surface px-2.5 py-2"
                 >
                   <span
-                    className="min-w-0 flex-1 truncate whitespace-nowrap text-[12.5px] text-ink"
+                    className="min-w-0 flex-1 truncate whitespace-nowrap text-cell text-ink"
                     title={s.file?.path ?? s.title}
                   >
                     {s.title}
@@ -177,7 +177,7 @@ export function MediaSystemTab({
               ).length;
               if (totalSpeed <= 0 && pending === 0) return null;
               return (
-                <div className="flex items-center gap-3 px-0.5 pb-2 pt-0.5 font-mono text-[11.5px] text-muted">
+                <div className="flex items-center gap-3 px-0.5 pb-2 pt-0.5 font-mono text-pill text-muted">
                   {totalSpeed > 0 && <span>↓ {fmtSpeed(totalSpeed)}</span>}
                   {pending > 0 && (
                     <span className="text-warn">
@@ -207,26 +207,26 @@ export function MediaSystemTab({
                 >
                   <div className="flex items-start gap-2">
                     <span
-                      className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-[1.35] text-ink"
+                      className="line-clamp-2 min-w-0 flex-1 text-body leading-[1.35] text-ink"
                       title={d.title}
                     >
                       {d.title}
                     </span>
                     {d.importPending && (
                       <span
-                        className="cursor-help whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-[9.5px] text-warn"
+                        className="cursor-help whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-mini text-warn"
                         title={d.importMessage}
                       >
                         ⚠ не импортировано
                       </span>
                     )}
-                    <span className="shrink-0 rounded-md bg-raise px-2 py-[3px] font-mono text-[10px] text-ink-soft">
+                    <span className="shrink-0 rounded-md bg-raise px-2 py-[3px] font-mono text-2xs text-ink-soft">
                       {SOURCE_LABEL[d.source]}
                     </span>
                   </div>
                   <div className="flex items-center gap-[9px]">
                     <ProgressBar pct={d.progress} />
-                    <span className="min-w-9 text-right font-mono text-[11px] text-ink-soft">
+                    <span className="min-w-9 text-right font-mono text-data text-ink-soft">
                       {d.progress}%
                     </span>
                   </div>

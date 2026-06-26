@@ -40,9 +40,9 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
   if (flat) {
     return (
       <div className={cn(ui.panel, "p-4")}>
-        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-[0.16em]">
+        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-5">
           <icons.list className="size-[15px] text-accent" />
-          <span className="text-[12.5px] text-ink">Задачи</span>
+          <span className="text-cell text-ink">Задачи</span>
           <span className={cn(ui.panelCount, "rounded border border-hair bg-surface px-2 py-1")}>
             {open} активных
           </span>
@@ -51,7 +51,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
           <div className="flex flex-1 items-center rounded-[14px] border border-hair bg-surface px-4">
             <input
               ref={inputRef}
-              className="w-full bg-transparent py-[13px] font-mono text-[13px] text-ink outline-none placeholder:text-muted"
+              className="w-full bg-transparent py-[13px] font-mono text-body text-ink outline-none placeholder:text-muted"
               placeholder="$ новая задача…"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -113,8 +113,8 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
                 <icons.check />
               </span>
               <div className="min-w-0 flex-1">
-                <div className={cn("truncate text-[13.5px] font-medium text-ink", t.done && "line-through text-muted")}>{t.label}</div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-muted">
+                <div className={cn("truncate text-row font-medium text-ink", t.done && "line-through text-muted")}>{t.label}</div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-label text-muted">
                   <span
                     className="size-2 rounded-full"
                     style={{ background: PRIO_VAR[t.prio] }}
@@ -167,7 +167,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
         <div className="flex flex-1 items-center rounded-[14px] border border-hair bg-surface px-4">
           <input
             ref={inputRef}
-            className="w-full bg-transparent py-[13px] font-mono text-[13px] text-ink outline-none placeholder:text-muted"
+            className="w-full bg-transparent py-[13px] font-mono text-body text-ink outline-none placeholder:text-muted"
             placeholder="$ новая задача…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -247,13 +247,13 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
             <div className="min-w-0 flex-1">
               <div
                 className={cn(
-                  "truncate text-[13.5px] font-medium text-ink",
+                  "truncate text-row font-medium text-ink",
                   t.done && "line-through text-muted",
                 )}
               >
                 {t.label}
               </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-muted">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-label text-muted">
                 <span
                   className="size-2 rounded-full"
                   style={{ background: PRIO_VAR[t.prio] }}

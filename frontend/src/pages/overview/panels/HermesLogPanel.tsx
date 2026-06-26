@@ -80,7 +80,7 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
     <>
       <div className="mb-4 flex items-center gap-2.5 border-b border-hair pb-4">
         <span className={cn("size-2.5 rounded-full", statusColor)} />
-        <span className="font-mono text-[12.5px] text-ink-soft">
+        <span className="font-mono text-cell text-ink-soft">
           статус: <b className="font-bold text-accent">{data.status}</b>
           {data.message ? ` · ${data.message}` : ""}
         </span>
@@ -105,10 +105,10 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
               >
                 <span className={cn("size-2 rounded-full", ledClass(t.status))} />
                 <div style={{ minWidth: 0 }}>
-                  <div className="truncate text-[13.5px] font-medium text-ink">
+                  <div className="truncate text-row font-medium text-ink">
                     {t.title}
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-[11px] text-muted">
+                  <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-data text-muted">
                     <span className="text-accent">
                       {STATUS_LABEL[t.status] ?? t.status}
                     </span>
@@ -120,7 +120,7 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
                     )}
                   </div>
                 </div>
-                <span className="rounded-full border border-hair bg-surface px-2 py-0.5 font-mono text-[10.5px] text-muted" title="записей лога">
+                <span className="rounded-full border border-hair bg-surface px-2 py-0.5 font-mono text-label text-muted" title="записей лога">
                   {t.logCount}
                 </span>
               </button>
@@ -140,10 +140,10 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
                 <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
               </button>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px] font-medium text-ink">
+                <div className="truncate text-row font-medium text-ink">
                   {current.title}
                 </div>
-                <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-[11px] text-muted">
+                <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-data text-muted">
                   <span className="text-accent">
                     {STATUS_LABEL[current.status] ?? current.status}
                   </span>
@@ -164,11 +164,11 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
             {!loading &&
               logs.map((l, i) => (
                 <div key={i} className="grid grid-cols-[58px_1fr] gap-2 border-t border-hair py-2.5">
-                  <span className="font-mono text-[10.5px] text-muted">{l.t}</span>
+                  <span className="font-mono text-label text-muted">{l.t}</span>
                   <div>
-                    <div className="text-[12.5px] leading-snug text-ink-soft">{l.msg}</div>
-                    <span className="font-mono text-[10.5px] text-muted">{l.k}</span>{" "}
-                    <span className="font-mono text-[10.5px] text-muted/80">· {l.tag}</span>
+                    <div className="text-cell leading-snug text-ink-soft">{l.msg}</div>
+                    <span className="font-mono text-label text-muted">{l.k}</span>{" "}
+                    <span className="font-mono text-label text-muted/80">· {l.tag}</span>
                   </div>
                 </div>
               ))}
@@ -181,7 +181,7 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
   if (flat) {
     return (
       <div className={cn(ui.panel, "p-4")}>
-        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-[0.16em]">
+        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-5">
           <span className="text-accent">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
               <circle
@@ -199,7 +199,7 @@ export function HermesLogPanel({ flat }: { flat?: boolean }) {
               />
             </svg>
           </span>
-          <span className="text-[12.5px] text-ink">Hermes</span>
+          <span className="text-cell text-ink">Hermes</span>
           <span className={cn(ui.panelCount, "rounded border border-hair bg-surface px-2 py-1")}>
             {tasks.filter((t) => t.status === "in_progress").length} активных
           </span>

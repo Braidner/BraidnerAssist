@@ -57,12 +57,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={apiRef.current}>
       {children}
-      <div className="fixed bottom-5 right-5 z-[500] flex w-[min(360px,calc(100vw-32px))] flex-col gap-2.5 max-[760px]:bottom-4 max-[760px]:right-4">
+      <div className="fixed bottom-5 right-5 z-[500] flex w-[min(360px,calc(100vw-32px))] flex-col gap-2.5 max-narrow:bottom-4 max-narrow:right-4">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-[14px] border border-hair bg-raise px-4 py-3 text-[13px] text-ink",
+              "flex cursor-pointer items-start gap-3 rounded-[14px] border border-hair bg-raise px-4 py-3 text-body text-ink",
               "animate-[toast-in_.22s_var(--ease)]",
               t.type === "success" && "border-l-4 border-l-ok",
               t.type === "error" && "border-l-4 border-l-bad",

@@ -134,7 +134,7 @@ export function Player({
         <div className="flex items-center justify-between gap-3">
           <span className="truncate text-sm text-ink">{title}</span>
           {direct && (
-            <div className="ml-auto mr-2 flex gap-1.5 max-[760px]:hidden">
+            <div className="ml-auto mr-2 flex gap-1.5 max-narrow:hidden">
               <button
                 className={media.button.sm}
                 onClick={copyLink}
@@ -162,7 +162,7 @@ export function Player({
           style={{ width: "100%", borderRadius: 12, background: "#000" }}
         />
         {direct && (
-          <div className="mt-2 text-[11px] leading-snug text-muted">
+          <div className="mt-2 text-data leading-snug text-muted">
             Если видео не играет (mkv/avi/HEVC) — нажми «Ссылка» или «.m3u» и
             открой в VLC/Kodi/приложении TorrServe на ТВ.
           </div>
@@ -278,7 +278,7 @@ export function ReleasePicker({
               </span>
             </label>
             <div className={cn(media.rowFoot, "flex-wrap gap-1.5")}>
-              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 font-mono text-[10.5px] text-muted">
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 font-mono text-label text-muted">
                 <span className={media.badge}>{r.quality}</span>
                 {r.languages.map((l) => (
                   <span key={l} className={media.lang}>
@@ -310,7 +310,7 @@ export function ReleasePicker({
               </button>
             </div>
             {done[r.guid] && /multi-season/i.test(r.rejections.join(" ")) && (
-              <div className={cn(media.reject, "text-[10.5px]")}>
+              <div className={cn(media.reject, "text-label")}>
                 Пак нескольких сезонов — после скачивания нажми «Импорт» в
                 Загрузках, чтобы разложить серии.
               </div>
@@ -482,11 +482,11 @@ export function ImportDrawer({
             <>
               {groups.map((g) => (
                 <div key={g.key} className="mt-2.5 rounded-xl bg-surface">
-                  <div className="flex items-center gap-2 px-2.5 py-2 max-[760px]:flex-wrap">
-                    <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-[13px] font-medium text-ink">
+                  <div className="flex items-center gap-2 px-2.5 py-2 max-narrow:flex-wrap">
+                    <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-body font-medium text-ink">
                       {g.label}
                     </span>
-                    <span className="font-mono text-[11px] text-muted">
+                    <span className="font-mono text-data text-muted">
                       {g.files.length} файл.
                     </span>
                   </div>
@@ -502,7 +502,7 @@ export function ImportDrawer({
                           checked={sel.has(f.id)}
                           onChange={() => toggle(f.id)}
                         />
-                        <span className="w-[26px] flex-none text-center font-mono text-[11px] text-muted">
+                        <span className="w-[26px] flex-none text-center font-mono text-data text-muted">
                           {fileLabel(f)}
                         </span>
                         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -512,7 +512,7 @@ export function ImportDrawer({
                               {l}
                             </span>
                           ))}
-                          <span className="font-mono text-[10px] text-muted">
+                          <span className="font-mono text-2xs text-muted">
                             {fmtSize(f.size)}
                           </span>
                           {f.rejections.length > 0 && (
@@ -524,7 +524,7 @@ export function ImportDrawer({
                             </span>
                           )}
                           <span
-                            className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-[10px] text-muted"
+                            className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-2xs text-muted"
                             title={f.relativePath}
                           >
                             {f.relativePath}

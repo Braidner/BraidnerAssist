@@ -39,8 +39,8 @@ const emptyState = "py-3 font-mono text-xs text-muted";
 const fileRow =
   "flex flex-row items-center gap-2.5 border-b border-hair py-2.5 last:border-b-0";
 const fileTitle =
-  "min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-ink disabled:cursor-default enabled:cursor-pointer";
-const fileMeta = "whitespace-nowrap font-mono text-[11px] text-muted";
+  "min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-body font-semibold text-ink disabled:cursor-default enabled:cursor-pointer";
+const fileMeta = "whitespace-nowrap font-mono text-data text-muted";
 
 export function FileBrowser() {
   const toast = useToast();
@@ -161,7 +161,7 @@ export function FileBrowser() {
               </span>
               <div className="flex gap-1.5">
                 <button
-                  className={cn(ui.button.iconSm, "text-[13px]")}
+                  className={cn(ui.button.iconSm, "text-body")}
                   title="Переименовать"
                   disabled={busy}
                   onClick={() => onRename(e)}
@@ -169,7 +169,7 @@ export function FileBrowser() {
                   ✏️
                 </button>
                 <button
-                  className={cn(ui.button.iconSm, "text-[13px]")}
+                  className={cn(ui.button.iconSm, "text-body")}
                   title="Переместить"
                   disabled={busy}
                   onClick={() => onMove(e)}
@@ -177,7 +177,7 @@ export function FileBrowser() {
                   ➡️
                 </button>
                 <button
-                  className={cn(ui.button.iconSm, "text-[13px]")}
+                  className={cn(ui.button.iconSm, "text-body")}
                   title="Удалить"
                   disabled={busy}
                   onClick={() => onDelete(e)}

@@ -1,12 +1,8 @@
+import { useState, useEffect } from "react";
 import { Card } from "../../../components/ui/Card.tsx";
 import { Placeholder } from "../../../components/panels/Placeholder.tsx";
+import { getHassAutomations, toggleHassAutomation } from "../../../lib/api.ts";
 import type { HassData, HassAutomation } from "../../../lib/api.ts";
-
-interface Props {
-  data: HassData;
-  onToggle: (entityId: string) => void;
-  flat?: boolean;
-}
 
 function AutomationRow({ auto, onToggle }: { auto: HassAutomation; onToggle: (id: string) => void }) {
   const isOn = auto.state === "on";
@@ -27,7 +23,27 @@ function AutomationRow({ auto, onToggle }: { auto: HassAutomation; onToggle: (id
   );
 }
 
-export function HomeAssistantPanel({ data, onToggle, flat }: Props) {
+export function HomeAssistantPanel({ flat }: { flat?: boolean }) {
+  const [data, setData] = useState<HassData>({ configured: false, automations: [] });
+
+  useEffect(() => {
+    getHassAutomations().then(setData);
+    const t = setInterval(() => getHassAutomations().then(setData), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const onToggle = (entityId: string) => {
+    setData((prev) => ({
+      ...prev,
+      automations: prev.automations.map((a) =>
+        a.entityId === entityId ? { ...a, state: a.state === "on" ? "off" : "on" } : a
+      ),
+    }));
+    toggleHassAutomation(entityId).then((ok) => {
+      if (!ok) getHassAutomations().then(setData);
+    });
+  };
+
   if (!data.configured) {
     return <Placeholder icon="home" title="Home Assistant" phase="Phase 4" />;
   }

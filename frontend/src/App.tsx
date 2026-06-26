@@ -3,9 +3,9 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
-  getHassAutomations, toggleHassAutomation, getDocker, getAdguard, getMedia,
+  getDocker, getAdguard, getMedia,
   setUnauthorizedHandler,
-  type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type AdguardData, type MediaData,
+  type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type DockerData, type AdguardData, type MediaData,
 } from "./lib/api.ts";
 import { TabsProvider } from "./lib/tabsContext.tsx";
 import { TasksProvider } from "./lib/tasksContext.tsx";
@@ -45,7 +45,6 @@ export function App() {
   const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
   const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
   const [media, setMedia] = useState<MediaData>({ configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] });
-  const [hass, setHass] = useState<HassData>({ configured: false, automations: [] });
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
@@ -76,7 +75,6 @@ export function App() {
     getDocker().then(setDocker);
     getAdguard().then(setAdguard);
     getMedia().then(setMedia);
-    getHassAutomations().then(setHass);
     getVersion().then(setVersionData);
 
     const serviceTimer = setInterval(() => getServices().then(setServicesData), 60_000);
@@ -84,7 +82,6 @@ export function App() {
     const proxmoxTimer = setInterval(() => getProxmox().then(setProxmox), 30_000);
     const dockerTimer = setInterval(() => getDocker().then(setDocker), 30_000);
     const adguardTimer = setInterval(() => getAdguard().then(setAdguard), 30_000);
-    const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
     const hermesTimer = setInterval(() => {
       getHermes().then(setHermes);
       getHermesTasks().then(setHermesTasks);
@@ -96,7 +93,6 @@ export function App() {
       clearInterval(proxmoxTimer);
       clearInterval(dockerTimer);
       clearInterval(adguardTimer);
-      clearInterval(hassTimer);
       clearInterval(hermesTimer);
     };
   }, [authed]);
@@ -113,18 +109,6 @@ export function App() {
 
   // ── Handlers ─────────────────────────────────────────────────────
   const onLogout = () => { clearToken(); setAuthed(false); };
-
-  const onToggleAutomation = (entityId: string) => {
-    setHass((prev) => ({
-      ...prev,
-      automations: prev.automations.map((a) =>
-        a.entityId === entityId ? { ...a, state: a.state === "on" ? "off" : "on" } : a
-      ),
-    }));
-    toggleHassAutomation(entityId).then((ok) => {
-      if (!ok) getHassAutomations().then(setHass);
-    });
-  };
 
   // ── Detail page check (hides TopBar) ─────────────────────────────
   const location = useLocation();
@@ -176,8 +160,6 @@ export function App() {
                 weather={weather}
                 proxmox={proxmox}
                 services={servicesData}
-                hass={hass}
-                onToggleAutomation={onToggleAutomation}
               />
             } />
             <Route path="/hermes" element={<HermesPage data={hermes} tasks={hermesTasks} />} />

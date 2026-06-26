@@ -3,21 +3,16 @@ import { TasksPanel } from "./panels/TasksPanel.tsx";
 import { HermesLogPanel } from "./panels/HermesLogPanel.tsx";
 import { HomeAssistantPanel } from "./panels/HAssistantPanel.tsx";
 import type {
-  ServicesData, WeatherData, ProxmoxData, HassData,
+  ServicesData, WeatherData, ProxmoxData,
 } from "../../lib/api.ts";
 
 interface OverviewPageProps {
   weather: WeatherData;
   proxmox: ProxmoxData;
   services: ServicesData;
-  hass: HassData;
-  onToggleAutomation: (entityId: string) => void;
 }
 
-export function OverviewPage({
-  weather, proxmox, services, hass,
-  onToggleAutomation,
-}: OverviewPageProps) {
+export function OverviewPage({ weather, proxmox, services }: OverviewPageProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <MiniWidgets weather={weather} proxmox={proxmox} services={services} />
@@ -27,7 +22,7 @@ export function OverviewPage({
           <TasksPanel flat />
           <HermesLogPanel flat />
         </div>
-        <HomeAssistantPanel flat data={hass} onToggle={onToggleAutomation} />
+        <HomeAssistantPanel flat />
       </div>
     </div>
   );

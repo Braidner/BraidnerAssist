@@ -57,16 +57,16 @@ export function TopBar({
     : "";
 
   return (
-    <div className="sticky top-0 z-20 mb-4 border-b border-hair bg-page/92 py-3 backdrop-blur-xl">
+    <div className="sticky top-0 z-20 border-b border-hair bg-page/92 py-3 backdrop-blur-xl">
       <div className="flex min-h-11 items-center justify-between gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
           {(tabs ?? []).map((tab, i) => (
             <button
               key={tab}
               className={cn(
                 "relative h-9 flex-none rounded-full border border-transparent px-3.5 font-mono text-data uppercase tracking-4 text-muted transition-colors hover:border-hair hover:bg-surface hover:text-ink-soft",
                 activeTab === i &&
-                  "border-hair bg-surface-2 text-ink after:absolute after:inset-x-4 after:-bottom-[13px] after:h-0.5 after:rounded-full after:bg-accent",
+                  "border-hair bg-surface-2 text-ink after:absolute after:inset-x-4 after:-bottom-3.25 after:h-0.5 after:rounded-full after:bg-accent",
               )}
               onClick={() => onTabChange?.(i)}
             >
@@ -165,7 +165,7 @@ export function TopBar({
             </svg>
           </button>
           <div className="hidden h-6 w-px bg-hair sm:block" />
-          <div className="hidden min-w-[70px] flex-col items-end leading-none sm:flex">
+          <div className="hidden min-w-17.5 flex-col items-end leading-none sm:flex">
             <span className="font-mono text-title font-bold tracking-1 text-ink">
               {hh}:{mm}
             </span>

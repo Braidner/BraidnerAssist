@@ -94,7 +94,7 @@
   --breakpoint-narrow: 47.5rem; /* 760px */
 }
 
-@custom-variant dark (&:where(.mc[data-theme="dark"], .mc[data-theme="dark"] *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ============================================================
    Mission Control v4 — Tailwind tokens + flat design
@@ -114,7 +114,7 @@
 }
 
 /* ---------------- DARK (default) ---------------- */
-.mc[data-theme="dark"] {
+[data-theme="dark"] {
   --page: #09090d;
   --surface: #0e1018;
   --surface-2: #171b28;
@@ -133,7 +133,7 @@
 }
 
 /* ---------------- LIGHT ---------------- */
-.mc[data-theme="light"] {
+[data-theme="light"] {
   --page: #e4e8f0;
   --surface: #e9edf4;
   --surface-2: #e3e7ef;

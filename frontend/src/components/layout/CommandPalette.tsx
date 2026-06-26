@@ -2,10 +2,17 @@
 // создание задачи и быстрые действия (рестарт контейнера, пауза DNS-фильтрации).
 // Открывается по Cmd/Ctrl+K, Escape — закрыть. Источник навигации — NAV_ITEMS.
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
-import { icons } from "../icons.tsx";
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   sendHermesCommand,
   dockerAction,
@@ -20,7 +27,6 @@ import {
   type UnifiedSearchResult,
 } from "../../lib/api.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
-import { cn } from "../../lib/cn.ts";
 
 const EMPTY_MEDIA: UnifiedSearchResult = {
   inLibrary: [],
@@ -62,10 +68,8 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [sel, setSel] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [mediaRes, setMediaRes] = useState<UnifiedSearchResult>(EMPTY_MEDIA);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Глобальный хоткей Cmd/Ctrl+K.
   useEffect(() => {
@@ -73,8 +77,6 @@ export function CommandPalette() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((o) => !o);
-      } else if (e.key === "Escape") {
-        setOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -85,9 +87,7 @@ export function CommandPalette() {
   useEffect(() => {
     if (open) {
       setQuery("");
-      setSel(0);
       setFeedback(null);
-      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
 
@@ -198,9 +198,7 @@ export function CommandPalette() {
       label: `${it.type === "Series" ? "📺" : "🎬"} ${it.name}${it.year ? ` (${it.year})` : ""}`,
       hint: "В библиотеке",
       run: () => {
-        navigate(
-          `/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`,
-        );
+        navigate(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`);
         close();
       },
     })),
@@ -243,87 +241,46 @@ export function CommandPalette() {
     ...dockerActions.filter(match),
     ...fuzzyNavActions,
   ];
-  const clampedSel = Math.min(sel, Math.max(actions.length - 1, 0));
-
-  const onInputKey = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSel((s) => Math.min(s + 1, actions.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSel((s) => Math.max(s - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      actions[clampedSel]?.run();
-    }
-  };
-
-  if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/55 px-4 pb-4 pt-[14vh] backdrop-blur-sm"
-      onClick={close}
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Командная палитра"
+      description="Команда, задача или страница"
+      className="sm:max-w-[560px]"
     >
-      <div
-        className="flex w-[min(560px,100%)] flex-col gap-1.5 rounded-card border border-hair bg-raise p-2.5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-2.5 px-3 py-2">
-          <span className="ic" style={{ color: "var(--muted)" }}>
-            <icons.target />
-          </span>
-          <input
-            ref={inputRef}
-            className="flex-1 bg-transparent text-lead text-ink outline-none placeholder:text-muted"
-            placeholder="Команда, задача или страница…"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSel(0);
-            }}
-            onKeyDown={onInputKey}
-          />
-          <span
-            className="mono"
-            style={{ fontSize: 11, color: "var(--muted)" }}
-          >
-            esc
-          </span>
-        </div>
-
-        {feedback ? (
-          <div className="px-4 py-[18px] text-center text-row text-accent">
-            {feedback}
-          </div>
-        ) : (
-          <div className="scroll flex max-h-[50vh] flex-col gap-[3px]">
-            {actions.length === 0 ? (
-              <div className="p-4 font-mono text-xs text-muted">
-                Ничего не найдено.
-              </div>
-            ) : (
-              actions.map((a, i) => (
-                <button
+      <Command shouldFilter={false}>
+        <CommandInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Команда, задача или страница…"
+        />
+        <CommandList>
+          {feedback ? (
+            <div className="px-4 py-[18px] text-center text-row text-accent">
+              {feedback}
+            </div>
+          ) : (
+            <>
+              <CommandEmpty>Ничего не найдено.</CommandEmpty>
+              {actions.map((a) => (
+                <CommandItem
                   key={a.id}
-                  className={cn(
-                    "flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-[10px] border border-transparent bg-transparent px-3 py-2.5 text-left text-row text-ink transition-colors",
-                    i === clampedSel &&
-                      "border-accent/35 bg-accent/10 text-accent",
-                  )}
-                  onMouseEnter={() => setSel(i)}
-                  onClick={() => a.run()}
+                  value={a.id}
+                  onSelect={() => a.run()}
+                  className="justify-between gap-2.5"
                 >
                   <span className="min-w-0 truncate">{a.label}</span>
                   <span className="flex-none font-mono text-label uppercase tracking-2 text-muted">
                     {a.hint}
                   </span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+                </CommandItem>
+              ))}
+            </>
+          )}
+        </CommandList>
+      </Command>
+    </CommandDialog>
   );
 }

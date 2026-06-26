@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { Target } from "lucide-react";
 import { login } from "../../lib/auth.ts";
-import { ui } from "../../lib/ui.ts";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Props {
   onSuccess: () => void;
@@ -31,22 +34,7 @@ export function LoginForm({ onSuccess }: Props) {
         {/* Logo */}
         <div className="mb-7 flex flex-col items-center text-center">
           <div className="mb-3 grid size-14 place-items-center rounded-2xl border border-hair bg-surface text-accent">
-            <svg
-              viewBox="0 0 24 24"
-              width="24"
-              height="24"
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <circle cx="12" cy="12" r="3" />
-              <line x1="12" y1="3" x2="12" y2="6" />
-              <line x1="12" y1="18" x2="12" y2="21" />
-              <line x1="3" y1="12" x2="6" y2="12" />
-              <line x1="18" y1="12" x2="21" y2="12" />
-            </svg>
+            <Target className="size-6" />
           </div>
           <div className="font-mono text-lg font-bold uppercase tracking-5 text-ink">
             Mission Control
@@ -59,11 +47,10 @@ export function LoginForm({ onSuccess }: Props) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-data uppercase tracking-4 text-muted">
+            <Label className="text-data uppercase tracking-4 text-muted">
               Логин
-            </label>
-            <input
-              className={ui.input}
+            </Label>
+            <Input
               type="text"
               autoComplete="username"
               autoFocus
@@ -74,11 +61,10 @@ export function LoginForm({ onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-data uppercase tracking-4 text-muted">
+            <Label className="text-data uppercase tracking-4 text-muted">
               Пароль
-            </label>
-            <input
-              className={ui.input}
+            </Label>
+            <Input
               type="password"
               autoComplete="current-password"
               value={password}
@@ -89,14 +75,13 @@ export function LoginForm({ onSuccess }: Props) {
 
           {error && <div className="text-center text-xs text-bad">{error}</div>}
 
-          <button
+          <Button
             type="submit"
-            className={`${ui.button.base} ${ui.button.accent} mt-1 w-full`}
+            className="mt-1 w-full"
             disabled={loading || !username || !password}
-            style={{ opacity: !username || !password ? 0.5 : 1 }}
           >
             {loading ? "Вход…" : "Войти"}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

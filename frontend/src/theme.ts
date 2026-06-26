@@ -16,6 +16,9 @@ export function useTheme() {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, theme);
+    // Also set on <html> so palette tokens reach Radix/shadcn portals
+    // (Dialog/Sheet/Popover render outside the .mc wrapper, at document body).
+    document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));

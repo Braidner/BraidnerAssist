@@ -180,7 +180,7 @@ export function App() {
         )}
         {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
         <CommandPalette containers={docker.containers} adguard={adguard} onAddTask={onAddTask} />
-        <Drawer task={selectedTask} onClose={() => setSelectedTask(null)} />
+        <Drawer />
 
         <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
 

@@ -23,7 +23,7 @@ interface OverviewPageProps {
 
 export function OverviewPage({
   weather, proxmox, services, tasks, hermes, hermesTasks, hass,
-  onToggleTask, onAddTask, onSelectTask, onDeleteTask, onToggleAutomation,
+  onToggleAutomation,
 }: OverviewPageProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -31,7 +31,7 @@ export function OverviewPage({
       <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 24px 0', flexShrink: 0 }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '14px 24px 24px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <TasksPanel flat tasks={tasks} onToggle={onToggleTask} onAdd={onAddTask} onSelect={onSelectTask} onDelete={onDeleteTask} />
+          <TasksPanel flat />
           <HermesLogPanel flat data={hermes} tasks={hermesTasks} />
         </div>
         <HomeAssistantPanel flat data={hass} onToggle={onToggleAutomation} />

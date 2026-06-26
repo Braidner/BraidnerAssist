@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "radix-ui-design-system": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/radix-ui-design-system/SKILL.md",
+      "computedHash": "4f61669def1dbb117039a07fb22a86cfa397b1518285d5e3d7f06abd09d4dc92"
+    },
     "tailwind-design-system": {
       "source": "wshobson/agents",
       "sourceType": "github",

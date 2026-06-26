@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
+import { LogOut, Moon, Settings, Sun } from "lucide-react";
 import type { Theme } from "../../theme.ts";
 import type { VersionData } from "../../lib/api.ts";
 import { useTabsState } from "../../lib/tabsContext.tsx";
 import { cn } from "../../lib/cn.ts";
-import { ui } from "../../lib/ui.ts";
+import { Button } from "@/components/ui/button";
 
 type Backend = "up" | "down" | "checking";
 
@@ -97,73 +98,26 @@ export function TopBar({
             </span>
           )}
           <div className="h-6 w-px bg-hair" />
-          <button className={ui.iconButton} title="Настройки" onClick={onSettings}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-              <circle
-                cx="7"
-                cy="7"
-                r="2.3"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <circle
-                cx="16"
-                cy="17"
-                r="2.3"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <path
-                d="M9.3 7H21M3 7h1.7M3 17h10.7M18.3 17H21"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-          <button
-            className={cn(ui.iconButton, "text-accent")}
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Настройки"
+            onClick={onSettings}
+          >
+            <Settings />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-accent"
             title="Тема"
             onClick={onToggleTheme}
           >
-            {theme === "dark" ? (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="4.2"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2L5.6 5.6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            ) : (
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M7 18a4 4 0 010-8 5 5 0 019.6-1.3A3.8 3.8 0 0117.5 18H7z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </button>
-          <button className={ui.iconButton} title="Выход" onClick={onLogout}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M14 4.5H6.5A1.5 1.5 0 005 6v12a1.5 1.5 0 001.5 1.5H14M17 8l4 4-4 4M21 12H9.5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+            {theme === "dark" ? <Sun /> : <Moon />}
+          </Button>
+          <Button variant="ghost" size="icon" title="Выход" onClick={onLogout}>
+            <LogOut />
+          </Button>
           <div className="hidden h-6 w-px bg-hair sm:block" />
           <div className="hidden min-w-17.5 flex-col items-end leading-none sm:flex">
             <span className="font-mono text-title font-bold tracking-1 text-ink">

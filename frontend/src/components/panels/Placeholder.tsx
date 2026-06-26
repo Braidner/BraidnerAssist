@@ -14,7 +14,7 @@ export function Placeholder({ icon, title, phase }: PlaceholderProps) {
     <Card icon={icon} title={title} className="justify-center">
       <div className="flex flex-col items-start gap-1 py-1.5">
         <span className="mb-2 grid size-[42px] place-items-center rounded-[13px] border border-hair bg-surface text-muted">
-          <Ic />
+          <Ic className="size-5" />
         </span>
         <span className="text-body text-ink-soft">Не подключено</span>
         <span className="font-mono text-data tracking-1 text-muted">

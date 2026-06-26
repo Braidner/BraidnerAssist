@@ -85,13 +85,12 @@ export function App() {
     <TabsProvider>
       <TasksProvider>
         <div className={ui.shell} data-theme={theme}>
-          {showSettings && (
-            <SettingsPanel
-              onClose={() => setShowSettings(false)}
-              onSave={() => setShowSettings(false)}
-            />
-          )}
-          {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
+          <SettingsPanel
+            open={showSettings}
+            onOpenChange={setShowSettings}
+            onSave={() => setShowSettings(false)}
+          />
+          <LogsPanel open={showLogs} onOpenChange={setShowLogs} />
           <CommandPalette />
           <Drawer />
 

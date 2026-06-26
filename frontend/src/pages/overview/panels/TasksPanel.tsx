@@ -110,7 +110,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
                   onToggle(t);
                 }}
               >
-                <icons.check />
+                <icons.check className="size-3.5" />
               </span>
               <div className="min-w-0 flex-1">
                 <div className={cn("truncate text-row font-medium text-ink", t.done && "line-through text-muted")}>{t.label}</div>
@@ -242,7 +242,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
                 onToggle(t);
               }}
             >
-              <icons.check />
+              <icons.check className="size-3.5" />
             </span>
             <div className="min-w-0 flex-1">
               <div

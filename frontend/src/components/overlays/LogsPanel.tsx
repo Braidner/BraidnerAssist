@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
-import { icons } from "../icons.tsx";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { getLogs, type LogEntry, type LogLevel } from "../../lib/api.ts";
-import { cn } from "../../lib/cn.ts";
-import { ui } from "../../lib/ui.ts";
 
 interface LogsPanelProps {
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 function levelColor(l: LogLevel): string {
@@ -29,7 +34,7 @@ function fmtTime(iso: string): string {
   });
 }
 
-export function LogsPanel({ onClose }: LogsPanelProps) {
+export function LogsPanel({ open, onOpenChange }: LogsPanelProps) {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<LogLevel | "all">("all");
@@ -42,17 +47,11 @@ export function LogsPanel({ onClose }: LogsPanelProps) {
   };
 
   useEffect(() => {
+    if (!open) return;
     load();
     const t = setInterval(load, 5000);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
+    return () => clearInterval(t);
+  }, [open]);
 
   const visible =
     filter === "all" ? entries : entries.filter((e) => e.level === filter);
@@ -66,43 +65,33 @@ export function LogsPanel({ onClose }: LogsPanelProps) {
   };
 
   return (
-    <>
-      <div className={ui.overlay} onClick={onClose} aria-hidden />
-      <aside
-        className={cn(ui.drawer, "min-w-[min(92vw,680px)] max-w-[780px]")}
-        aria-label="Логи бэкенда"
-      >
-        <div className={ui.drawerInner}>
-          <div className={ui.drawerHead}>
-            <div className={ui.drawerKind}>
-              <icons.list style={{ width: 14, height: 14 }} />
-              <span>Логи бэкенда</span>
-              <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-data text-muted">
-                обновляется каждые 5с
-              </span>
-            </div>
-            <button className={ui.iconButton} onClick={onClose} title="Закрыть">
-              <icons.close style={{ width: 16, height: 16 }} />
-            </button>
-          </div>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="flex w-[min(92vw,680px)] flex-col gap-0 sm:max-w-[780px]">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            Логи бэкенда
+            <span className="rounded-md bg-surface-2 px-2 py-0.5 font-mono text-data font-normal text-muted">
+              обновляется каждые 5с
+            </span>
+          </SheetTitle>
+        </SheetHeader>
 
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
           {/* filter chips */}
           <div className="mb-2.5 flex flex-wrap gap-1.5">
             {(["all", "error", "warn", "info"] as const).map((lvl) => (
-              <button
+              <Button
                 key={lvl}
-                className={cn(
-                  ui.pill,
-                  filter === lvl && "border-accent/50 bg-accent/15 text-accent",
-                )}
+                variant={filter === lvl ? "secondary" : "ghost"}
+                size="sm"
                 onClick={() => setFilter(lvl)}
               >
                 {lvl === "all" ? "Все" : levelLabel(lvl as LogLevel)}
-              </button>
+              </Button>
             ))}
-            <button className={ui.pill} onClick={load} title="Обновить">
+            <Button variant="ghost" size="sm" onClick={load} title="Обновить">
               ↺
-            </button>
+            </Button>
           </div>
 
           <div className="scroll flex flex-col text-xs">
@@ -147,7 +136,7 @@ export function LogsPanel({ onClose }: LogsPanelProps) {
             ))}
           </div>
         </div>
-      </aside>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 }

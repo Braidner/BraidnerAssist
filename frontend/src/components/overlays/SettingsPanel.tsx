@@ -1,26 +1,33 @@
 import { useEffect, useState } from "react";
-import { cn } from "../../lib/cn.ts";
-import { icons } from "../icons.tsx";
+import { Plus, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   getServicesConfig,
   putServicesConfig,
   type ServiceConfig,
 } from "../../lib/api.ts";
-import { ui } from "../../lib/ui.ts";
 
 interface SettingsPanelProps {
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSave: () => void;
 }
 
-export function SettingsPanel({ onClose, onSave }: SettingsPanelProps) {
+export function SettingsPanel({ open, onOpenChange, onSave }: SettingsPanelProps) {
   const [rows, setRows] = useState<ServiceConfig[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getServicesConfig().then(setRows);
-  }, []);
+    if (open) getServicesConfig().then(setRows);
+  }, [open]);
 
   const update = (i: number, field: keyof ServiceConfig, value: string) =>
     setRows((rs) =>
@@ -35,9 +42,7 @@ export function SettingsPanel({ onClose, onSave }: SettingsPanelProps) {
     setError(null);
     setSaving(true);
     try {
-      await putServicesConfig(
-        rows.filter((r) => r.name.trim() && r.url.trim()),
-      );
+      await putServicesConfig(rows.filter((r) => r.name.trim() && r.url.trim()));
       onSave();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
@@ -47,66 +52,59 @@ export function SettingsPanel({ onClose, onSave }: SettingsPanelProps) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[200] grid place-items-center bg-black/55 p-4 backdrop-blur-sm"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="flex w-[min(540px,100%)] flex-col rounded-card border border-hair bg-raise px-7 py-6">
-        <div className="mb-[18px] flex items-center justify-between">
-          <span className="flex items-center text-lead font-semibold text-ink">
-            <icons.gear
-              style={{ width: 16, height: 16, marginRight: 8, opacity: 0.7 }}
-            />
-            Настройки
-          </span>
-          <button className={ui.pill} onClick={onClose} title="Закрыть">
-            <icons.close style={{ width: 14, height: 14 }} />
-          </button>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[540px]">
+        <DialogHeader>
+          <DialogTitle>Настройки</DialogTitle>
+        </DialogHeader>
+
+        <div>
+          <div className="mb-2.5 font-mono text-label uppercase tracking-3 text-muted">
+            Homelab Services
+          </div>
+
+          <div className="mb-2.5 flex flex-col gap-2">
+            {rows.map((row, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <Input
+                  className="h-9 flex-1"
+                  placeholder="Имя"
+                  value={row.name}
+                  onChange={(e) => update(i, "name", e.target.value)}
+                />
+                <Input
+                  className="h-9 flex-[2] font-mono text-xs"
+                  placeholder="http://host:port"
+                  value={row.url}
+                  onChange={(e) => update(i, "url", e.target.value)}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="flex-none text-muted hover:text-bad"
+                  onClick={() => removeRow(i)}
+                  title="Удалить"
+                >
+                  <X />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <Button variant="outline" size="sm" className="self-start" onClick={addRow}>
+            <Plus />
+            Добавить
+          </Button>
+
+          {error && <div className="mt-2.5 text-cell text-bad">{error}</div>}
         </div>
 
-        <div className="mb-2.5 font-mono text-label uppercase tracking-3 text-muted">
-          Homelab Services
-        </div>
-
-        <div className="mb-2.5 flex flex-col gap-2">
-          {rows.map((row, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                className={cn(ui.input, "h-9 flex-1 py-0")}
-                placeholder="Имя"
-                value={row.name}
-                onChange={(e) => update(i, "name", e.target.value)}
-              />
-              <input
-                className={cn(ui.input, "h-9 flex-[2] py-0 font-mono text-xs")}
-                placeholder="http://host:port"
-                value={row.url}
-                onChange={(e) => update(i, "url", e.target.value)}
-              />
-              <button
-                className="grid size-[30px] flex-none place-items-center rounded-lg border border-transparent bg-transparent text-muted transition-colors hover:border-bad/40 hover:text-bad"
-                onClick={() => removeRow(i)}
-                title="Удалить"
-              >
-                <icons.close style={{ width: 13, height: 13 }} />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <button className={cn(ui.pill, "mb-3.5 self-start")} onClick={addRow}>
-          <icons.plus style={{ width: 14, height: 14, marginRight: 4 }} />
-          Добавить
-        </button>
-
-        {error && <div className="mb-2.5 text-cell text-bad">{error}</div>}
-
-        <div className="mt-1 flex justify-end">
-          <button className={cn(ui.button.base, "px-5")} onClick={save} disabled={saving}>
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={saving}>
             {saving ? "Сохраняю…" : "Сохранить"}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

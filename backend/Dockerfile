@@ -5,8 +5,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -19,19 +19,20 @@ RUN npm run build
 FROM node:24-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-ARG APP_VERSION=dev
-ENV APP_VERSION=$APP_VERSION
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY --from=build /app/dist ./dist
+
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 
 # Применяем миграции к смонтированной /data БД, затем стартуем.
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

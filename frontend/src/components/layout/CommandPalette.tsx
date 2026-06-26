@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
 import { icons } from "../icons.tsx";
 import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, type DockerContainer, type AdguardData, type UnifiedSearchResult } from "../../lib/api.ts";
+import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
 const EMPTY_MEDIA: UnifiedSearchResult = { inLibrary: [], discover: [], releases: [] };
 
@@ -20,10 +21,10 @@ interface Action {
 interface Props {
   containers: DockerContainer[];
   adguard: AdguardData;
-  onAddTask: (title: string) => void;
 }
 
-export function CommandPalette({ containers, adguard, onAddTask }: Props) {
+export function CommandPalette({ containers, adguard }: Props) {
+  const { onAddTask } = useTasksCtx();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

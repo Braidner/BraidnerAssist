@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
-  getTasks, toggleTask, createTask, deleteTask, getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
+  getHermes, getHermesTasks, getServices, getWeather, getProxmox, getVersion,
   getHassAutomations, toggleHassAutomation, getDocker, getAdguard, getMedia,
   setUnauthorizedHandler,
-  type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type AdguardData, type MediaData,
+  type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type AdguardData, type MediaData,
 } from "./lib/api.ts";
 import { TabsProvider } from "./lib/tabsContext.tsx";
+import { TasksProvider } from "./lib/tasksContext.tsx";
 import { SettingsPanel } from "./components/overlays/SettingsPanel.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
@@ -36,8 +37,6 @@ export function App() {
   // ── UI state (always declared — Rules of Hooks) ───────────────────
   const [clock, setClock] = useState(() => new Date());
   const [backend, setBackend] = useState<Backend>("checking");
-  const [tasks, setTasks] = useState<PanelTask[]>([]);
-  const [selectedTask, setSelectedTask] = useState<PanelTask | null>(null);
   const [hermes, setHermes] = useState<HermesData>({ status: "idle", message: null, log: [] });
   const [hermesTasks, setHermesTasks] = useState<HermesTask[]>([]);
   const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
@@ -69,7 +68,6 @@ export function App() {
       .then(() => setBackend("up"))
       .catch(() => setBackend("down"));
 
-    getTasks().then(setTasks);
     getHermes().then(setHermes);
     getHermesTasks().then(setHermesTasks);
     getServices().then(setServicesData);
@@ -86,7 +84,6 @@ export function App() {
     const proxmoxTimer = setInterval(() => getProxmox().then(setProxmox), 30_000);
     const dockerTimer = setInterval(() => getDocker().then(setDocker), 30_000);
     const adguardTimer = setInterval(() => getAdguard().then(setAdguard), 30_000);
-    const tasksTimer = setInterval(() => getTasks().then(setTasks), 300_000);
     const hassTimer = setInterval(() => getHassAutomations().then(setHass), 30_000);
     const hermesTimer = setInterval(() => {
       getHermes().then(setHermes);
@@ -99,7 +96,6 @@ export function App() {
       clearInterval(proxmoxTimer);
       clearInterval(dockerTimer);
       clearInterval(adguardTimer);
-      clearInterval(tasksTimer);
       clearInterval(hassTimer);
       clearInterval(hermesTimer);
     };
@@ -116,33 +112,7 @@ export function App() {
   }, [authed, dlActive]);
 
   // ── Handlers ─────────────────────────────────────────────────────
-  const onToggleTask = (task: PanelTask) => {
-    if (task.tag === "gitlab") return;
-    const done = !task.done;
-    setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done } : x)));
-    toggleTask(task.id, done).then((ok) => {
-      if (!ok) setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: !done } : x)));
-    });
-  };
-
   const onLogout = () => { clearToken(); setAuthed(false); };
-
-  const onAddTask = (title: string) => {
-    createTask(title).then((task) => {
-      if (task) setTasks((ts) => [task, ...ts]);
-    });
-  };
-
-  const onSelectTask = (task: PanelTask) => setSelectedTask(task);
-
-  const onDeleteTask = (task: PanelTask) => {
-    const prev = tasks;
-    setTasks((ts) => ts.filter((x) => x.id !== task.id));
-    if (selectedTask?.id === task.id) setSelectedTask(null);
-    deleteTask(task.id).then((ok) => {
-      if (!ok) setTasks(prev);
-    });
-  };
 
   const onToggleAutomation = (entityId: string) => {
     setHass((prev) => ({
@@ -171,6 +141,7 @@ export function App() {
 
   return (
     <TabsProvider>
+      <TasksProvider>
       <div className="mc" data-theme={theme}>
         {showSettings && (
           <SettingsPanel
@@ -179,7 +150,7 @@ export function App() {
           />
         )}
         {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
-        <CommandPalette containers={docker.containers} adguard={adguard} onAddTask={onAddTask} />
+        <CommandPalette containers={docker.containers} adguard={adguard} />
         <Drawer />
 
         <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
@@ -205,14 +176,9 @@ export function App() {
                 weather={weather}
                 proxmox={proxmox}
                 services={servicesData}
-                tasks={tasks}
                 hermes={hermes}
                 hermesTasks={hermesTasks}
                 hass={hass}
-                onToggleTask={onToggleTask}
-                onAddTask={onAddTask}
-                onSelectTask={onSelectTask}
-                onDeleteTask={onDeleteTask}
                 onToggleAutomation={onToggleAutomation}
               />
             } />
@@ -223,6 +189,7 @@ export function App() {
           </Routes>
         </div>
       </div>
+      </TasksProvider>
     </TabsProvider>
   );
 }

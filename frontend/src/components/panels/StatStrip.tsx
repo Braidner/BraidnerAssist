@@ -1,5 +1,6 @@
 import { useRef, type ReactNode } from "react";
-import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource, PanelTask } from "../../lib/api.ts";
+import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
+import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
 const WMO_SHORT: Record<number, string> = {
   0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
@@ -208,10 +209,10 @@ interface MiniWidgetsProps {
   weather: WeatherData | null;
   proxmox: ProxmoxData | null;
   services: ServicesData | null;
-  tasks: PanelTask[];
 }
 
-export function MiniWidgets({ weather, proxmox, services, tasks }: MiniWidgetsProps) {
+export function MiniWidgets({ weather, proxmox, services }: MiniWidgetsProps) {
+  const { tasks } = useTasksCtx();
   const activeCount = tasks.filter(t => !t.done).length;
   const serviceList = services?.services ?? [];
   const onlineCount = serviceList.filter(s => s.status === 'ok').length;

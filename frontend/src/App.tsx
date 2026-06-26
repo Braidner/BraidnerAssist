@@ -176,8 +176,6 @@ export function App() {
                 weather={weather}
                 proxmox={proxmox}
                 services={servicesData}
-                hermes={hermes}
-                hermesTasks={hermesTasks}
                 hass={hass}
                 onToggleAutomation={onToggleAutomation}
               />

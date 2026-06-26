@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card } from "../../../components/ui/Card.tsx";
 import { fmtUpdated } from "../../../lib/format.ts";
-import { getTaskLogs, type HermesData, type HermesTask, type PanelLogLine } from "../../../lib/api.ts";
+import { getHermes, getHermesTasks, getTaskLogs, type HermesData, type HermesTask, type PanelLogLine } from "../../../lib/api.ts";
 
 const STATUS_LABEL: Record<string, string> = {
   in_progress: "в работе",
@@ -16,10 +16,22 @@ function ledClass(status: string): string {
 }
 
 // Hermes · агент — task-центричный виджет: список взятых задач + проваливание в их логи.
-export function HermesLogPanel({ data, tasks, flat }: { data: HermesData; tasks: HermesTask[]; flat?: boolean }) {
+export function HermesLogPanel({ flat }: { flat?: boolean }) {
+  const [data, setData] = useState<HermesData>({ status: "idle", message: null, log: [] });
+  const [tasks, setTasks] = useState<HermesTask[]>([]);
   const [selected, setSelected] = useState<HermesTask | null>(null);
   const [logs, setLogs] = useState<PanelLogLine[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    getHermes().then(setData);
+    getHermesTasks().then(setTasks);
+    const t = setInterval(() => {
+      getHermes().then(setData);
+      getHermesTasks().then(setTasks);
+    }, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (selected && !tasks.some((t) => t.id === selected.id)) setSelected(null);

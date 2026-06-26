@@ -1,16 +1,41 @@
 import { useRef, useEffect, useState, type ReactNode } from "react";
-import { getWeather, getProxmox, getServices, type WeatherData, type ServicesData, type ProxmoxData, type ProxmoxResource } from "../../lib/api.ts";
+import {
+  getWeather,
+  getProxmox,
+  getServices,
+  type WeatherData,
+  type ServicesData,
+  type ProxmoxData,
+  type ProxmoxResource,
+} from "../../lib/api.ts";
+import { cn } from "../../lib/cn.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
 const WMO_SHORT: Record<number, string> = {
-  0: "ЯСНО", 1: "ЯСНО", 2: "ОБЛАЧНО", 3: "ПАСМУРНО",
-  45: "ТУМАН", 48: "ТУМАН",
-  51: "МОРОСЬ", 53: "МОРОСЬ", 55: "МОРОСЬ",
-  61: "ДОЖДЬ", 63: "ДОЖДЬ", 65: "ДОЖДЬ",
-  71: "СНЕГ",  73: "СНЕГ",  75: "СНЕГ", 77: "КРУПА",
-  80: "ЛИВЕНЬ", 81: "ЛИВНИ", 82: "ЛИВЕНЬ",
-  85: "СНЕГОПАД", 86: "СНЕГОПАД",
-  95: "ГРОЗА", 96: "ГРОЗА", 99: "ГРОЗА",
+  0: "ЯСНО",
+  1: "ЯСНО",
+  2: "ОБЛАЧНО",
+  3: "ПАСМУРНО",
+  45: "ТУМАН",
+  48: "ТУМАН",
+  51: "МОРОСЬ",
+  53: "МОРОСЬ",
+  55: "МОРОСЬ",
+  61: "ДОЖДЬ",
+  63: "ДОЖДЬ",
+  65: "ДОЖДЬ",
+  71: "СНЕГ",
+  73: "СНЕГ",
+  75: "СНЕГ",
+  77: "КРУПА",
+  80: "ЛИВЕНЬ",
+  81: "ЛИВНИ",
+  82: "ЛИВЕНЬ",
+  85: "СНЕГОПАД",
+  86: "СНЕГОПАД",
+  95: "ГРОЗА",
+  96: "ГРОЗА",
+  99: "ГРОЗА",
 };
 function wmoShort(code: number): string {
   return WMO_SHORT[code] ?? WMO_SHORT[Math.floor(code / 10) * 10] ?? "ПЕРЕМ.";
@@ -21,7 +46,8 @@ function dayLabel(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
   const today = new Date();
   if (d.toDateString() === today.toDateString()) return "СЕГОДНЯ";
-  const tom = new Date(today); tom.setDate(tom.getDate() + 1);
+  const tom = new Date(today);
+  tom.setDate(tom.getDate() + 1);
   if (d.toDateString() === tom.toDateString()) return "ЗАВТРА";
   return DOW[d.getDay()];
 }
@@ -36,19 +62,48 @@ function gb(bytes: number): number {
   return Math.round(bytes / 1024 ** 3);
 }
 
+const statCard =
+  "flex h-24 w-[300px] flex-none snap-start flex-col justify-center rounded-[18px] border border-hair bg-raise px-[18px] py-3.5";
+const proxmoxCard = cn(statCard, "w-[360px]");
+const serviceCard =
+  "flex h-24 w-[206px] flex-none snap-start flex-col justify-center gap-[7px] overflow-hidden rounded-[18px] border border-hair bg-raise px-4 py-3.5";
+const track = "h-[7px] overflow-hidden rounded-full bg-groove";
+const trackFill =
+  "block h-full rounded-full bg-[linear-gradient(90deg,color-mix(in_srgb,var(--accent)_70%,var(--ink)),var(--accent))]";
+const monoUpper = "[font-family:var(--font)] uppercase";
+const statusDot = "size-2 flex-none rounded-full";
+const miniGrid =
+  "grid grid-cols-[1fr_1.2fr_1fr_auto] gap-3 px-6 pb-1 pt-4 max-[860px]:grid-cols-2";
+const miniCard =
+  "shrink-0 rounded-[10px] border border-hair bg-surface-2 px-4 py-3.5";
+const miniLabel =
+  "mb-2 [font-family:var(--mono)] text-[9px] uppercase tracking-[0.1em] text-muted";
+const miniBar = "h-[3px] flex-1 overflow-hidden rounded-[3px] bg-groove";
+const miniBarFill =
+  "block h-full rounded-[3px] transition-[width] duration-700 ease-[cubic-bezier(0.22,0.61,0.36,1)]";
+
 function Bar({ pct }: { pct: number }) {
-  return <div className="track"><i style={{ width: Math.min(100, Math.max(0, pct)) + "%" }} /></div>;
+  return (
+    <div className={track}>
+      <i
+        className={trackFill}
+        style={{ width: Math.min(100, Math.max(0, pct)) + "%" }}
+      />
+    </div>
+  );
 }
 
 /* drag-to-scroll carousel with edge-fade mask (right side) */
 function Carousel({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef({ down: false, x: 0, sl: 0 });
+  const [grabbing, setGrabbing] = useState(false);
 
   const onDown = (e: React.PointerEvent) => {
-    const el = ref.current; if (!el) return;
+    const el = ref.current;
+    if (!el) return;
     drag.current = { down: true, x: e.clientX, sl: el.scrollLeft };
-    el.classList.add("grabbing");
+    setGrabbing(true);
     el.setPointerCapture?.(e.pointerId);
   };
   const onMove = (e: React.PointerEvent) => {
@@ -56,17 +111,26 @@ function Carousel({ children }: { children: ReactNode }) {
     ref.current.scrollLeft = drag.current.sl - (e.clientX - drag.current.x);
   };
   const onUp = (e: React.PointerEvent) => {
-    const el = ref.current; if (!el) return;
+    const el = ref.current;
+    if (!el) return;
     drag.current.down = false;
-    el.classList.remove("grabbing");
-    try { el.releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
+    setGrabbing(false);
+    try {
+      el.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* noop */
+    }
   };
 
   return (
-    <div className="carousel anim">
-      <div className="car-vp">
+    <div className="flex flex-col animate-[fade-up_0.34s_var(--ease)_both]">
+      <div className="relative -mx-4 [-webkit-mask-image:linear-gradient(90deg,#000_0,#000_calc(100%-16px),transparent_100%)] [mask-image:linear-gradient(90deg,#000_0,#000_calc(100%-16px),transparent_100%)] max-[860px]:[-webkit-mask-image:linear-gradient(90deg,transparent_0,#000_16px,#000_calc(100%-16px),transparent_100%)] max-[860px]:[mask-image:linear-gradient(90deg,transparent_0,#000_16px,#000_calc(100%-16px),transparent_100%)]">
         <div
-          className="car-track"
+          className={cn(
+            "flex cursor-grab touch-pan-y snap-x snap-proximity gap-3.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 py-1.5 scroll-smooth [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden [&>*]:snap-start",
+            grabbing &&
+              "cursor-grabbing scroll-auto select-none [&_*]:pointer-events-none",
+          )}
           ref={ref}
           onPointerDown={onDown}
           onPointerMove={onMove}
@@ -84,11 +148,17 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
   const { current, forecast } = weather;
   if (!current) {
     return (
-      <div className="scard neu lift">
-        <div className="wx">
-          <div className="wx-now">
-            <span className="wx-temp">—</span>
-            <span className="wx-meta mono">ПОГОДА<br />НЕ НАСТРОЕНО</span>
+      <div className={statCard}>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col">
+            <span className="[font-family:var(--font)] text-[32px] font-bold leading-[0.9] text-ink">
+              —
+            </span>
+            <span className="mt-1.5 [font-family:var(--font)] text-[9.5px] leading-[1.45] tracking-[0.03em] text-muted">
+              ПОГОДА
+              <br />
+              НЕ НАСТРОЕНО
+            </span>
           </div>
         </div>
       </div>
@@ -96,18 +166,34 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
   }
   const days = (forecast ?? []).slice(0, 3);
   return (
-    <div className="scard neu lift">
-      <div className="wx">
-        <div className="wx-now">
-          <span className="wx-temp">{current.temp}<sup>°C</sup></span>
-          <span className="wx-meta mono">{wmoShort(current.code)}<br />ВЕТЕР {current.wind} КМ/Ч</span>
+    <div className={statCard}>
+      <div className="flex items-center gap-4">
+        <div className="flex flex-col">
+          <span className="whitespace-nowrap [font-family:var(--font)] text-[32px] font-bold leading-[0.9] text-ink">
+            {current.temp}
+            <sup className="align-super text-[13px] text-ink-soft">°C</sup>
+          </span>
+          <span className="mt-1.5 [font-family:var(--font)] text-[9.5px] leading-[1.45] tracking-[0.03em] text-muted">
+            {wmoShort(current.code)}
+            <br />
+            ВЕТЕР {current.wind} КМ/Ч
+          </span>
         </div>
-        <div className="wx-days">
+        <div className="flex gap-3.5">
           {days.map((d) => (
-            <div className="wx-day" key={d.date}>
-              <div className="dd">{dayLabel(d.date)}</div>
-              <div className="dt">{d.max}°<small>/{d.min}°</small></div>
-              <div className="dsky">{wmoShort(d.code)}</div>
+            <div className="text-left" key={d.date}>
+              <div className="[font-family:var(--font)] text-[9px] tracking-[0.08em] text-muted">
+                {dayLabel(d.date)}
+              </div>
+              <div className="mt-0.5 whitespace-nowrap [font-family:var(--font)] text-base font-bold text-ink">
+                {d.max}°
+                <small className="text-[10px] font-medium text-muted">
+                  /{d.min}°
+                </small>
+              </div>
+              <div className="mt-px [font-family:var(--font)] text-[8px] tracking-[0.05em] text-faint">
+                {wmoShort(d.code)}
+              </div>
             </div>
           ))}
         </div>
@@ -116,52 +202,131 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
   );
 }
 
-function ProxmoxStat({ res, node }: { res: ProxmoxResource; node: string | null }) {
+function ProxmoxStat({
+  res,
+  node,
+}: {
+  res: ProxmoxResource;
+  node: string | null;
+}) {
   return (
-    <div className="scard pcard neu lift">
-      <div className="pve">
-        <div className="pve-row">
-          <span className="pve-k">CPU</span><Bar pct={res.cpuPct} /><span className="pve-v">{res.cpuPct}%</span>
+    <div className={proxmoxCard}>
+      <div className="flex flex-col gap-2">
+        <div className="grid grid-cols-[38px_1fr_auto] items-center gap-[11px]">
+          <span
+            className={cn(
+              monoUpper,
+              "text-[10px] tracking-[0.05em] text-muted",
+            )}
+          >
+            CPU
+          </span>
+          <Bar pct={res.cpuPct} />
+          <span className="[font-family:var(--font)] whitespace-nowrap text-xs font-bold text-ink">
+            {res.cpuPct}%
+          </span>
         </div>
-        <div className="pve-row">
-          <span className="pve-k">RAM</span><Bar pct={res.memPct} /><span className="pve-v">{gb(res.memUsed)}/{gb(res.memTotal)} ГБ</span>
+        <div className="grid grid-cols-[38px_1fr_auto] items-center gap-[11px]">
+          <span
+            className={cn(
+              monoUpper,
+              "text-[10px] tracking-[0.05em] text-muted",
+            )}
+          >
+            RAM
+          </span>
+          <Bar pct={res.memPct} />
+          <span className="[font-family:var(--font)] whitespace-nowrap text-xs font-bold text-ink">
+            {gb(res.memUsed)}/{gb(res.memTotal)} ГБ
+          </span>
         </div>
-        <div className="pve-row">
-          <span className="pve-k">DISK</span><Bar pct={res.diskPct} /><span className="pve-v">{gb(res.diskUsed)}/{gb(res.diskTotal)} ГБ</span>
+        <div className="grid grid-cols-[38px_1fr_auto] items-center gap-[11px]">
+          <span
+            className={cn(
+              monoUpper,
+              "text-[10px] tracking-[0.05em] text-muted",
+            )}
+          >
+            DISK
+          </span>
+          <Bar pct={res.diskPct} />
+          <span className="[font-family:var(--font)] whitespace-nowrap text-xs font-bold text-ink">
+            {gb(res.diskUsed)}/{gb(res.diskTotal)} ГБ
+          </span>
         </div>
       </div>
       {node && (
-        <div className="svc-kind" style={{ marginTop: 6 }}>PROXMOX · {node.toUpperCase()}</div>
+        <div className="mt-1.5 [font-family:var(--font)] text-[9px] tracking-[0.1em] text-faint">
+          PROXMOX · {node.toUpperCase()}
+        </div>
       )}
     </div>
   );
 }
 
-function VMStat({ name, type, running, cpuPct, memPct }: {
-  name: string; type: "qemu" | "lxc"; running: boolean; cpuPct: number; memPct: number;
+function VMStat({
+  name,
+  type,
+  running,
+  cpuPct,
+  memPct,
+}: {
+  name: string;
+  type: "qemu" | "lxc";
+  running: boolean;
+  cpuPct: number;
+  memPct: number;
 }) {
   const color = running ? "var(--ok)" : "var(--muted)";
   return (
-    <div className="svc-card neu lift">
-      <div className="svc-top">
-        <span className="dot-led" style={{ background: color, boxShadow: running ? `0 0 8px color-mix(in srgb, ${color} 70%, transparent)` : "none" }} />
-        <span className="svc-nm">{name}</span>
+    <div className={serviceCard}>
+      <div className="flex min-w-0 items-center gap-[9px]">
+        <span
+          className={statusDot}
+          style={{
+            background: color,
+          }}
+        />
+        <span className="truncate whitespace-nowrap [font-family:var(--font)] text-sm font-bold text-ink">
+          {name}
+        </span>
       </div>
-      <div className="svc-line">{running ? `CPU ${cpuPct}% · RAM ${memPct}%` : "ОСТАНОВЛЕНА"}</div>
-      <div className="svc-kind">{type.toUpperCase()}</div>
+      <div className="whitespace-nowrap [font-family:var(--font)] text-[11px] tracking-[0.02em] text-ink-soft">
+        {running ? `CPU ${cpuPct}% · RAM ${memPct}%` : "ОСТАНОВЛЕНА"}
+      </div>
+      <div className="whitespace-nowrap [font-family:var(--font)] text-[9px] tracking-[0.1em] text-faint">
+        {type.toUpperCase()}
+      </div>
     </div>
   );
 }
 
-function ServiceStat({ name, status, tag }: { name: string; status: "ok" | "warn" | "bad"; tag: string }) {
+function ServiceStat({
+  name,
+  status,
+  tag,
+}: {
+  name: string;
+  status: "ok" | "warn" | "bad";
+  tag: string;
+}) {
   const color = STAT_VAR[status];
   return (
-    <div className="svc-card neu lift">
-      <div className="svc-top">
-        <span className="dot-led" style={{ background: color, boxShadow: `0 0 8px color-mix(in srgb, ${color} 70%, transparent)` }} />
-        <span className="svc-nm">{name}</span>
+    <div className={serviceCard}>
+      <div className="flex min-w-0 items-center gap-[9px]">
+        <span
+          className={statusDot}
+          style={{
+            background: color,
+          }}
+        />
+        <span className="truncate whitespace-nowrap [font-family:var(--font)] text-sm font-bold text-ink">
+          {name}
+        </span>
       </div>
-      <div className="svc-line">{tag}</div>
+      <div className="whitespace-nowrap [font-family:var(--font)] text-[11px] tracking-[0.02em] text-ink-soft">
+        {tag}
+      </div>
     </div>
   );
 }
@@ -195,7 +360,14 @@ export function StatStrip({ weather, proxmox, services }: StatStripProps) {
   });
 
   services.services.forEach((s) => {
-    tiles.push(<ServiceStat key={`svc-${s.name}`} name={s.name} status={s.status} tag={s.tag} />);
+    tiles.push(
+      <ServiceStat
+        key={`svc-${s.name}`}
+        name={s.name}
+        status={s.status}
+        tag={s.tag}
+      />,
+    );
   });
 
   return <Carousel>{tiles}</Carousel>;
@@ -207,138 +379,197 @@ export function StatStrip({ weather, proxmox, services }: StatStripProps) {
 
 export function MiniWidgets() {
   const { tasks } = useTasksCtx();
-  const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
-  const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
-  const [services, setServices] = useState<ServicesData>({ configured: false, services: [] });
+  const [weather, setWeather] = useState<WeatherData>({
+    configured: false,
+    current: null,
+    forecast: [],
+  });
+  const [proxmox, setProxmox] = useState<ProxmoxData>({
+    configured: false,
+    node: null,
+    resource: null,
+    vms: [],
+  });
+  const [services, setServices] = useState<ServicesData>({
+    configured: false,
+    services: [],
+  });
 
   useEffect(() => {
     getWeather().then(setWeather);
     getProxmox().then(setProxmox);
     getServices().then(setServices);
-    const weatherT = setInterval(() => getWeather().then(setWeather), 1_800_000);
+    const weatherT = setInterval(
+      () => getWeather().then(setWeather),
+      1_800_000,
+    );
     const proxmoxT = setInterval(() => getProxmox().then(setProxmox), 30_000);
-    const servicesT = setInterval(() => getServices().then(setServices), 60_000);
-    return () => { clearInterval(weatherT); clearInterval(proxmoxT); clearInterval(servicesT); };
+    const servicesT = setInterval(
+      () => getServices().then(setServices),
+      60_000,
+    );
+    return () => {
+      clearInterval(weatherT);
+      clearInterval(proxmoxT);
+      clearInterval(servicesT);
+    };
   }, []);
-  const activeCount = tasks.filter(t => !t.done).length;
+  const activeCount = tasks.filter((t) => !t.done).length;
   const serviceList = services?.services ?? [];
-  const onlineCount = serviceList.filter(s => s.status === 'ok').length;
+  const onlineCount = serviceList.filter((s) => s.status === "ok").length;
 
   const ramPct = proxmox?.resource ? Math.round(proxmox.resource.memPct) : 0;
   const diskPct = proxmox?.resource ? Math.round(proxmox.resource.diskPct) : 0;
   const ramVal = proxmox?.resource
     ? `${Math.round(proxmox.resource.memUsed / 1024)}/${Math.round(proxmox.resource.memTotal / 1024)}G`
-    : '—';
+    : "—";
   const diskVal = proxmox?.resource
     ? `${Math.round(proxmox.resource.diskUsed / 1024 / 1024)}/${Math.round(proxmox.resource.diskTotal / 1024 / 1024)}G`
-    : '—';
+    : "—";
 
   // weather code → emoji
   const wxIcon = (code: number) => {
-    if (code === 0) return '☀️';
-    if (code <= 2) return '⛅';
-    if (code <= 48) return '🌫️';
-    if (code <= 67) return '🌧️';
-    if (code <= 77) return '❄️';
-    if (code <= 82) return '🌦️';
-    return '⛈️';
+    if (code === 0) return "☀️";
+    if (code <= 2) return "⛅";
+    if (code <= 48) return "🌫️";
+    if (code <= 67) return "🌧️";
+    if (code <= 77) return "❄️";
+    if (code <= 82) return "🌦️";
+    return "⛈️";
   };
 
-  const days = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+  const days = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
 
   return (
-    <div className="mini-widgets">
+    <div className={miniGrid}>
       {/* Weather */}
-      <div className="mw-card">
-        <div className="mw-label">Погода</div>
+      <div className={miniCard}>
+        <div className={miniLabel}>Погода</div>
         {weather?.current ? (
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <div className="flex items-end justify-between">
             <div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 36, fontWeight: 700, color: 'var(--ink)', lineHeight: 1 }}>
-                {Math.round(weather.current.temp)}<sup style={{ fontSize: 14, verticalAlign: 'super', fontWeight: 400 }}>°</sup>
+              <div className="[font-family:var(--mono)] text-4xl font-bold leading-none text-ink">
+                {Math.round(weather.current.temp)}
+                <sup className="align-super text-sm font-normal">°</sup>
               </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', marginTop: 4, letterSpacing: '0.04em' }}>
+              <div className="mt-1 [font-family:var(--mono)] text-[9px] tracking-[0.04em] text-muted">
                 ВЕТЕР {weather.current.wind} м/с
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-end' }}>
+            <div className="flex flex-col items-end gap-[3px]">
               {weather.forecast.slice(0, 3).map((d) => {
                 const date = new Date(d.date);
                 return (
-                  <div key={d.date} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', width: 18 }}>{days[date.getDay()]}</span>
+                  <div key={d.date} className="flex items-center gap-1.5">
+                    <span className="w-[18px] [font-family:var(--mono)] text-[9px] text-muted">
+                      {days[date.getDay()]}
+                    </span>
                     <span style={{ fontSize: 11 }}>{wxIcon(d.code)}</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--ink-soft)' }}>{Math.round(d.max)}°</span>
+                    <span className="[font-family:var(--mono)] text-[9.5px] text-ink-soft">
+                      {Math.round(d.max)}°
+                    </span>
                   </div>
                 );
               })}
             </div>
           </div>
         ) : (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>—</div>
+          <div className="mt-1 [font-family:var(--mono)] text-[11px] text-muted">
+            —
+          </div>
         )}
       </div>
 
       {/* Proxmox */}
-      <div className="mw-card">
-        <div className="mw-label">Proxmox</div>
+      <div className={miniCard}>
+        <div className={miniLabel}>Proxmox</div>
         {proxmox?.resource ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="flex flex-col gap-2">
             {[
-              { k: 'CPU',  pct: proxmox.resource.cpuPct, val: Math.round(proxmox.resource.cpuPct) + '%' },
-              { k: 'RAM',  pct: ramPct, val: ramVal },
-              { k: 'DISK', pct: diskPct, val: diskVal },
-            ].map(r => (
-              <div key={r.k} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--muted)', width: 28, flexShrink: 0 }}>{r.k}</span>
-                <div className="mw-fbar">
-                  <i style={{ width: Math.min(r.pct, 100) + '%', background: r.pct > 80 ? 'var(--bad)' : 'var(--accent)' }}/>
+              {
+                k: "CPU",
+                pct: proxmox.resource.cpuPct,
+                val: Math.round(proxmox.resource.cpuPct) + "%",
+              },
+              { k: "RAM", pct: ramPct, val: ramVal },
+              { k: "DISK", pct: diskPct, val: diskVal },
+            ].map((r) => (
+              <div key={r.k} className="flex items-center gap-[9px]">
+                <span className="w-7 shrink-0 [font-family:var(--mono)] text-[9px] text-muted">
+                  {r.k}
+                </span>
+                <div className={miniBar}>
+                  <i
+                    className={miniBarFill}
+                    style={{
+                      width: Math.min(r.pct, 100) + "%",
+                      background: r.pct > 80 ? "var(--bad)" : "var(--accent)",
+                    }}
+                  />
                 </div>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--ink-soft)', width: 58, textAlign: 'right', flexShrink: 0 }}>{r.val}</span>
+                <span className="w-[58px] shrink-0 text-right [font-family:var(--mono)] text-[9.5px] text-ink-soft">
+                  {r.val}
+                </span>
               </div>
             ))}
           </div>
         ) : (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>—</div>
+          <div className="mt-1 [font-family:var(--mono)] text-[11px] text-muted">
+            —
+          </div>
         )}
       </div>
 
       {/* Services */}
-      <div className="mw-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div className="mw-label" style={{ marginBottom: 0 }}>Сервисы</div>
+      <div className={miniCard}>
+        <div className="mb-2 flex items-center justify-between">
+          <div className={cn(miniLabel, "mb-0")}>Сервисы</div>
           {serviceList.length > 0 && (
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--accent)' }}>
+            <div className="[font-family:var(--mono)] text-[9px] text-accent">
               {onlineCount}/{serviceList.length} online
             </div>
           )}
         </div>
         {serviceList.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {serviceList.slice(0, 5).map(s => (
-              <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                  background: s.status === 'ok' ? 'var(--accent)' : s.status === 'warn' ? 'var(--warn)' : 'var(--bad)',
-                  boxShadow: `0 0 5px ${s.status === 'ok' ? 'var(--accent)' : s.status === 'warn' ? 'var(--warn)' : 'var(--bad)'}`,
-                }}/>
-                <span style={{ fontFamily: 'var(--font)', fontSize: 11, color: 'var(--ink-soft)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="flex flex-col gap-[5px]">
+            {serviceList.slice(0, 5).map((s) => (
+              <div key={s.name} className="flex items-center gap-2">
+                <span
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{
+                    background:
+                      s.status === "ok"
+                        ? "var(--accent)"
+                        : s.status === "warn"
+                          ? "var(--warn)"
+                          : "var(--bad)",
+                  }}
+                />
+                <span className="flex-1 truncate whitespace-nowrap [font-family:var(--font)] text-[11px] text-ink-soft">
                   {s.name}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--muted)' }}>—</div>
+          <div className="[font-family:var(--mono)] text-[11px] text-muted">
+            —
+          </div>
         )}
       </div>
 
       {/* Active task count */}
-      <div className="mw-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 90 }}>
-        <div className="mw-label">Задачи</div>
+      <div
+        className={cn(miniCard, "flex min-w-[90px] flex-col justify-between")}
+      >
+        <div className={miniLabel}>Задачи</div>
         <div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 48, fontWeight: 700, color: 'var(--accent)', lineHeight: 1 }}>{activeCount}</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 9.5, color: 'var(--muted)', marginTop: 4, letterSpacing: '0.04em' }}>АКТИВНЫХ</div>
+          <div className="[font-family:var(--mono)] text-5xl font-bold leading-none text-accent">
+            {activeCount}
+          </div>
+          <div className="mt-1 [font-family:var(--mono)] text-[9.5px] tracking-[0.04em] text-muted">
+            АКТИВНЫХ
+          </div>
         </div>
       </div>
     </div>

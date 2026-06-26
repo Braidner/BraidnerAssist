@@ -12,7 +12,10 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export async function login(username: string, password: string): Promise<boolean> {
+export async function login(
+  username: string,
+  password: string,
+): Promise<boolean> {
   try {
     const res = await fetch("/api/auth/login", {
       method: "POST",

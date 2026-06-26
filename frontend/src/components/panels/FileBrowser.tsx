@@ -5,27 +5,58 @@
 import { useEffect, useState } from "react";
 import { Card } from "../ui/Card.tsx";
 import {
-  listFiles, fsMkdir, fsRename, fsMove, fsDelete,
-  type FileEntry, type FileListing,
+  listFiles,
+  fsMkdir,
+  fsRename,
+  fsMove,
+  fsDelete,
+  type FileEntry,
+  type FileListing,
 } from "../../lib/api.ts";
 import { fmtSize } from "../../pages/media/shared/mediaShared.tsx";
+import { cn } from "../../lib/cn.ts";
+import { ui } from "../../lib/ui.ts";
 import { useToast } from "../ui/Toast.tsx";
 
-const fmtDate = (ms: number) => (ms ? new Date(ms).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "");
+const fmtDate = (ms: number) =>
+  ms
+    ? new Date(ms).toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+      })
+    : "";
 const icon = (e: FileEntry) =>
-  e.type === "dir" ? "📁" : /mkv|mp4|avi|m4v|mov|ts|webm|wmv/.test(e.ext) ? "🎬" : /srt|ass|sub|vtt/.test(e.ext) ? "💬" : "📄";
+  e.type === "dir"
+    ? "📁"
+    : /mkv|mp4|avi|m4v|mov|ts|webm|wmv/.test(e.ext)
+      ? "🎬"
+      : /srt|ass|sub|vtt/.test(e.ext)
+        ? "💬"
+        : "📄";
+
+const emptyState = "py-3 font-mono text-xs text-muted";
+const fileRow =
+  "flex flex-row items-center gap-2.5 border-b border-hair py-2.5 last:border-b-0";
+const fileTitle =
+  "min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-ink disabled:cursor-default enabled:cursor-pointer";
+const fileMeta = "whitespace-nowrap font-mono text-[11px] text-muted";
 
 export function FileBrowser() {
   const toast = useToast();
   const [cwd, setCwd] = useState("");
-  const [data, setData] = useState<FileListing | null | "loading" | "off">("loading");
+  const [data, setData] = useState<FileListing | null | "loading" | "off">(
+    "loading",
+  );
   const [busy, setBusy] = useState(false);
 
   const load = (p: string) => {
     setData("loading");
     listFiles(p).then((r) => setData(r ?? "off"));
   };
-  useEffect(() => { load(cwd); }, [cwd]);
+  useEffect(() => {
+    load(cwd);
+  }, [cwd]);
 
   const reload = () => load(cwd);
 
@@ -38,8 +69,10 @@ export function FileBrowser() {
     setBusy(true);
     const ok = await fn();
     setBusy(false);
-    if (ok) { toast.success(okMsg); reload(); }
-    else toast.error("Операция не удалась");
+    if (ok) {
+      toast.success(okMsg);
+      reload();
+    } else toast.error("Операция не удалась");
   };
 
   const onMkdir = () => {
@@ -48,14 +81,22 @@ export function FileBrowser() {
   };
   const onRename = (e: FileEntry) => {
     const name = window.prompt("Новое имя:", e.name);
-    if (name?.trim() && name !== e.name) run(() => fsRename(e.path, name.trim()), "Переименовано");
+    if (name?.trim() && name !== e.name)
+      run(() => fsRename(e.path, name.trim()), "Переименовано");
   };
   const onMove = (e: FileEntry) => {
-    const dest = window.prompt("Переместить в папку (путь от корня медиатеки):", cwd);
+    const dest = window.prompt(
+      "Переместить в папку (путь от корня медиатеки):",
+      cwd,
+    );
     if (dest != null) run(() => fsMove(e.path, dest.trim()), "Перемещено");
   };
   const onDelete = (e: FileEntry) => {
-    if (window.confirm(`Удалить «${e.name}»${e.type === "dir" ? " и всё внутри" : ""}? Действие необратимо.`)) {
+    if (
+      window.confirm(
+        `Удалить «${e.name}»${e.type === "dir" ? " и всё внутри" : ""}? Действие необратимо.`,
+      )
+    ) {
       run(() => fsDelete(e.path), "Удалено");
     }
   };
@@ -65,46 +106,84 @@ export function FileBrowser() {
       icon="server"
       title="Файлы медиатеки"
       action={
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-sm" disabled={busy} onClick={onMkdir}>+ Папка</button>
-          <button className="btn btn-sm" disabled={busy} onClick={reload}>↻</button>
+        <div className="flex gap-2">
+          <button className={ui.button.sm} disabled={busy} onClick={onMkdir}>
+            + Папка
+          </button>
+          <button className={ui.button.sm} disabled={busy} onClick={reload}>
+            ↻
+          </button>
         </div>
       }
     >
       {/* breadcrumb */}
-      <div className="add-field" style={{ flexWrap: "wrap", gap: 6, marginTop: 0, marginBottom: 10 }}>
-        <button className="btn btn-sm" disabled={!cwd} onClick={() => setCwd("")}>🏠 корень</button>
+      <div className="mb-2.5 mt-0 flex flex-wrap gap-1.5">
+        <button
+          className={ui.button.sm}
+          disabled={!cwd}
+          onClick={() => setCwd("")}
+        >
+          🏠 корень
+        </button>
         {crumbs.map((c, i) => (
-          <button key={i} className="btn btn-sm" disabled={i === crumbs.length - 1} onClick={() => go(i)}>{c}</button>
+          <button
+            key={i}
+            className={ui.button.sm}
+            disabled={i === crumbs.length - 1}
+            onClick={() => go(i)}
+          >
+            {c}
+          </button>
         ))}
       </div>
 
       {data === "loading" ? (
-        <div className="empty">Загружаем…</div>
+        <div className={emptyState}>Загружаем…</div>
       ) : !data ? (
-        <div className="empty">Не удалось прочитать папку.</div>
+        <div className={emptyState}>Не удалось прочитать папку.</div>
       ) : data.entries.length === 0 ? (
-        <div className="empty">Папка пуста.</div>
+        <div className={emptyState}>Папка пуста.</div>
       ) : (
-        <div className="dl-list">
+        <div className="flex flex-col">
           {data.entries.map((e) => (
-            <div key={e.path} className="dl-row" style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <div key={e.path} className={fileRow}>
               <button
-                className="dl-title"
-                style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: e.type === "dir" ? "pointer" : "default", color: "var(--ink)", padding: 0 }}
+                className={fileTitle}
                 title={e.name}
                 disabled={e.type !== "dir"}
                 onClick={() => e.type === "dir" && setCwd(e.path)}
               >
                 {icon(e)} {e.name}
               </button>
-              <span className="dl-meta mono" style={{ whiteSpace: "nowrap" }}>
-                {e.type === "file" ? fmtSize(e.size) : ""}{e.mtime ? ` · ${fmtDate(e.mtime)}` : ""}
+              <span className={fileMeta}>
+                {e.type === "file" ? fmtSize(e.size) : ""}
+                {e.mtime ? ` · ${fmtDate(e.mtime)}` : ""}
               </span>
-              <div className="dl-actions">
-                <button className="btn btn-icon btn-sm" title="Переименовать" disabled={busy} onClick={() => onRename(e)}>✏️</button>
-                <button className="btn btn-icon btn-sm" title="Переместить" disabled={busy} onClick={() => onMove(e)}>➡️</button>
-                <button className="btn btn-icon btn-sm" title="Удалить" disabled={busy} onClick={() => onDelete(e)}>🗑</button>
+              <div className="flex gap-1.5">
+                <button
+                  className={cn(ui.button.iconSm, "text-[13px]")}
+                  title="Переименовать"
+                  disabled={busy}
+                  onClick={() => onRename(e)}
+                >
+                  ✏️
+                </button>
+                <button
+                  className={cn(ui.button.iconSm, "text-[13px]")}
+                  title="Переместить"
+                  disabled={busy}
+                  onClick={() => onMove(e)}
+                >
+                  ➡️
+                </button>
+                <button
+                  className={cn(ui.button.iconSm, "text-[13px]")}
+                  title="Удалить"
+                  disabled={busy}
+                  onClick={() => onDelete(e)}
+                >
+                  🗑
+                </button>
               </div>
             </div>
           ))}

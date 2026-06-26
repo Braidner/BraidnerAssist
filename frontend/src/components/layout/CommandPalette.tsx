@@ -6,10 +6,27 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
 import { icons } from "../icons.tsx";
-import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, getDocker, getAdguard, type DockerData, type AdguardData, type UnifiedSearchResult } from "../../lib/api.ts";
+import {
+  sendHermesCommand,
+  dockerAction,
+  adguardProtection,
+  unifiedSearch,
+  addTitle,
+  addTorrent,
+  getDocker,
+  getAdguard,
+  type DockerData,
+  type AdguardData,
+  type UnifiedSearchResult,
+} from "../../lib/api.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
+import { cn } from "../../lib/cn.ts";
 
-const EMPTY_MEDIA: UnifiedSearchResult = { inLibrary: [], discover: [], releases: [] };
+const EMPTY_MEDIA: UnifiedSearchResult = {
+  inLibrary: [],
+  discover: [],
+  releases: [],
+};
 
 interface Action {
   id: string;
@@ -19,8 +36,18 @@ interface Action {
 }
 
 export function CommandPalette() {
-  const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
-  const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
+  const [docker, setDocker] = useState<DockerData>({
+    configured: false,
+    containers: [],
+  });
+  const [adguard, setAdguard] = useState<AdguardData>({
+    configured: false,
+    dnsQueries: 0,
+    blocked: 0,
+    blockedPercent: 0,
+    avgProcessingMs: 0,
+    topBlocked: [],
+  });
 
   useEffect(() => {
     getDocker().then(setDocker);
@@ -65,13 +92,21 @@ export function CommandPalette() {
   }, [open]);
 
   const close = () => setOpen(false);
-  const done = (msg: string) => { setFeedback(msg); setTimeout(close, 800); };
+  const done = (msg: string) => {
+    setFeedback(msg);
+    setTimeout(close, 800);
+  };
 
   // Единый поиск по медиа (библиотека + discover + релизы) — с дебаунсом.
   useEffect(() => {
     const q = query.trim();
-    if (!open || q.length < 3) { setMediaRes(EMPTY_MEDIA); return; }
-    const t = setTimeout(() => { unifiedSearch(q).then(setMediaRes); }, 350);
+    if (!open || q.length < 3) {
+      setMediaRes(EMPTY_MEDIA);
+      return;
+    }
+    const t = setTimeout(() => {
+      unifiedSearch(q).then(setMediaRes);
+    }, 350);
     return () => clearTimeout(t);
   }, [query, open]);
 
@@ -81,7 +116,10 @@ export function CommandPalette() {
         id: `nav:${item.to}`,
         label: item.label,
         hint: "Перейти",
-        run: () => { navigate(item.to); close(); },
+        run: () => {
+          navigate(item.to);
+          close();
+        },
       })),
     [navigate],
   );
@@ -93,7 +131,10 @@ export function CommandPalette() {
         id: `docker:${c.id}`,
         label: `Перезапустить ${c.name}`,
         hint: "Docker",
-        run: async () => { await dockerAction(c.id, "restart"); done(`Перезапущен ${c.name} ✓`); },
+        run: async () => {
+          await dockerAction(c.id, "restart");
+          done(`Перезапущен ${c.name} ✓`);
+        },
       })),
     [docker.containers],
   );
@@ -106,13 +147,19 @@ export function CommandPalette() {
         id: "dns:pause",
         label: "Приостановить DNS-фильтрацию (10 мин)",
         hint: "AdGuard",
-        run: async () => { await adguardProtection(false, 600_000); done("DNS-фильтрация на паузе ✓"); },
+        run: async () => {
+          await adguardProtection(false, 600_000);
+          done("DNS-фильтрация на паузе ✓");
+        },
       },
       {
         id: "dns:resume",
         label: "Включить DNS-фильтрацию",
         hint: "AdGuard",
-        run: async () => { await adguardProtection(true); done("DNS-фильтрация включена ✓"); },
+        run: async () => {
+          await adguardProtection(true);
+          done("DNS-фильтрация включена ✓");
+        },
       },
     ];
   }, [adguard.configured]);
@@ -127,13 +174,19 @@ export function CommandPalette() {
           id: "hermes:send",
           label: `Передать Hermes: «${trimmed}»`,
           hint: "Команда",
-          run: async () => { await sendHermesCommand(trimmed); done("Отправлено Hermes ✓"); },
+          run: async () => {
+            await sendHermesCommand(trimmed);
+            done("Отправлено Hermes ✓");
+          },
         },
         {
           id: "task:add",
           label: `Создать задачу: «${trimmed}»`,
           hint: "Задача",
-          run: () => { onAddTask(trimmed); done("Задача создана ✓"); },
+          run: () => {
+            onAddTask(trimmed);
+            done("Задача создана ✓");
+          },
         },
       ]
     : [];
@@ -144,19 +197,32 @@ export function CommandPalette() {
       id: `lib:${it.id}`,
       label: `${it.type === "Series" ? "📺" : "🎬"} ${it.name}${it.year ? ` (${it.year})` : ""}`,
       hint: "В библиотеке",
-      run: () => { navigate(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`); close(); },
+      run: () => {
+        navigate(
+          `/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`,
+        );
+        close();
+      },
     })),
     ...mediaRes.discover.map((it) => ({
       id: `disc:${it.kind}:${it.id}`,
       label: `+ ${it.title}${it.year ? ` (${it.year})` : ""}`,
       hint: it.kind === "movie" ? "Добавить фильм" : "Добавить сериал",
-      run: async () => { const ok = await addTitle(it.kind, it.id); done(ok ? "Добавлено ✓" : "Ошибка"); },
+      run: async () => {
+        const ok = await addTitle(it.kind, it.id);
+        done(ok ? "Добавлено ✓" : "Ошибка");
+      },
     })),
     ...mediaRes.releases.map((r) => ({
       id: `rel:${r.guid}`,
       label: `⬇ ${r.title}`,
       hint: "Скачать",
-      run: async () => { if (r.url) { const ok = await addTorrent(r.url); done(ok ? "В qBittorrent ✓" : "Ошибка"); } },
+      run: async () => {
+        if (r.url) {
+          const ok = await addTorrent(r.url);
+          done(ok ? "В qBittorrent ✓" : "Ошибка");
+        }
+      },
     })),
   ];
 
@@ -165,9 +231,10 @@ export function CommandPalette() {
   const exactNavActions = trimmed
     ? matchedNavActions.filter((a) => a.label.toLowerCase() === lc)
     : [];
-  const fuzzyNavActions = exactNavActions.length > 0
-    ? matchedNavActions.filter((a) => a.label.toLowerCase() !== lc)
-    : matchedNavActions;
+  const fuzzyNavActions =
+    exactNavActions.length > 0
+      ? matchedNavActions.filter((a) => a.label.toLowerCase() !== lc)
+      : matchedNavActions;
   const actions = [
     ...exactNavActions,
     ...textActions,
@@ -194,37 +261,63 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div className="cmdk-backdrop" onClick={close}>
-      <div className="cmdk-panel neu" onClick={(e) => e.stopPropagation()}>
-        <div className="cmdk-input-row">
-          <span className="ic" style={{ color: "var(--muted)" }}><icons.target /></span>
+    <div
+      className="fixed inset-0 z-[300] flex items-start justify-center bg-black/55 px-4 pb-4 pt-[14vh] backdrop-blur-sm"
+      onClick={close}
+    >
+      <div
+        className="flex w-[min(560px,100%)] flex-col gap-1.5 rounded-card border border-hair bg-raise p-2.5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2.5 px-3 py-2">
+          <span className="ic" style={{ color: "var(--muted)" }}>
+            <icons.target />
+          </span>
           <input
             ref={inputRef}
-            className="cmdk-input"
+            className="flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
             placeholder="Команда, задача или страница…"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setSel(0); }}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSel(0);
+            }}
             onKeyDown={onInputKey}
           />
-          <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>esc</span>
+          <span
+            className="mono"
+            style={{ fontSize: 11, color: "var(--muted)" }}
+          >
+            esc
+          </span>
         </div>
 
         {feedback ? (
-          <div className="cmdk-sent">{feedback}</div>
+          <div className="px-4 py-[18px] text-center text-[13.5px] text-accent">
+            {feedback}
+          </div>
         ) : (
-          <div className="cmdk-list">
+          <div className="scroll flex max-h-[50vh] flex-col gap-[3px]">
             {actions.length === 0 ? (
-              <div className="empty" style={{ padding: 16 }}>Ничего не найдено.</div>
+              <div className="p-4 font-mono text-xs text-muted">
+                Ничего не найдено.
+              </div>
             ) : (
               actions.map((a, i) => (
                 <button
                   key={a.id}
-                  className={`cmdk-item ${i === clampedSel ? "active" : ""}`}
+                  className={cn(
+                    "flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-[10px] border border-transparent bg-transparent px-3 py-2.5 text-left text-[13.5px] text-ink transition-colors",
+                    i === clampedSel &&
+                      "border-accent/35 bg-accent/10 text-accent",
+                  )}
                   onMouseEnter={() => setSel(i)}
                   onClick={() => a.run()}
                 >
-                  <span className="cmdk-item-label">{a.label}</span>
-                  <span className="cmdk-item-hint mono">{a.hint}</span>
+                  <span className="min-w-0 truncate">{a.label}</span>
+                  <span className="flex-none font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted">
+                    {a.hint}
+                  </span>
                 </button>
               ))
             )}

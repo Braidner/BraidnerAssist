@@ -6,16 +6,33 @@
 
 import { useEffect, useState } from "react";
 import {
-  searchReleases, previewTorrentFiles, grabSelectedFiles, getContentTorrents, pickMoreFiles, organizeTorrent,
-  type SearchResult, type PickFile, type TorrentPreview, type ContentTorrent,
+  searchReleases,
+  previewTorrentFiles,
+  grabSelectedFiles,
+  getContentTorrents,
+  pickMoreFiles,
+  organizeTorrent,
+  type SearchResult,
+  type PickFile,
+  type TorrentPreview,
+  type ContentTorrent,
 } from "../../../lib/api.ts";
 import { fmtSize, ProgressBar } from "./mediaShared.tsx";
 import { useToast } from "../../../components/ui/Toast.tsx";
+import { cn } from "../../../lib/cn.ts";
+import { media } from "./mediaStyles.ts";
 
-type Key = { contentType: "movie" | "series"; tmdbId?: number | null; tvdbId?: number | null; title: string };
+type Key = {
+  contentType: "movie" | "series";
+  tmdbId?: number | null;
+  tvdbId?: number | null;
+  title: string;
+};
 
 // Сгруппировать видеофайлы по сезонам (сериал) или плоско (фильм).
-function groupBySeason(files: PickFile[]): { key: number; label: string; files: PickFile[] }[] {
+function groupBySeason(
+  files: PickFile[],
+): { key: number; label: string; files: PickFile[] }[] {
   const map = new Map<number, PickFile[]>();
   for (const f of files) {
     const sn = f.season ?? -1;
@@ -26,7 +43,8 @@ function groupBySeason(files: PickFile[]): { key: number; label: string; files: 
     .sort((a, b) => a[0] - b[0])
     .map(([sn, fs]) => ({
       key: sn,
-      label: sn === -1 ? "Без сезона" : sn === 0 ? "Спецвыпуски" : `Сезон ${sn}`,
+      label:
+        sn === -1 ? "Без сезона" : sn === 0 ? "Спецвыпуски" : `Сезон ${sn}`,
       files: fs.sort((a, b) => (a.episodes[0] ?? 0) - (b.episodes[0] ?? 0)),
     }));
 }
@@ -40,13 +58,24 @@ const epLabel = (f: PickFile): string => {
   return f.path.split("/").pop() ?? f.path;
 };
 
-export function TorrentFilePicker({ contentType, tmdbId, tvdbId, title, onGrabbed }: Key & { onGrabbed?: () => void }) {
+export function TorrentFilePicker({
+  contentType,
+  tmdbId,
+  tvdbId,
+  title,
+  onGrabbed,
+}: Key & { onGrabbed?: () => void }) {
   const toast = useToast();
   const [q, setQ] = useState(title);
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
-  const [picked, setPicked] = useState<{ source: string; title: string } | null>(null);
-  const [preview, setPreview] = useState<TorrentPreview | null | "loading">(null);
+  const [picked, setPicked] = useState<{
+    source: string;
+    title: string;
+  } | null>(null);
+  const [preview, setPreview] = useState<TorrentPreview | null | "loading">(
+    null,
+  );
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [grabbing, setGrabbing] = useState(false);
 
@@ -73,22 +102,31 @@ export function TorrentFilePicker({ contentType, tmdbId, tvdbId, title, onGrabbe
         setChecked(new Set(best ? [best.fileIndex] : []));
       } else {
         const withEp = vids.filter((f) => f.episodes.length > 0);
-        setChecked(new Set((withEp.length ? withEp : vids).map((f) => f.fileIndex)));
+        setChecked(
+          new Set((withEp.length ? withEp : vids).map((f) => f.fileIndex)),
+        );
       }
     } else {
       toast.error("Не удалось получить список файлов (TorrServer)");
     }
   };
 
-  const toggle = (idx: number) => setChecked((p) => {
-    const n = new Set(p); n.has(idx) ? n.delete(idx) : n.add(idx); return n;
-  });
+  const toggle = (idx: number) =>
+    setChecked((p) => {
+      const n = new Set(p);
+      n.has(idx) ? n.delete(idx) : n.add(idx);
+      return n;
+    });
 
   const onGrab = async () => {
-    if (!picked || !preview || preview === "loading" || checked.size === 0) return;
+    if (!picked || !preview || preview === "loading" || checked.size === 0)
+      return;
     setGrabbing(true);
     const ok = await grabSelectedFiles({
-      contentType, tmdbId, tvdbId, title,
+      contentType,
+      tmdbId,
+      tvdbId,
+      title,
       source: picked.source,
       infohash: preview.infohash,
       files: preview.files,
@@ -97,86 +135,149 @@ export function TorrentFilePicker({ contentType, tmdbId, tvdbId, title, onGrabbe
     setGrabbing(false);
     if (ok) {
       toast.success(`Качаем выбранные файлы: ${checked.size}`);
-      setPicked(null); setPreview(null); setChecked(new Set());
+      setPicked(null);
+      setPreview(null);
+      setChecked(new Set());
       onGrabbed?.();
     } else {
-      toast.error("Не удалось поставить на закачку (см. метаданные/qBittorrent)");
+      toast.error(
+        "Не удалось поставить на закачку (см. метаданные/qBittorrent)",
+      );
     }
   };
 
   return (
     <div>
-      <div className="add-field" style={{ marginTop: 4 }}>
+      <div className={cn(media.field, "mt-1")}>
         <input
-          className="neu-in mc-input"
+          className={media.input}
           placeholder="Поиск раздачи…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSearch();
+          }}
         />
-        <button className="btn btn-icon btn-accent" disabled={!q.trim() || searching} onClick={onSearch}>
+        <button
+          className={media.button.accentIcon}
+          disabled={!q.trim() || searching}
+          onClick={onSearch}
+        >
           {searching ? "…" : "🔍"}
         </button>
       </div>
 
       {/* список раздач */}
-      {results && !picked && (
-        results.length === 0 ? (
-          <div className="empty" style={{ marginTop: 10 }}>Раздачи не найдены.</div>
+      {results &&
+        !picked &&
+        (results.length === 0 ? (
+          <div className={cn(media.empty, "mt-2.5")}>Раздачи не найдены.</div>
         ) : (
-          <div className="sr-list">
+          <div className={media.list}>
             {results.map((r) => (
-              <div key={r.guid} className="sr-row">
-                <span className="sr-title" title={r.title}>{r.title}</span>
-                <div className="sr-foot">
-                  <span className="sr-meta">{fmtSize(r.size)} · <span className="sr-seeds">{r.seeders} seed</span> · {r.indexer}</span>
-                  <button className="btn btn-sm btn-accent" disabled={!r.url} onClick={() => openTorrent(r)}>📂 Файлы</button>
+              <div key={r.guid} className={media.row}>
+                <span className={media.rowTitle} title={r.title}>
+                  {r.title}
+                </span>
+                <div className={media.rowFoot}>
+                  <span className={media.rowMeta}>
+                    {fmtSize(r.size)} ·{" "}
+                    <span className={media.okText}>{r.seeders} seed</span> ·{" "}
+                    {r.indexer}
+                  </span>
+                  <button
+                    className={media.button.accentSm}
+                    disabled={!r.url}
+                    onClick={() => openTorrent(r)}
+                  >
+                    📂 Файлы
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-        )
-      )}
+        ))}
 
       {/* предпросмотр файлов выбранной раздачи */}
       {picked && (
-        <div style={{ marginTop: 12 }}>
-          <div className="add-field" style={{ alignItems: "center", marginBottom: 8 }}>
-            <span className="sr-title" style={{ flex: 1 }} title={picked.title}>{picked.title}</span>
-            <button className="btn btn-sm" onClick={() => { setPicked(null); setPreview(null); }}>← К списку</button>
+        <div className="mt-3">
+          <div className={cn(media.field, "mb-2 items-center")}>
+            <span className={cn(media.rowTitle, "flex-1")} title={picked.title}>
+              {picked.title}
+            </span>
+            <button
+              className={media.button.sm}
+              onClick={() => {
+                setPicked(null);
+                setPreview(null);
+              }}
+            >
+              ← К списку
+            </button>
           </div>
 
           {preview === "loading" ? (
-            <div className="empty">Читаем файлы торрента…</div>
+            <div className={media.empty}>Читаем файлы торрента…</div>
           ) : !preview ? (
-            <div className="empty">Не удалось получить файлы.</div>
+            <div className={media.empty}>Не удалось получить файлы.</div>
           ) : (
             <>
-              {groupBySeason(preview.files.filter((f) => f.isVideo)).map((g) => (
-                <div key={g.key} className="media-season">
-                  <div className="media-season-head">
-                    <span className="media-season-toggle" style={{ cursor: "default" }}>{g.label}</span>
-                    <span className="mono" style={{ color: "var(--muted)", fontSize: 11 }}>{g.files.length} файл.</span>
+              {groupBySeason(preview.files.filter((f) => f.isVideo)).map(
+                (g) => (
+                  <div key={g.key} className="mt-2.5 rounded-xl bg-surface">
+                    <div className="flex items-center gap-2 px-2.5 py-2 max-[760px]:flex-wrap">
+                      <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-[13px] font-medium text-ink">
+                        {g.label}
+                      </span>
+                      <span className="font-mono text-[11px] text-muted">
+                        {g.files.length} файл.
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1 px-2.5 pb-2.5 pt-1">
+                      {g.files.map((f) => (
+                        <label
+                          key={f.fileIndex}
+                          className="flex cursor-pointer items-center gap-[9px] rounded-lg px-2 py-1.5 transition-colors hover:bg-hair"
+                        >
+                          <input
+                            type="checkbox"
+                            className={media.checkbox}
+                            checked={checked.has(f.fileIndex)}
+                            onChange={() => toggle(f.fileIndex)}
+                          />
+                          <span className="w-[26px] flex-none text-center font-mono text-[11px] text-muted">
+                            {epLabel(f)}
+                          </span>
+                          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                            <span className="font-mono text-[10px] text-muted">
+                              {fmtSize(f.length)}
+                            </span>
+                            <span
+                              className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-[10px] text-muted"
+                              title={f.path}
+                            >
+                              {f.path.split("/").pop()}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                  <div className="media-ep-list">
-                    {g.files.map((f) => (
-                      <label key={f.fileIndex} className="imp-row">
-                        <input type="checkbox" className="imp-check" checked={checked.has(f.fileIndex)} onChange={() => toggle(f.fileIndex)} />
-                        <span className="media-ep-num mono">{epLabel(f)}</span>
-                        <span className="imp-meta">
-                          <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{fmtSize(f.length)}</span>
-                          <span className="imp-path" title={f.path}>{f.path.split("/").pop()}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {preview.files.filter((f) => f.isVideo).length === 0 && (
-                <div className="empty">Видеофайлы не найдены в торренте.</div>
+                ),
               )}
-              <button className="btn btn-accent" style={{ width: "100%", marginTop: 14 }} disabled={grabbing || checked.size === 0} onClick={onGrab}>
-                {grabbing ? "Ставим на закачку…" : `⬇ Скачать выбранное (${checked.size})`}
+              {preview.files.filter((f) => f.isVideo).length === 0 && (
+                <div className={media.empty}>
+                  Видеофайлы не найдены в торренте.
+                </div>
+              )}
+              <button
+                className={cn(media.button.accent, "mt-3.5 w-full")}
+                disabled={grabbing || checked.size === 0}
+                onClick={onGrab}
+              >
+                {grabbing
+                  ? "Ставим на закачку…"
+                  : `⬇ Скачать выбранное (${checked.size})`}
               </button>
             </>
           )}
@@ -186,19 +287,34 @@ export function TorrentFilePicker({ contentType, tmdbId, tvdbId, title, onGrabbe
   );
 }
 
-export function ContentTorrents({ contentType, tmdbId, tvdbId, reloadKey }: { contentType: "movie" | "series"; tmdbId?: number | null; tvdbId?: number | null; reloadKey?: number }) {
+export function ContentTorrents({
+  contentType,
+  tmdbId,
+  tvdbId,
+  reloadKey,
+}: {
+  contentType: "movie" | "series";
+  tmdbId?: number | null;
+  tvdbId?: number | null;
+  reloadKey?: number;
+}) {
   const toast = useToast();
   const [torrents, setTorrents] = useState<ContentTorrent[]>([]);
   const [addSel, setAddSel] = useState<Record<string, Set<number>>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = () => getContentTorrents({ type: contentType, tmdbId, tvdbId }).then(setTorrents);
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [contentType, tmdbId, tvdbId, reloadKey]);
+  const load = () =>
+    getContentTorrents({ type: contentType, tmdbId, tvdbId }).then(setTorrents);
+  useEffect(() => {
+    load(); /* eslint-disable-next-line */
+  }, [contentType, tmdbId, tvdbId, reloadKey]);
 
-  const toggleAdd = (hash: string, idx: number) => setAddSel((p) => {
-    const n = new Set(p[hash] ?? []); n.has(idx) ? n.delete(idx) : n.add(idx);
-    return { ...p, [hash]: n };
-  });
+  const toggleAdd = (hash: string, idx: number) =>
+    setAddSel((p) => {
+      const n = new Set(p[hash] ?? []);
+      n.has(idx) ? n.delete(idx) : n.add(idx);
+      return { ...p, [hash]: n };
+    });
 
   const onMore = async (hash: string) => {
     const idxs = [...(addSel[hash] ?? [])];
@@ -206,16 +322,25 @@ export function ContentTorrents({ contentType, tmdbId, tvdbId, reloadKey }: { co
     setBusy(hash);
     const ok = await pickMoreFiles(hash, idxs);
     setBusy(null);
-    if (ok) { toast.success(`Докачиваем ещё файлов: ${idxs.length}`); setAddSel((p) => ({ ...p, [hash]: new Set() })); load(); }
-    else toast.error("Не удалось докачать");
+    if (ok) {
+      toast.success(`Докачиваем ещё файлов: ${idxs.length}`);
+      setAddSel((p) => ({ ...p, [hash]: new Set() }));
+      load();
+    } else toast.error("Не удалось докачать");
   };
 
   const onOrganize = async (hash: string) => {
     setBusy("org" + hash);
     const r = await organizeTorrent(hash);
     setBusy(null);
-    if (r) toast.success(`Разложено в библиотеку: ${r.organized}${r.skipped ? ` (пропущено ${r.skipped})` : ""}`);
-    else toast.error("Не удалось разложить (нужен файл-браузер/MEDIA_ROOT и скачанные файлы)");
+    if (r)
+      toast.success(
+        `Разложено в библиотеку: ${r.organized}${r.skipped ? ` (пропущено ${r.skipped})` : ""}`,
+      );
+    else
+      toast.error(
+        "Не удалось разложить (нужен файл-браузер/MEDIA_ROOT и скачанные файлы)",
+      );
   };
 
   if (torrents.length === 0) return null;
@@ -226,39 +351,78 @@ export function ContentTorrents({ contentType, tmdbId, tvdbId, reloadKey }: { co
         const sel = addSel[t.infohash] ?? new Set<number>();
         return (
           <div key={t.infohash} style={{ marginBottom: 14 }}>
-            <div className="add-field" style={{ alignItems: "center", marginBottom: 6 }}>
-              <span className="mediadetail-facts mono" style={{ flex: 1 }} title={t.title}>📦 {t.title}</span>
-              <button className="btn btn-sm" disabled={busy === "org" + t.infohash} title="Разложить скачанное в библиотеку (hardlink + Jellyfin scan)" onClick={() => onOrganize(t.infohash)}>
+            <div className={cn(media.field, "mb-1.5 items-center")}>
+              <span
+                className="flex-1 font-mono text-[11.5px] text-muted"
+                title={t.title}
+              >
+                📦 {t.title}
+              </span>
+              <button
+                className={media.button.sm}
+                disabled={busy === "org" + t.infohash}
+                title="Разложить скачанное в библиотеку (hardlink + Jellyfin scan)"
+                onClick={() => onOrganize(t.infohash)}
+              >
                 {busy === "org" + t.infohash ? "…" : "🗂 Разложить"}
               </button>
             </div>
             {groupBySeasonFiles(t.files).map((g) => (
-              <div key={g.key} className="media-season">
-                <div className="media-season-head">
-                  <span className="media-season-toggle" style={{ cursor: "default" }}>{g.label}</span>
+              <div key={g.key} className="mt-2.5 rounded-xl bg-surface">
+                <div className="flex items-center gap-2 px-2.5 py-2 max-[760px]:flex-wrap">
+                  <span className="flex flex-1 cursor-default items-center justify-between gap-2 px-0.5 py-1 text-[13px] font-medium text-ink">
+                    {g.label}
+                  </span>
                 </div>
-                <div className="media-ep-list">
+                <div className="flex flex-col gap-1 px-2.5 pb-2.5 pt-1">
                   {g.files.map((f) => {
-                    const label = f.seasonNumber != null && f.episodeNumber != null
-                      ? `S${f.seasonNumber}E${f.episodeNumber}` : (f.path.split("/").pop() ?? f.path);
+                    const label =
+                      f.seasonNumber != null && f.episodeNumber != null
+                        ? `S${f.seasonNumber}E${f.episodeNumber}`
+                        : (f.path.split("/").pop() ?? f.path);
                     const pct = Math.round((f.progress ?? 0) * 100);
                     return (
-                      <div key={f.fileIndex} className="imp-row">
+                      <div
+                        key={f.fileIndex}
+                        className="flex items-center gap-[9px] rounded-lg px-2 py-1.5"
+                      >
                         {f.wanted ? (
-                          <span className="imp-check" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }} title="Качается">{pct >= 100 ? "✓" : "↓"}</span>
+                          <span
+                            className={cn(
+                              media.checkbox,
+                              "inline-flex items-center justify-center",
+                            )}
+                            title="Качается"
+                          >
+                            {pct >= 100 ? "✓" : "↓"}
+                          </span>
                         ) : (
-                          <input type="checkbox" className="imp-check" checked={sel.has(f.fileIndex)} onChange={() => toggleAdd(t.infohash, f.fileIndex)} title="Докачать" />
+                          <input
+                            type="checkbox"
+                            className={media.checkbox}
+                            checked={sel.has(f.fileIndex)}
+                            onChange={() => toggleAdd(t.infohash, f.fileIndex)}
+                            title="Докачать"
+                          />
                         )}
-                        <span className="media-ep-num mono">{label}</span>
-                        <span className="imp-meta" style={{ alignItems: "center" }}>
-                          <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{fmtSize(f.length)}</span>
+                        <span className="w-[26px] flex-none text-center font-mono text-[11px] text-muted">
+                          {label}
+                        </span>
+                        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-[10px] text-muted">
+                            {fmtSize(f.length)}
+                          </span>
                           {f.wanted ? (
-                            <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 90 }}>
+                            <span className="flex min-w-[90px] flex-1 items-center gap-1.5">
                               <ProgressBar pct={pct} />
-                              <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{pct}%</span>
+                              <span className="font-mono text-[10px] text-muted">
+                                {pct}%
+                              </span>
                             </span>
                           ) : (
-                            <span className="imp-path">не качается</span>
+                            <span className="min-w-20 flex-1 truncate whitespace-nowrap font-mono text-[10px] text-muted">
+                              не качается
+                            </span>
                           )}
                         </span>
                       </div>
@@ -268,8 +432,14 @@ export function ContentTorrents({ contentType, tmdbId, tvdbId, reloadKey }: { co
               </div>
             ))}
             {sel.size > 0 && (
-              <button className="btn btn-sm btn-accent" style={{ marginTop: 8 }} disabled={busy === t.infohash} onClick={() => onMore(t.infohash)}>
-                {busy === t.infohash ? "…" : `⬇ Докачать выбранное (${sel.size})`}
+              <button
+                className={cn(media.button.accentSm, "mt-2")}
+                disabled={busy === t.infohash}
+                onClick={() => onMore(t.infohash)}
+              >
+                {busy === t.infohash
+                  ? "…"
+                  : `⬇ Докачать выбранное (${sel.size})`}
               </button>
             )}
           </div>

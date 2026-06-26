@@ -1,4 +1,6 @@
 import { NavLink } from "react-router-dom";
+import { cn } from "../../lib/cn.ts";
+import { ui } from "../../lib/ui.ts";
 import { icons, type IconName } from "../icons.tsx";
 
 interface NavItem {
@@ -21,18 +23,46 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
+  const navItem = (active = false) =>
+    cn(
+      "group relative flex h-12 items-center gap-0 rounded-[14px] bg-transparent p-0 text-ink-soft no-underline transition-colors hover:text-ink max-[860px]:h-14 max-[860px]:gap-4 max-[860px]:px-2",
+      active && "active text-accent",
+    );
+
   return (
     <>
-      <div className={`sb-backdrop ${open ? "show" : ""}`} onClick={onClose} />
-      <aside className={`sidebar ${open ? "open" : ""}`}>
-        <div className="sb-logo">
-          <span className="sb-mark"><icons.target style={{ width: 24, height: 24 }} /></span>
-          <span className="sb-word">
-            <div className="t1">Mission Control</div>
-            <div className="t2 mono">braidner</div>
+      <div
+        className={cn(
+          "pointer-events-none fixed inset-0 z-[39] hidden bg-black/50 opacity-0 backdrop-blur-sm transition-opacity duration-300 max-[860px]:block",
+          open && "pointer-events-auto opacity-100",
+        )}
+        onClick={onClose}
+      />
+      <aside
+        className={cn(
+          "sticky top-0 z-30 flex h-screen w-[76px] flex-none flex-col items-stretch gap-1.5 overflow-hidden border-r border-hair bg-page px-3.5 py-[22px]",
+          "max-[860px]:fixed max-[860px]:inset-y-0 max-[860px]:left-0 max-[860px]:z-40 max-[860px]:h-full max-[860px]:w-[min(82vw,320px)] max-[860px]:-translate-x-full max-[860px]:px-[18px] max-[860px]:py-6 max-[860px]:transition-transform max-[860px]:duration-300",
+          open && "max-[860px]:translate-x-0",
+        )}
+      >
+        <div className="mb-4 flex items-center justify-center gap-[13px] whitespace-nowrap px-0.5 pb-1 pt-1.5 max-[860px]:justify-start max-[860px]:px-1.5 max-[860px]:pb-2">
+          <span className="grid size-[46px] flex-none place-items-center rounded-[14px] border border-hair bg-raise text-accent">
+            <icons.target className="size-6" />
           </span>
-          <button className="sb-close" onClick={onClose} aria-label="Закрыть">
-            <icons.close style={{ width: 20, height: 20 }} />
+          <span className="hidden max-[860px]:block">
+            <div className="text-[17px] font-bold tracking-normal text-ink">
+              Mission Control
+            </div>
+            <div className="mt-0.5 font-mono text-[11px] tracking-[0.04em] text-muted">
+              braidner
+            </div>
+          </span>
+          <button
+            className={cn(ui.iconButton, "ml-auto hidden max-[860px]:grid")}
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            <icons.close className="size-5" />
           </button>
         </div>
 
@@ -43,20 +73,36 @@ export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
               key={to}
               to={to}
               end={to === "/"}
-              className={({ isActive }) => `sb-item ${isActive ? "active" : ""}`}
+              className={({ isActive }) => navItem(isActive)}
               onClick={onClose}
               title={label}
             >
-              <span className="sb-icon"><Ic style={{ width: 21, height: 21 }} /></span>
-              <span className="sb-label">{label}</span>
+              <span className="grid size-12 flex-none place-items-center max-[860px]:size-10">
+                <Ic className="size-[21px]" />
+              </span>
+              <span className="hidden whitespace-nowrap text-[15px] font-medium tracking-[0.01em] max-[860px]:inline">
+                {label}
+              </span>
+              <span className="absolute left-[7px] top-1/2 hidden h-[22px] w-1 -translate-y-1/2 rounded-full bg-accent group-[.active]:block" />
             </NavLink>
           );
         })}
 
-        <span className="sb-spacer" />
-        <button className="sb-item" onClick={() => { onSettings(); onClose(); }} title="Настройки">
-          <span className="sb-icon"><icons.gear style={{ width: 21, height: 21 }} /></span>
-          <span className="sb-label">Настройки</span>
+        <span className="flex-1" />
+        <button
+          className={navItem()}
+          onClick={() => {
+            onSettings();
+            onClose();
+          }}
+          title="Настройки"
+        >
+          <span className="grid size-12 flex-none place-items-center max-[860px]:size-10">
+            <icons.gear className="size-[21px]" />
+          </span>
+          <span className="hidden whitespace-nowrap text-[15px] font-medium tracking-[0.01em] max-[860px]:inline">
+            Настройки
+          </span>
         </button>
       </aside>
     </>

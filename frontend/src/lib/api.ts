@@ -6,7 +6,9 @@ import { getToken, clearToken } from "./auth.ts";
 
 // Fetch with JWT; fires onUnauthorized callback on 401 (token expired/invalid).
 let onUnauthorized: (() => void) | null = null;
-export function setUnauthorizedHandler(fn: () => void) { onUnauthorized = fn; }
+export function setUnauthorizedHandler(fn: () => void) {
+  onUnauthorized = fn;
+}
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const token = getToken();
@@ -92,7 +94,11 @@ interface BackendTask {
   branchInfo?: string | null;
 }
 
-const PRIO_MAP: Record<string, Prio> = { high: "bad", medium: "warn", low: "info" };
+const PRIO_MAP: Record<string, Prio> = {
+  high: "bad",
+  medium: "warn",
+  low: "info",
+};
 
 function timeOf(iso: string): string {
   const d = new Date(iso);
@@ -108,7 +114,7 @@ export async function getTasks(): Promise<PanelTask[]> {
       id: t.id,
       label: t.title,
       done: t.status === "done",
-      prio: t.status === "done" ? "ok" : PRIO_MAP[t.priority] ?? "info",
+      prio: t.status === "done" ? "ok" : (PRIO_MAP[t.priority] ?? "info"),
       tag: t.source,
       hermes: t.source !== "local",
       claimedBy: t.claimedBy,
@@ -158,7 +164,15 @@ export async function createTask(title: string): Promise<PanelTask | null> {
     });
     if (!res.ok) return null;
     const t = (await res.json()) as BackendTask;
-    return { id: t.id, label: t.title, done: false, prio: PRIO_MAP[t.priority] ?? "info", tag: t.source, hermes: false, updatedAt: t.updatedAt ?? new Date().toISOString() };
+    return {
+      id: t.id,
+      label: t.title,
+      done: false,
+      prio: PRIO_MAP[t.priority] ?? "info",
+      tag: t.source,
+      hermes: false,
+      updatedAt: t.updatedAt ?? new Date().toISOString(),
+    };
   } catch {
     return null;
   }
@@ -192,14 +206,16 @@ export async function getServicesConfig(): Promise<ServiceConfig[]> {
   }
 }
 
-export async function putServicesConfig(services: ServiceConfig[]): Promise<void> {
+export async function putServicesConfig(
+  services: ServiceConfig[],
+): Promise<void> {
   const res = await apiFetch("/api/settings/services", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(services),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { error?: string };
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(err.error ?? "Save failed");
   }
 }
@@ -208,7 +224,10 @@ export async function getServices(): Promise<ServicesData> {
   try {
     const res = await apiFetch("/api/services");
     if (!res.ok) throw new Error();
-    const data = (await res.json()) as { configured: boolean; services?: ServiceStatus[] };
+    const data = (await res.json()) as {
+      configured: boolean;
+      services?: ServiceStatus[];
+    };
     return { configured: data.configured, services: data.services ?? [] };
   } catch {
     return { configured: false, services: [] };
@@ -234,8 +253,14 @@ export async function getWeather(): Promise<WeatherData> {
   try {
     const res = await apiFetch("/api/weather");
     if (!res.ok) throw new Error();
-    const data = (await res.json()) as { configured: boolean } & Partial<WeatherData>;
-    return { configured: data.configured, current: data.current ?? null, forecast: data.forecast ?? [] };
+    const data = (await res.json()) as {
+      configured: boolean;
+    } & Partial<WeatherData>;
+    return {
+      configured: data.configured,
+      current: data.current ?? null,
+      forecast: data.forecast ?? [],
+    };
   } catch {
     return { configured: false, current: null, forecast: [] };
   }
@@ -273,7 +298,9 @@ export async function getProxmox(): Promise<ProxmoxData> {
   try {
     const res = await apiFetch("/api/proxmox");
     if (!res.ok) throw new Error();
-    const data = (await res.json()) as { configured: boolean } & Partial<ProxmoxData>;
+    const data = (await res.json()) as {
+      configured: boolean;
+    } & Partial<ProxmoxData>;
     return {
       configured: data.configured,
       node: data.node ?? null,
@@ -348,8 +375,12 @@ export async function getHermes(): Promise<HermesData> {
       apiFetch("/api/hermes/status"),
       apiFetch("/api/hermes/log"),
     ]);
-    const status = statusRes.ok ? ((await statusRes.json()) as BackendAgentStatus) : {};
-    const rawLog = logRes.ok ? ((await logRes.json()) as BackendAgentLog[]) : [];
+    const status = statusRes.ok
+      ? ((await statusRes.json()) as BackendAgentStatus)
+      : {};
+    const rawLog = logRes.ok
+      ? ((await logRes.json()) as BackendAgentLog[])
+      : [];
     return {
       status: (status.status as HermesData["status"]) ?? "idle",
       message: status.message ?? null,
@@ -395,7 +426,10 @@ export interface HermesCommand {
   createdAt: string;
 }
 
-export async function sendHermesCommand(command: string, payload?: unknown): Promise<HermesCommand | null> {
+export async function sendHermesCommand(
+  command: string,
+  payload?: unknown,
+): Promise<HermesCommand | null> {
   try {
     const res = await apiFetch("/api/hermes/command", {
       method: "POST",
@@ -481,11 +515,17 @@ export async function getDocker(): Promise<DockerData> {
   }
 }
 
-export async function dockerAction(id: string, action: string): Promise<boolean> {
+export async function dockerAction(
+  id: string,
+  action: string,
+): Promise<boolean> {
   try {
-    const res = await apiFetch(`/api/docker/containers/${encodeURIComponent(id)}/${action}`, {
-      method: "POST",
-    });
+    const res = await apiFetch(
+      `/api/docker/containers/${encodeURIComponent(id)}/${action}`,
+      {
+        method: "POST",
+      },
+    );
     return res.ok;
   } catch {
     return false;
@@ -553,7 +593,10 @@ export async function getAdguard(): Promise<AdguardData> {
 }
 
 // Включить/выключить DNS-фильтрацию AdGuard. durationMs=0 → бессрочно.
-export async function adguardProtection(enabled: boolean, durationMs = 0): Promise<boolean> {
+export async function adguardProtection(
+  enabled: boolean,
+  durationMs = 0,
+): Promise<boolean> {
   try {
     const res = await apiFetch("/api/adguard/protection", {
       method: "POST",
@@ -623,10 +666,23 @@ export interface MediaData {
 export async function getMedia(): Promise<MediaData> {
   try {
     const res = await apiFetch("/api/media");
-    if (!res.ok) return { configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] };
+    if (!res.ok)
+      return {
+        configured: false,
+        torrserver: false,
+        tmdb: false,
+        nowPlaying: [],
+        downloads: [],
+      };
     return (await res.json()) as MediaData;
   } catch {
-    return { configured: false, torrserver: false, tmdb: false, nowPlaying: [], downloads: [] };
+    return {
+      configured: false,
+      torrserver: false,
+      tmdb: false,
+      nowPlaying: [],
+      downloads: [],
+    };
   }
 }
 
@@ -643,7 +699,9 @@ export interface TmdbItem {
 
 export async function tmdbSearch(q: string): Promise<TmdbItem[]> {
   try {
-    const res = await apiFetch(`/api/media/tmdb/search?q=${encodeURIComponent(q)}`);
+    const res = await apiFetch(
+      `/api/media/tmdb/search?q=${encodeURIComponent(q)}`,
+    );
     if (!res.ok) return [];
     return (await res.json()) as TmdbItem[];
   } catch {
@@ -652,9 +710,13 @@ export async function tmdbSearch(q: string): Promise<TmdbItem[]> {
 }
 
 // kind пусто → тренды недели (микс); "movie"/"series" → популярное по типу.
-export async function tmdbTrending(kind?: "movie" | "series"): Promise<TmdbItem[]> {
+export async function tmdbTrending(
+  kind?: "movie" | "series",
+): Promise<TmdbItem[]> {
   try {
-    const res = await apiFetch(`/api/media/tmdb/trending${kind ? `?kind=${kind}` : ""}`);
+    const res = await apiFetch(
+      `/api/media/tmdb/trending${kind ? `?kind=${kind}` : ""}`,
+    );
     if (!res.ok) return [];
     return (await res.json()) as TmdbItem[];
   } catch {
@@ -693,7 +755,10 @@ export interface TorrServerStream {
   file: TorrServerFile | null;
 }
 
-export async function torrserverAdd(link: string, title?: string): Promise<TorrServerAdd | null> {
+export async function torrserverAdd(
+  link: string,
+  title?: string,
+): Promise<TorrServerAdd | null> {
   try {
     const res = await apiFetch("/api/media/torrserver/add", {
       method: "POST",
@@ -719,7 +784,9 @@ export async function torrserverList(): Promise<TorrServerStream[]> {
 
 export async function torrserverRemove(hash: string): Promise<boolean> {
   try {
-    const res = await apiFetch(`/api/media/torrserver/${hash}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/media/torrserver/${hash}`, {
+      method: "DELETE",
+    });
     return res.ok;
   } catch {
     return false;
@@ -770,7 +837,9 @@ export interface SeriesDetail {
   seasons: SeriesSeason[];
 }
 
-export async function getSeriesDetail(id: string): Promise<SeriesDetail | null> {
+export async function getSeriesDetail(
+  id: string,
+): Promise<SeriesDetail | null> {
   try {
     const res = await apiFetch(`/api/media/series/${encodeURIComponent(id)}`);
     if (!res.ok) return null;
@@ -834,9 +903,13 @@ export interface MoviePageDetail {
   size: number | null;
 }
 
-export async function getSeriesPageDetail(id: string): Promise<SeriesPageDetail | null> {
+export async function getSeriesPageDetail(
+  id: string,
+): Promise<SeriesPageDetail | null> {
   try {
-    const res = await apiFetch(`/api/media/detail/series/${encodeURIComponent(id)}`);
+    const res = await apiFetch(
+      `/api/media/detail/series/${encodeURIComponent(id)}`,
+    );
     if (!res.ok) return null;
     return (await res.json()) as SeriesPageDetail;
   } catch {
@@ -844,9 +917,13 @@ export async function getSeriesPageDetail(id: string): Promise<SeriesPageDetail 
   }
 }
 
-export async function getMoviePageDetail(id: string): Promise<MoviePageDetail | null> {
+export async function getMoviePageDetail(
+  id: string,
+): Promise<MoviePageDetail | null> {
   try {
-    const res = await apiFetch(`/api/media/detail/movie/${encodeURIComponent(id)}`);
+    const res = await apiFetch(
+      `/api/media/detail/movie/${encodeURIComponent(id)}`,
+    );
     if (!res.ok) return null;
     return (await res.json()) as MoviePageDetail;
   } catch {
@@ -858,7 +935,9 @@ export async function getMoviePageDetail(id: string): Promise<MoviePageDetail | 
 // Карточки работают и для тайтлов, которых ещё нет в библиотеке (id = tvdbId/tmdbId).
 export async function discoverSearch(q: string): Promise<ArrLookupItem[]> {
   try {
-    const res = await apiFetch(`/api/media/discover/search?q=${encodeURIComponent(q)}`);
+    const res = await apiFetch(
+      `/api/media/discover/search?q=${encodeURIComponent(q)}`,
+    );
     if (!res.ok) return [];
     return (await res.json()) as ArrLookupItem[];
   } catch {
@@ -866,7 +945,9 @@ export async function discoverSearch(q: string): Promise<ArrLookupItem[]> {
   }
 }
 
-export async function getSeriesDiscoverDetail(tvdbId: number): Promise<SeriesPageDetail | null> {
+export async function getSeriesDiscoverDetail(
+  tvdbId: number,
+): Promise<SeriesPageDetail | null> {
   try {
     const res = await apiFetch(`/api/media/discover/detail/series/${tvdbId}`);
     if (!res.ok) return null;
@@ -876,7 +957,9 @@ export async function getSeriesDiscoverDetail(tvdbId: number): Promise<SeriesPag
   }
 }
 
-export async function getMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail | null> {
+export async function getMovieDiscoverDetail(
+  tmdbId: number,
+): Promise<MoviePageDetail | null> {
   try {
     const res = await apiFetch(`/api/media/discover/detail/movie/${tmdbId}`);
     if (!res.ok) return null;
@@ -910,7 +993,11 @@ export async function getCalendar(days = 14): Promise<CalendarItem[]> {
 }
 
 // Запуск поиска: весь сезон (seasonNumber) / недостающие (без него) / фильм. id = tvdbId|tmdbId.
-export async function seasonSearch(type: "series" | "movie", id: number, seasonNumber?: number): Promise<boolean> {
+export async function seasonSearch(
+  type: "series" | "movie",
+  id: number,
+  seasonNumber?: number,
+): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/season/search", {
       method: "POST",
@@ -1060,7 +1147,9 @@ export async function executeImport(p: {
 
 // Постеры тащим через бэкенд-прокси: у клиентов часто нет IPv6-egress до BunnyCDN
 // (TMDB резолвится в AAAA) → прямой <img> виснет по таймауту. Бэкенд ходит по IPv4.
-export function posterUrl(remote: string | null | undefined): string | undefined {
+export function posterUrl(
+  remote: string | null | undefined,
+): string | undefined {
   if (!remote) return undefined;
   return `/api/poster?url=${encodeURIComponent(remote)}`;
 }
@@ -1122,7 +1211,9 @@ export interface TorrentPreview {
 }
 
 // Предпросмотр файлов торрента (через TorrServer, без скачивания).
-export async function previewTorrentFiles(source: string): Promise<TorrentPreview | null> {
+export async function previewTorrentFiles(
+  source: string,
+): Promise<TorrentPreview | null> {
   try {
     const res = await apiFetch("/api/media/pick/preview", {
       method: "POST",
@@ -1160,7 +1251,10 @@ export async function grabSelectedFiles(input: {
 }
 
 // Докачать ещё файлы через тот же торрент.
-export async function pickMoreFiles(infohash: string, addIndexes: number[]): Promise<boolean> {
+export async function pickMoreFiles(
+  infohash: string,
+  addIndexes: number[],
+): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/pick/more", {
       method: "POST",
@@ -1190,7 +1284,9 @@ export interface ContentTorrent {
 }
 
 // Разложить скачанные файлы торрента в библиотеку (свой органайзер).
-export async function organizeTorrent(infohash: string): Promise<{ organized: number; skipped: number } | null> {
+export async function organizeTorrent(
+  infohash: string,
+): Promise<{ organized: number; skipped: number } | null> {
   try {
     const res = await apiFetch("/api/media/pick/organize", {
       method: "POST",
@@ -1213,12 +1309,17 @@ export interface FileEntry {
   mtime: number;
   ext: string;
 }
-export interface FileListing { path: string; entries: FileEntry[]; }
+export interface FileListing {
+  path: string;
+  entries: FileEntry[];
+}
 
 // null → файл-браузер не настроен (нет MEDIA_ROOT) либо ошибка.
 export async function listFiles(path = ""): Promise<FileListing | null> {
   try {
-    const res = await apiFetch(`/api/media/files?path=${encodeURIComponent(path)}`);
+    const res = await apiFetch(
+      `/api/media/files?path=${encodeURIComponent(path)}`,
+    );
     if (!res.ok) return null;
     return (await res.json()) as FileListing;
   } catch {
@@ -1226,7 +1327,10 @@ export async function listFiles(path = ""): Promise<FileListing | null> {
   }
 }
 
-async function fsAction(endpoint: string, body: Record<string, string>): Promise<boolean> {
+async function fsAction(
+  endpoint: string,
+  body: Record<string, string>,
+): Promise<boolean> {
   try {
     const res = await apiFetch(`/api/media/files/${endpoint}`, {
       method: "POST",
@@ -1238,9 +1342,12 @@ async function fsAction(endpoint: string, body: Record<string, string>): Promise
     return false;
   }
 }
-export const fsMkdir = (path: string, name: string) => fsAction("mkdir", { path, name });
-export const fsRename = (path: string, name: string) => fsAction("rename", { path, name });
-export const fsMove = (src: string, dest: string) => fsAction("move", { src, dest });
+export const fsMkdir = (path: string, name: string) =>
+  fsAction("mkdir", { path, name });
+export const fsRename = (path: string, name: string) =>
+  fsAction("rename", { path, name });
+export const fsMove = (src: string, dest: string) =>
+  fsAction("move", { src, dest });
 export const fsDelete = (path: string) => fsAction("delete", { path });
 
 // Торренты, привязанные к тайтлу (секция «Уже качается из этого торрента»).
@@ -1272,9 +1379,14 @@ export interface ArrLookupItem {
   added: boolean;
 }
 
-export async function lookupTitle(type: "movie" | "series", q: string): Promise<ArrLookupItem[]> {
+export async function lookupTitle(
+  type: "movie" | "series",
+  q: string,
+): Promise<ArrLookupItem[]> {
   try {
-    const res = await apiFetch(`/api/media/lookup?type=${type}&q=${encodeURIComponent(q)}`);
+    const res = await apiFetch(
+      `/api/media/lookup?type=${type}&q=${encodeURIComponent(q)}`,
+    );
     if (!res.ok) return [];
     return (await res.json()) as ArrLookupItem[];
   } catch {
@@ -1282,7 +1394,10 @@ export async function lookupTitle(type: "movie" | "series", q: string): Promise<
   }
 }
 
-export async function addTitle(type: "movie" | "series", id: number): Promise<boolean> {
+export async function addTitle(
+  type: "movie" | "series",
+  id: number,
+): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/add", {
       method: "POST",
@@ -1312,7 +1427,10 @@ export async function getMediaDevices(): Promise<PlayDevice[]> {
   }
 }
 
-export async function playOnDevice(sessionId: string, itemId: string): Promise<boolean> {
+export async function playOnDevice(
+  sessionId: string,
+  itemId: string,
+): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/play-to", {
       method: "POST",
@@ -1357,11 +1475,17 @@ export async function addTorrent(url: string): Promise<boolean> {
   }
 }
 
-export async function torrentAction(hash: string, action: "pause" | "resume" | "delete"): Promise<boolean> {
+export async function torrentAction(
+  hash: string,
+  action: "pause" | "resume" | "delete",
+): Promise<boolean> {
   try {
-    const res = await apiFetch(`/api/media/torrent/${encodeURIComponent(hash)}/${action}`, {
-      method: "POST",
-    });
+    const res = await apiFetch(
+      `/api/media/torrent/${encodeURIComponent(hash)}/${action}`,
+      {
+        method: "POST",
+      },
+    );
     return res.ok;
   } catch {
     return false;

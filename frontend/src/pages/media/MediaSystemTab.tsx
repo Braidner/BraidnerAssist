@@ -4,10 +4,19 @@ import { Card } from "../../components/ui/Card.tsx";
 import { FileBrowser } from "../../components/panels/FileBrowser.tsx";
 import {
   torrserverStreamUrl,
-  type MediaData, type DownloadItem, type TorrServerStream,
+  type MediaData,
+  type DownloadItem,
+  type TorrServerStream,
 } from "../../lib/api.ts";
-import { ProgressBar, fmtSize, fmtSpeed, fmtEta } from "./shared/mediaShared.tsx";
+import {
+  ProgressBar,
+  fmtSize,
+  fmtSpeed,
+  fmtEta,
+} from "./shared/mediaShared.tsx";
 import { useToast } from "../../components/ui/Toast.tsx";
+import { cn } from "../../lib/cn.ts";
+import { media as ms } from "./shared/mediaStyles.ts";
 
 const SOURCE_LABEL: Record<DownloadItem["source"], string> = {
   sonarr: "Sonarr",
@@ -45,43 +54,89 @@ export function MediaSystemTab({
   const toast = useToast();
 
   const playStream = (s: TorrServerStream) => {
-    if (!s.file) { toast.error("Нет видеофайла в раздаче"); return; }
-    if (!s.file.playable) toast.info("Формат не для браузера — используй «Ссылка»/«.m3u»");
-    onSetPlayer({ url: torrserverStreamUrl(s.hash, s.file.index), title: s.title, direct: true });
+    if (!s.file) {
+      toast.error("Нет видеофайла в раздаче");
+      return;
+    }
+    if (!s.file.playable)
+      toast.info("Формат не для браузера — используй «Ссылка»/«.m3u»");
+    onSetPlayer({
+      url: torrserverStreamUrl(s.hash, s.file.index),
+      title: s.title,
+      direct: true,
+    });
   };
 
   return (
-    <div className="page-col-main">
+    <div className={ms.pageMain}>
       {/* Смотреть онлайн через TorrServer — мгновенный стрим без полной загрузки */}
       {media.torrserver && (
-        <Card icon="pulse" title="Смотреть онлайн" action={<span className="panel-count">{tsStreams.length}</span>}>
-          <div className="add-field" style={{ marginTop: 4 }}>
+        <Card
+          icon="pulse"
+          title="Смотреть онлайн"
+          action={<span className={ms.panelCount}>{tsStreams.length}</span>}
+        >
+          <div className={cn(ms.field, "mt-1")}>
             <input
-              className="neu-in mc-input"
+              className={ms.input}
               placeholder="magnet:… для мгновенного просмотра"
               value={magnet}
               onChange={(e) => setMagnet(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) { onWatchNow(magnet.trim(), "Поток", "ts-magnet").then(() => setMagnet("")); } }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && magnet.trim()) {
+                  onWatchNow(magnet.trim(), "Поток", "ts-magnet").then(() =>
+                    setMagnet(""),
+                  );
+                }
+              }}
             />
             <button
-              className="btn btn-icon btn-accent"
+              className={ms.button.accentIcon}
               disabled={!magnet.trim() || busy === "ts-magnet"}
               title="Смотреть сейчас"
-              onClick={() => onWatchNow(magnet.trim(), "Поток", "ts-magnet").then(() => setMagnet(""))}
+              onClick={() =>
+                onWatchNow(magnet.trim(), "Поток", "ts-magnet").then(() =>
+                  setMagnet(""),
+                )
+              }
             >
               {busy === "ts-magnet" ? "…" : "▶"}
             </button>
           </div>
           {tsStreams.length === 0 ? (
-            <div className="empty" style={{ marginTop: 10 }}>Нет активных потоков. Вставь magnet или жми «▶ Сейчас» в поиске.</div>
+            <div className={cn(ms.empty, "mt-2.5")}>
+              Нет активных потоков. Вставь magnet или жми «▶ Сейчас» в поиске.
+            </div>
           ) : (
-            <div className="ts-list">
+            <div className="mt-2.5 flex flex-col gap-2">
               {tsStreams.map((s) => (
-                <div key={s.hash} className="ts-row">
-                  <span className="ts-title" title={s.file?.path ?? s.title}>{s.title}</span>
-                  <div className="ts-actions">
-                    <button className="btn btn-icon btn-sm" title="Смотреть" disabled={!s.file} onClick={() => playStream(s)}>▶</button>
-                    <button className="btn btn-icon btn-sm" title="Остановить стрим" disabled={busy === "tsrm" + s.hash} onClick={() => onRemoveStream(s.hash)}>🗑</button>
+                <div
+                  key={s.hash}
+                  className="flex items-center gap-2 rounded-[11px] border border-hair bg-surface px-2.5 py-2"
+                >
+                  <span
+                    className="min-w-0 flex-1 truncate whitespace-nowrap text-[12.5px] text-ink"
+                    title={s.file?.path ?? s.title}
+                  >
+                    {s.title}
+                  </span>
+                  <div className="flex flex-none gap-1">
+                    <button
+                      className={ms.button.iconSm}
+                      title="Смотреть"
+                      disabled={!s.file}
+                      onClick={() => playStream(s)}
+                    >
+                      ▶
+                    </button>
+                    <button
+                      className={ms.button.iconSm}
+                      title="Остановить стрим"
+                      disabled={busy === "tsrm" + s.hash}
+                      onClick={() => onRemoveStream(s.hash)}
+                    >
+                      🗑
+                    </button>
                   </div>
                 </div>
               ))}
@@ -95,26 +150,40 @@ export function MediaSystemTab({
         icon="cloud"
         title="Загрузки"
         action={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="panel-count">{media.downloads.length}</span>
-            <button className="btn btn-sm btn-accent" onClick={() => onSetAddOpen(true)}>
+          <div className="flex items-center gap-2">
+            <span className={ms.panelCount}>{media.downloads.length}</span>
+            <button
+              className={ms.button.accentSm}
+              onClick={() => onSetAddOpen(true)}
+            >
               + Добавить
             </button>
           </div>
         }
       >
         {media.downloads.length === 0 ? (
-          <div className="empty">Очередь пуста. Нажми «Добавить», чтобы найти и скачать.</div>
+          <div className={ms.empty}>
+            Очередь пуста. Нажми «Добавить», чтобы найти и скачать.
+          </div>
         ) : (
-          <div className="dl-list">
+          <div className="mt-3 flex flex-col gap-2.5">
             {(() => {
-              const totalSpeed = media.downloads.reduce((s, d) => s + (d.dlspeed ?? 0), 0);
-              const pending = media.downloads.filter((d) => d.importPending).length;
+              const totalSpeed = media.downloads.reduce(
+                (s, d) => s + (d.dlspeed ?? 0),
+                0,
+              );
+              const pending = media.downloads.filter(
+                (d) => d.importPending,
+              ).length;
               if (totalSpeed <= 0 && pending === 0) return null;
               return (
-                <div className="dl-summary mono">
+                <div className="flex items-center gap-3 px-0.5 pb-2 pt-0.5 font-mono text-[11.5px] text-muted">
                   {totalSpeed > 0 && <span>↓ {fmtSpeed(totalSpeed)}</span>}
-                  {pending > 0 && <span className="dl-summary-warn">⚠ не импортировано: {pending}</span>}
+                  {pending > 0 && (
+                    <span className="text-warn">
+                      ⚠ не импортировано: {pending}
+                    </span>
+                  )}
                 </div>
               );
             })()}
@@ -128,34 +197,80 @@ export function MediaSystemTab({
                 d.seeds != null ? `${d.seeds} seed` : "",
                 fmtSize(d.size),
                 paused ? "на паузе" : "",
-              ].filter(Boolean).join(" · ");
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
-                <div key={d.hash} className="dl-row">
-                  <div className="dl-head">
-                    <span className="dl-title" title={d.title}>{d.title}</span>
+                <div
+                  key={d.hash}
+                  className="flex flex-col gap-[9px] rounded-xl border border-hair bg-surface px-3.5 py-3"
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-[1.35] text-ink"
+                      title={d.title}
+                    >
+                      {d.title}
+                    </span>
                     {d.importPending && (
-                      <span className="dl-import-badge" title={d.importMessage}>⚠ не импортировано</span>
+                      <span
+                        className="cursor-help whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-[9.5px] text-warn"
+                        title={d.importMessage}
+                      >
+                        ⚠ не импортировано
+                      </span>
                     )}
-                    <span className="dl-source">{SOURCE_LABEL[d.source]}</span>
+                    <span className="shrink-0 rounded-md bg-raise px-2 py-[3px] font-mono text-[10px] text-ink-soft">
+                      {SOURCE_LABEL[d.source]}
+                    </span>
                   </div>
-                  <div className="dl-progress">
+                  <div className="flex items-center gap-[9px]">
                     <ProgressBar pct={d.progress} />
-                    <span className="dl-pct">{d.progress}%</span>
+                    <span className="min-w-9 text-right font-mono text-[11px] text-ink-soft">
+                      {d.progress}%
+                    </span>
                   </div>
-                  <div className="dl-foot">
-                    <span className="dl-meta">{meta || "—"}</span>
-                    <div className="dl-actions">
+                  <div className="flex items-center gap-2.5">
+                    <span className={ms.rowMeta}>{meta || "—"}</span>
+                    <div className="flex shrink-0 gap-1.5">
                       {!isQb && d.importPending && (
-                        <button className="btn btn-sm btn-accent" title="Ручной импорт файлов" onClick={() => onSetImportFor(d)}>Импорт</button>
+                        <button
+                          className={ms.button.accentSm}
+                          title="Ручной импорт файлов"
+                          onClick={() => onSetImportFor(d)}
+                        >
+                          Импорт
+                        </button>
                       )}
                       {isQb && (
                         <>
                           {paused ? (
-                            <button className="btn btn-icon btn-sm" title="Возобновить" disabled={busy === d.hash + "resume"} onClick={() => onTorrent(d.hash, "resume")}>▶</button>
+                            <button
+                              className={ms.button.iconSm}
+                              title="Возобновить"
+                              disabled={busy === d.hash + "resume"}
+                              onClick={() => onTorrent(d.hash, "resume")}
+                            >
+                              ▶
+                            </button>
                           ) : (
-                            <button className="btn btn-icon btn-sm" title="Пауза" disabled={busy === d.hash + "pause"} onClick={() => onTorrent(d.hash, "pause")}>⏸</button>
+                            <button
+                              className={ms.button.iconSm}
+                              title="Пауза"
+                              disabled={busy === d.hash + "pause"}
+                              onClick={() => onTorrent(d.hash, "pause")}
+                            >
+                              ⏸
+                            </button>
                           )}
-                          <button className="btn btn-icon btn-sm" title="Удалить" disabled={busy === d.hash + "delete"} onClick={() => onTorrent(d.hash, "delete")}>🗑</button>
+                          <button
+                            className={ms.button.iconSm}
+                            title="Удалить"
+                            disabled={busy === d.hash + "delete"}
+                            onClick={() => onTorrent(d.hash, "delete")}
+                          >
+                            🗑
+                          </button>
                         </>
                       )}
                     </div>

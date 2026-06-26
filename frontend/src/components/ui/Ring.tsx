@@ -10,7 +10,15 @@ export function Ring({ pct, size = 76 }: RingProps) {
   return (
     <div className="ring" style={{ width: size, height: size }}>
       <svg width={size} height={size}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--sd)" strokeWidth="6" opacity="0.5" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="var(--hair)"
+          strokeWidth="6"
+          opacity="0.5"
+        />
         <circle
           cx={size / 2}
           cy={size / 2}

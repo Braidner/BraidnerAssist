@@ -6,27 +6,62 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useRegisterTabs } from "../../lib/tabsContext.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import {
-  getMediaLibrary, addTorrent, torrentAction, refreshJellyfin,
-  lookupTitle, addTitle, searchReleases, posterUrl,
-  getRecommendations, discoverSearch,
-  tmdbSearch, tmdbTrending, tmdbResolveTvdb,
-  torrserverAdd, torrserverList, torrserverRemove, torrserverStreamUrl, getCalendar,
-  getContinueWatching, getMediaPlayUrl,
-  type MediaData, type DownloadItem, type LibraryItem, type SearchResult, type ArrLookupItem,
-  type Recommendation, type TorrServerStream, type CalendarItem, type ResumeItem, type TmdbItem,
+  getMediaLibrary,
+  addTorrent,
+  torrentAction,
+  refreshJellyfin,
+  lookupTitle,
+  addTitle,
+  searchReleases,
+  posterUrl,
+  getRecommendations,
+  discoverSearch,
+  tmdbSearch,
+  tmdbTrending,
+  tmdbResolveTvdb,
+  torrserverAdd,
+  torrserverList,
+  torrserverRemove,
+  torrserverStreamUrl,
+  getCalendar,
+  getContinueWatching,
+  getMediaPlayUrl,
+  type MediaData,
+  type DownloadItem,
+  type LibraryItem,
+  type SearchResult,
+  type ArrLookupItem,
+  type Recommendation,
+  type TorrServerStream,
+  type CalendarItem,
+  type ResumeItem,
+  type TmdbItem,
 } from "../../lib/api.ts";
 import {
-  ReleasePicker, ImportDrawer, Player, fmtSize,
+  ReleasePicker,
+  ImportDrawer,
+  Player,
+  fmtSize,
 } from "./shared/mediaShared.tsx";
 import { useToast } from "../../components/ui/Toast.tsx";
 import { MediaLibraryTab } from "./MediaLibraryTab.tsx";
 import { MediaDiscoverTab } from "./MediaDiscoverTab.tsx";
 import { MediaSystemTab } from "./MediaSystemTab.tsx";
+import { cn } from "../../lib/cn.ts";
+import { ui } from "../../lib/ui.ts";
+import { media as ms } from "./shared/mediaStyles.ts";
 
 // Дравер «Добавить»: основной путь — поиск тайтла в Radarr/Sonarr (правильный
 // пайплайн в медиатеку); ниже — ручные опции (прямой magnet + raw-поиск Prowlarr).
 function AddTorrentDrawer({
-  open, onClose, onAdd, onAddTitle, onGrabbed, onWatchNow, torrserver, busy,
+  open,
+  onClose,
+  onAdd,
+  onAddTitle,
+  onGrabbed,
+  onWatchNow,
+  torrserver,
+  busy,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,7 +87,9 @@ function AddTorrentDrawer({
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -75,58 +112,131 @@ function AddTorrentDrawer({
 
   return (
     <>
-      <div className={`drawer-overlay ${open ? "open" : ""}`} onClick={onClose} />
-      <aside className={`drawer ${open ? "open" : ""}`}>
-        <div className="drawer-inner">
-          <div className="drawer-head">
-            <span className="drawer-kind">Добавить в медиатеку</span>
-            <button className="btn btn-icon btn-sm" onClick={onClose}>✕</button>
+      <div
+        className={cn(
+          "pointer-events-none opacity-0",
+          ui.overlay,
+          open && "pointer-events-auto opacity-100",
+        )}
+        onClick={onClose}
+      />
+      <aside
+        className={cn(
+          ui.drawer,
+          "translate-x-full transition-transform duration-300",
+          open && "translate-x-0",
+        )}
+      >
+        <div className={ui.drawerInner}>
+          <div className={ui.drawerHead}>
+            <span className={ui.drawerKind}>Добавить в медиатеку</span>
+            <button
+              className={cn(ui.button.base, ui.button.iconSm)}
+              onClick={onClose}
+            >
+              ✕
+            </button>
           </div>
 
           {/* Основной путь: Radarr/Sonarr — авто-граб + импорт + скан */}
-          <div className="seg">
-            <button className={`seg-btn ${kind === "movie" ? "on" : ""}`} onClick={() => { setKind("movie"); setTitleResults([]); }}>Фильм</button>
-            <button className={`seg-btn ${kind === "series" ? "on" : ""}`} onClick={() => { setKind("series"); setTitleResults([]); }}>Сериал</button>
+          <div className={ms.seg}>
+            <button
+              className={cn(ms.segButton, kind === "movie" && ms.segButtonOn)}
+              onClick={() => {
+                setKind("movie");
+                setTitleResults([]);
+              }}
+            >
+              Фильм
+            </button>
+            <button
+              className={cn(ms.segButton, kind === "series" && ms.segButtonOn)}
+              onClick={() => {
+                setKind("series");
+                setTitleResults([]);
+              }}
+            >
+              Сериал
+            </button>
           </div>
-          <div className="add-field">
+          <div className={ms.field}>
             <input
-              className="neu-in mc-input"
-              placeholder={kind === "movie" ? "Название фильма…" : "Название сериала…"}
+              className={ms.input}
+              placeholder={
+                kind === "movie" ? "Название фильма…" : "Название сериала…"
+              }
               value={titleQuery}
               onChange={(e) => setTitleQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") onLookup(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onLookup();
+              }}
             />
-            <button className="btn btn-icon btn-accent" disabled={!titleQuery.trim() || lookingUp} onClick={onLookup}>
+            <button
+              className={ms.button.accentIcon}
+              disabled={!titleQuery.trim() || lookingUp}
+              onClick={onLookup}
+            >
               {lookingUp ? "…" : "🔍"}
             </button>
           </div>
 
           {titleResults.length > 0 && (
-            <div className="lk-list">
+            <div className={ms.list}>
               {titleResults.map((it) => {
                 const isAdded = it.added || addedIds[it.id];
                 const key = `title-${it.id}`;
                 const pickerOn = pickerFor === it.id;
                 return (
-                  <div key={it.id} className="lk-wrap">
-                    <div className="lk-row">
-                      <div className="lk-poster">
-                        {it.poster ? <img src={posterUrl(it.poster)} alt="" loading="lazy" /> : <span className="lk-poster-ph">{kind === "movie" ? "🎬" : "📺"}</span>}
+                  <div key={it.id} className="flex flex-col gap-2">
+                    <div className="flex items-center gap-[11px] rounded-xl border border-hair bg-surface px-3 py-2.5">
+                      <div className="grid h-[63px] w-[42px] flex-none place-items-center overflow-hidden rounded-[7px] bg-groove">
+                        {it.poster ? (
+                          <img
+                            className="h-full w-full object-cover"
+                            src={posterUrl(it.poster)}
+                            alt=""
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span className="text-xl opacity-50">
+                            {kind === "movie" ? "🎬" : "📺"}
+                          </span>
+                        )}
                       </div>
-                      <div className="lk-body">
-                        <span className="lk-title" title={it.title}>{it.title}{it.year ? ` (${it.year})` : ""}</span>
-                        {it.overview && <span className="lk-overview">{it.overview}</span>}
-                        <div className="lk-actions">
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <span
+                          className="truncate whitespace-nowrap text-[13px] font-medium text-ink"
+                          title={it.title}
+                        >
+                          {it.title}
+                          {it.year ? ` (${it.year})` : ""}
+                        </span>
+                        {it.overview && (
+                          <span className="line-clamp-2 text-[11px] leading-[1.35] text-muted">
+                            {it.overview}
+                          </span>
+                        )}
+                        <div className="mt-1 flex gap-2">
                           <button
-                            className="btn btn-sm btn-accent"
+                            className={ms.button.accentSm}
                             disabled={isAdded || busy === key}
-                            onClick={async () => { const ok = await onAddTitle(it, key); if (ok) setAddedIds((p) => ({ ...p, [it.id]: true })); }}
+                            onClick={async () => {
+                              const ok = await onAddTitle(it, key);
+                              if (ok)
+                                setAddedIds((p) => ({ ...p, [it.id]: true }));
+                            }}
                           >
-                            {isAdded ? "В библиотеке" : busy === key ? "…" : "Добавить"}
+                            {isAdded
+                              ? "В библиотеке"
+                              : busy === key
+                                ? "…"
+                                : "Добавить"}
                           </button>
                           <button
-                            className="btn btn-sm"
-                            onClick={() => setPickerFor(pickerOn ? null : it.id)}
+                            className={ms.button.sm}
+                            onClick={() =>
+                              setPickerFor(pickerOn ? null : it.id)
+                            }
                           >
                             {pickerOn ? "Скрыть раздачи" : "Выбрать раздачу"}
                           </button>
@@ -134,24 +244,33 @@ function AddTorrentDrawer({
                       </div>
                     </div>
                     {pickerOn && (
-                      <div className="lk-picker">
+                      <div className="px-0.5 pb-2 pt-1">
                         {it.kind === "series" && (
-                          <div className="add-field" style={{ alignItems: "center" }}>
-                            <span className="add-label" style={{ margin: 0 }}>Сезон</span>
+                          <div className={cn(ms.field, "items-center")}>
+                            <span className={cn(ms.label, "m-0")}>Сезон</span>
                             <input
-                              className="neu-in mc-input"
+                              className={cn(ms.input, "w-[70px] flex-none")}
                               type="number"
                               min={1}
                               value={pickSeason}
-                              onChange={(e) => setPickSeason(Math.max(0, Number(e.target.value) || 1))}
-                              style={{ width: 70 }}
+                              onChange={(e) =>
+                                setPickSeason(
+                                  Math.max(0, Number(e.target.value) || 1),
+                                )
+                              }
                             />
                           </div>
                         )}
                         <ReleasePicker
-                          params={it.kind === "series"
-                            ? { type: "series", id: it.id, seasonNumber: pickSeason }
-                            : { type: "movie", id: it.id }}
+                          params={
+                            it.kind === "series"
+                              ? {
+                                  type: "series",
+                                  id: it.id,
+                                  seasonNumber: pickSeason,
+                                }
+                              : { type: "movie", id: it.id }
+                          }
                           onGrabbed={onGrabbed}
                         />
                       </div>
@@ -162,66 +281,93 @@ function AddTorrentDrawer({
             </div>
           )}
           {!lookingUp && titleQuery.trim() && titleResults.length === 0 && (
-            <div className="empty" style={{ marginTop: 12 }}>Ничего не найдено.</div>
+            <div className={cn(ms.empty, "mt-3")}>Ничего не найдено.</div>
           )}
 
           {/* Ручные опции — прямой magnet и сырой поиск Prowlarr */}
-          <button className="add-toggle" onClick={() => setShowManual((v) => !v)}>
+          <button
+            className={ms.subtleToggle}
+            onClick={() => setShowManual((v) => !v)}
+          >
             {showManual ? "▾" : "▸"} Вручную (magnet / Prowlarr)
           </button>
 
           {showManual && (
             <>
-              <div className="add-label">Прямая ссылка (magnet или .torrent)</div>
-              <div className="add-field">
+              <div className={ms.label}>
+                Прямая ссылка (magnet или .torrent)
+              </div>
+              <div className={ms.field}>
                 <input
-                  className="neu-in mc-input"
+                  className={ms.input}
                   placeholder="magnet:… или https://….torrent"
                   value={magnet}
                   onChange={(e) => setMagnet(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && magnet.trim()) onAdd(magnet.trim(), "magnet").then(() => setMagnet("")); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && magnet.trim())
+                      onAdd(magnet.trim(), "magnet").then(() => setMagnet(""));
+                  }}
                 />
-                <button className="btn btn-icon btn-accent" disabled={!magnet.trim() || busy === "magnet"} onClick={() => onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))}>
+                <button
+                  className={ms.button.accentIcon}
+                  disabled={!magnet.trim() || busy === "magnet"}
+                  onClick={() =>
+                    onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))
+                  }
+                >
                   {busy === "magnet" ? "…" : "+"}
                 </button>
               </div>
 
-              <div className="add-label">Поиск релизов (Prowlarr)</div>
-              <div className="add-field">
+              <div className={ms.label}>Поиск релизов (Prowlarr)</div>
+              <div className={ms.field}>
                 <input
-                  className="neu-in mc-input"
+                  className={ms.input}
                   placeholder="Название релиза…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onSearch();
+                  }}
                 />
-                <button className="btn btn-icon btn-accent" disabled={!query.trim() || searching} onClick={onSearch}>
+                <button
+                  className={ms.button.accentIcon}
+                  disabled={!query.trim() || searching}
+                  onClick={onSearch}
+                >
                   {searching ? "…" : "🔍"}
                 </button>
               </div>
 
               {results.length > 0 && (
-                <div className="sr-list">
+                <div className={ms.list}>
                   {results.map((r) => (
-                    <div key={r.guid} className="sr-row">
-                      <span className="sr-title" title={r.title}>{r.title}</span>
-                      <div className="sr-foot">
-                        <span className="sr-meta">
-                          {fmtSize(r.size)} · <span className="sr-seeds">{r.seeders} seed</span> · {r.indexer}
+                    <div key={r.guid} className={ms.row}>
+                      <span className={ms.rowTitle} title={r.title}>
+                        {r.title}
+                      </span>
+                      <div className={ms.rowFoot}>
+                        <span className={ms.rowMeta}>
+                          {fmtSize(r.size)} ·{" "}
+                          <span className={ms.okText}>{r.seeders} seed</span> ·{" "}
+                          {r.indexer}
                         </span>
-                        <div className="sr-btns">
+                        <div className="flex flex-wrap gap-1.5">
                           {torrserver && (
                             <button
-                              className="btn btn-sm"
+                              className={ms.button.sm}
                               disabled={!r.url || busy === r.guid + "ts"}
                               title="Смотреть сейчас через TorrServer (без полной загрузки)"
-                              onClick={() => r.url && onWatchNow(r.url, r.title, r.guid + "ts")}
+                              onClick={() =>
+                                r.url &&
+                                onWatchNow(r.url, r.title, r.guid + "ts")
+                              }
                             >
                               {busy === r.guid + "ts" ? "…" : "▶ Сейчас"}
                             </button>
                           )}
                           <button
-                            className="btn btn-sm btn-accent"
+                            className={ms.button.accentSm}
                             disabled={!r.url || busy === r.guid}
                             onClick={() => r.url && onAdd(r.url, r.guid)}
                           >
@@ -234,7 +380,7 @@ function AddTorrentDrawer({
                 </div>
               )}
               {!searching && query.trim() && results.length === 0 && (
-                <div className="empty" style={{ marginTop: 14 }}>Ничего не найдено.</div>
+                <div className={cn(ms.empty, "mt-3.5")}>Ничего не найдено.</div>
               )}
             </>
           )}
@@ -246,17 +392,23 @@ function AddTorrentDrawer({
 
 type MediaTab = "library" | "discover" | "system";
 
-export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaUpdate: () => void }) {
+export function MediaPage({
+  media,
+  onMediaUpdate,
+}: {
+  media: MediaData;
+  onMediaUpdate: () => void;
+}) {
   const nav = useNavigate();
   const toast = useToast();
   const [params] = useSearchParams();
-  const tab = ((params.get("tab") as MediaTab) || "library");
+  const tab = (params.get("tab") as MediaTab) || "library";
 
   const TAB_KEYS: MediaTab[] = ["library", "discover", "system"];
   useRegisterTabs(
-    ['Библиотека', 'Дискавери', 'Система'],
+    ["Библиотека", "Дискавери", "Система"],
     Math.max(0, TAB_KEYS.indexOf(tab)),
-    (i: number) => nav(`/media${i > 0 ? `?tab=${TAB_KEYS[i]}` : ''}`),
+    (i: number) => nav(`/media${i > 0 ? `?tab=${TAB_KEYS[i]}` : ""}`),
   );
 
   // ── Shared state ──────────────────────────────────────────────────────────
@@ -264,7 +416,11 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   const [addOpen, setAddOpen] = useState(false);
   const [importFor, setImportFor] = useState<DownloadItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [player, setPlayer] = useState<{ url: string; title: string; direct: boolean } | null>(null);
+  const [player, setPlayer] = useState<{
+    url: string;
+    title: string;
+    direct: boolean;
+  } | null>(null);
   const [tsStreams, setTsStreams] = useState<TorrServerStream[]>([]);
   const [magnet, setMagnet] = useState("");
   const [libReady, setLibReady] = useState(false);
@@ -274,14 +430,20 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
 
   // Library data
   useEffect(() => {
-    if (media.configured) getMediaLibrary().then((l) => { setLibrary(l); setLibReady(true); });
+    if (media.configured)
+      getMediaLibrary().then((l) => {
+        setLibrary(l);
+        setLibReady(true);
+      });
   }, [media.configured]);
 
   const shownLibrary = library
     .filter((it) => (fType === "all" ? true : it.type === fType))
     .filter((it) => (!onlyUnwatched ? true : !it.played))
     .sort((a, b) =>
-      sortBy === "year" ? (b.year ?? 0) - (a.year ?? 0) : a.name.localeCompare(b.name, "ru"),
+      sortBy === "year"
+        ? (b.year ?? 0) - (a.year ?? 0)
+        : a.name.localeCompare(b.name, "ru"),
     );
 
   // Recommendations
@@ -298,11 +460,24 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   const [dsearching, setDsearching] = useState(false);
   useEffect(() => {
     const q = dq.trim();
-    if (q.length < 2) { setDres([]); setTmRes([]); setDsearching(false); return; }
+    if (q.length < 2) {
+      setDres([]);
+      setTmRes([]);
+      setDsearching(false);
+      return;
+    }
     setDsearching(true);
     const t = setTimeout(() => {
-      if (media.tmdb) tmdbSearch(q).then((r) => { setTmRes(r); setDsearching(false); });
-      else discoverSearch(q).then((r) => { setDres(r); setDsearching(false); });
+      if (media.tmdb)
+        tmdbSearch(q).then((r) => {
+          setTmRes(r);
+          setDsearching(false);
+        });
+      else
+        discoverSearch(q).then((r) => {
+          setDres(r);
+          setDsearching(false);
+        });
     }, 350);
     return () => clearTimeout(t);
   }, [dq, media.tmdb]);
@@ -324,7 +499,9 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   }, [media.configured]);
 
   // TorrServer streams
-  const refreshTs = () => { if (media.torrserver) torrserverList().then(setTsStreams); };
+  const refreshTs = () => {
+    if (media.torrserver) torrserverList().then(setTsStreams);
+  };
   useEffect(() => {
     if (media.torrserver) torrserverList().then(setTsStreams);
   }, [media.torrserver]);
@@ -349,32 +526,48 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
       return;
     }
     refreshTs();
-    if (!info.file.playable) toast.info("Формат не для браузера — используй «Ссылка»/«.m3u» во внешнем плеере");
-    setPlayer({ url: torrserverStreamUrl(info.hash, info.file.index), title: info.title || title, direct: true });
+    if (!info.file.playable)
+      toast.info(
+        "Формат не для браузера — используй «Ссылка»/«.m3u» во внешнем плеере",
+      );
+    setPlayer({
+      url: torrserverStreamUrl(info.hash, info.file.index),
+      title: info.title || title,
+      direct: true,
+    });
   };
 
   const removeStream = async (hash: string) => {
     setBusy("tsrm" + hash);
     const ok = await torrserverRemove(hash);
     setBusy(null);
-    if (ok) { toast.success("Стрим остановлен"); refreshTs(); }
-    else toast.error("Не удалось остановить стрим");
+    if (ok) {
+      toast.success("Стрим остановлен");
+      refreshTs();
+    } else toast.error("Не удалось остановить стрим");
   };
 
   const onAdd = async (url: string, key: string) => {
     setBusy(key);
     const ok = await addTorrent(url);
     setBusy(null);
-    if (ok) { toast.success("Торрент добавлен в qBittorrent"); onMediaUpdate(); }
-    else toast.error("Не удалось добавить торрент");
+    if (ok) {
+      toast.success("Торрент добавлен в qBittorrent");
+      onMediaUpdate();
+    } else toast.error("Не удалось добавить торрент");
   };
 
-  const onAddTitle = async (item: ArrLookupItem, key: string): Promise<boolean> => {
+  const onAddTitle = async (
+    item: ArrLookupItem,
+    key: string,
+  ): Promise<boolean> => {
     setBusy(key);
     const ok = await addTitle(item.kind, item.id);
     setBusy(null);
-    if (ok) { toast.success(`«${item.title}» добавлен — ищем релиз`); onMediaUpdate(); }
-    else toast.error("Не удалось добавить тайтл");
+    if (ok) {
+      toast.success(`«${item.title}» добавлен — ищем релиз`);
+      onMediaUpdate();
+    } else toast.error("Не удалось добавить тайтл");
     return ok;
   };
 
@@ -385,12 +578,17 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
     setBusy(null);
     if (okAdd) {
       toast.success(`«${rec.title}» добавлен в библиотеку`);
-      setRecs((prev) => prev.filter((r) => !(r.kind === rec.kind && r.id === rec.id)));
+      setRecs((prev) =>
+        prev.filter((r) => !(r.kind === rec.kind && r.id === rec.id)),
+      );
       onMediaUpdate();
     } else toast.error("Не удалось добавить");
   };
 
-  const onTorrent = async (hash: string, action: "pause" | "resume" | "delete") => {
+  const onTorrent = async (
+    hash: string,
+    action: "pause" | "resume" | "delete",
+  ) => {
     setBusy(hash + action);
     const ok = await torrentAction(hash, action);
     setBusy(null);
@@ -399,24 +597,34 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
   };
 
   const openDiscover = (it: ArrLookupItem) =>
-    nav(`/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`);
+    nav(
+      `/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`,
+    );
 
   const openTmdb = async (it: TmdbItem) => {
-    if (it.kind === "movie") { nav(`/media/discover/movie/${it.tmdbId}`); return; }
+    if (it.kind === "movie") {
+      nav(`/media/discover/movie/${it.tmdbId}`);
+      return;
+    }
     setBusy("tmdb" + it.tmdbId);
     const tvdb = await tmdbResolveTvdb(it.tmdbId);
     setBusy(null);
     if (tvdb) nav(`/media/discover/series/${tvdb}`);
-    else toast.error("Не удалось определить tvdbId сериала (нет в Sonarr/TVDB)");
+    else
+      toast.error("Не удалось определить tvdbId сериала (нет в Sonarr/TVDB)");
   };
 
   // ── Not configured ────────────────────────────────────────────────────────
   if (!media.configured) {
     return (
-      <div className="page">
-        <div className="page-cols">
-          <div className="page-col-main">
-            <Placeholder icon="pulse" title="Медиа" phase="Медиа-стек не настроен (JELLYFIN/SONARR/RADARR/QBITTORRENT/PROWLARR)" />
+      <div className={ms.page}>
+        <div className={ms.pageCols}>
+          <div className={ms.pageMain}>
+            <Placeholder
+              icon="pulse"
+              title="Медиа"
+              phase="Медиа-стек не настроен (JELLYFIN/SONARR/RADARR/QBITTORRENT/PROWLARR)"
+            />
           </div>
         </div>
       </div>
@@ -425,7 +633,7 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="page">
+    <div className={ms.page}>
       <AddTorrentDrawer
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -436,12 +644,23 @@ export function MediaPage({ media, onMediaUpdate }: { media: MediaData; onMediaU
         torrserver={media.torrserver}
         busy={busy}
       />
-      {player && <Player url={player.url} title={player.title} direct={player.direct} onClose={() => setPlayer(null)} />}
+      {player && (
+        <Player
+          url={player.url}
+          title={player.title}
+          direct={player.direct}
+          onClose={() => setPlayer(null)}
+        />
+      )}
       {importFor && (
         <ImportDrawer
           item={importFor}
           onClose={() => setImportFor(null)}
-          onDone={() => { setImportFor(null); onMediaUpdate(); refreshJellyfin(); }}
+          onDone={() => {
+            setImportFor(null);
+            onMediaUpdate();
+            refreshJellyfin();
+          }}
         />
       )}
 

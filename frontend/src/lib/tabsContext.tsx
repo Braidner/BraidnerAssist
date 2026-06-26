@@ -41,6 +41,6 @@ export function useRegisterTabs(
   useEffect(() => {
     setTabsState({ tabs, activeTab, onTabChange });
     return () => setTabsState(EMPTY);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.join(","), activeTab]);
 }

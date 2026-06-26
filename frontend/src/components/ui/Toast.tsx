@@ -1,7 +1,15 @@
 // Общая система тостов: ToastProvider оборачивает приложение, useToast() даёт
-// success/error/info. Стек справа снизу, авто-скрытие 3.5с, неоморфные карточки.
+// success/error/info. Стек справа снизу, авто-скрытие 3.5с, плоские карточки.
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { cn } from "../../lib/cn.ts";
 
 type ToastType = "success" | "error" | "info";
 interface Toast {
@@ -49,11 +57,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={apiRef.current}>
       {children}
-      <div className="toast-stack">
+      <div className="fixed bottom-5 right-5 z-[500] flex w-[min(360px,calc(100vw-32px))] flex-col gap-2.5 max-[760px]:bottom-4 max-[760px]:right-4">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast neu toast-${t.type}`} onClick={() => remove(t.id)} role="status">
-            <span className="toast-icon">{ICON[t.type]}</span>
-            <span className="toast-msg">{t.message}</span>
+          <div
+            key={t.id}
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-[14px] border border-hair bg-raise px-4 py-3 text-[13px] text-ink",
+              "animate-[toast-in_.22s_var(--ease)]",
+              t.type === "success" && "border-l-4 border-l-ok",
+              t.type === "error" && "border-l-4 border-l-bad",
+              t.type === "info" && "border-l-4 border-l-info",
+            )}
+            onClick={() => remove(t.id)}
+            role="status"
+          >
+            <span
+              className={cn(
+                "grid size-5 flex-none place-items-center rounded-full text-xs font-bold",
+                t.type === "success" && "bg-ok text-accent-ink",
+                t.type === "error" && "bg-bad text-white",
+                t.type === "info" && "bg-info text-white",
+              )}
+            >
+              {ICON[t.type]}
+            </span>
+            <span className="min-w-0 flex-1 leading-snug">{t.message}</span>
           </div>
         ))}
       </div>

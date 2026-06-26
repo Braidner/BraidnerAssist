@@ -2,8 +2,22 @@ import { useState, useEffect } from "react";
 import { Card } from "../../components/ui/Card.tsx";
 import { Ring } from "../../components/ui/Ring.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
-import type { ProxmoxData, ServicesData, DockerData, DockerContainer, AdguardData } from "../../lib/api.ts";
-import { dockerAction, getDocker, getAdguard, getProxmox, getServices } from "../../lib/api.ts";
+import { cn } from "../../lib/cn.ts";
+import { ui } from "../../lib/ui.ts";
+import type {
+  ProxmoxData,
+  ServicesData,
+  DockerData,
+  DockerContainer,
+  AdguardData,
+} from "../../lib/api.ts";
+import {
+  dockerAction,
+  getDocker,
+  getAdguard,
+  getProxmox,
+  getServices,
+} from "../../lib/api.ts";
 
 const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
   ok: "var(--ok)",
@@ -15,11 +29,35 @@ function gb(bytes: number): number {
   return Math.round(bytes / 1024 ** 3);
 }
 
-function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: DockerData) => void }) {
+const statList = "flex flex-col gap-0";
+const statRow =
+  "grid grid-cols-[12px_1fr_auto_auto] items-center gap-2.5 border-t border-hair py-2 text-[13px]";
+const statName = "min-w-0 truncate text-[13.5px] font-medium text-ink";
+const statTag = "font-mono text-[11px] text-muted";
+const gaugeRow = "flex flex-wrap gap-7 px-0 pb-1 pt-2";
+const gaugeItem = "flex items-center gap-3.5";
+const gaugeLabel = "flex flex-col gap-1";
+const gaugeName = "font-mono text-[10px] uppercase tracking-[0.1em] text-muted";
+const gaugeValue = "font-mono text-[13px] font-bold text-ink";
+const statusDot = "size-2.5 rounded-full";
+
+function DockerCard({
+  docker,
+  onRefresh,
+}: {
+  docker: DockerData;
+  onRefresh: (d: DockerData) => void;
+}) {
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
   if (!docker.configured) {
-    return <Placeholder icon="server" title="Docker" phase="DOCKER_SOCKET не задан" />;
+    return (
+      <Placeholder
+        icon="server"
+        title="Docker"
+        phase="DOCKER_SOCKET не задан"
+      />
+    );
   }
 
   const act = async (c: DockerContainer, action: string) => {
@@ -28,7 +66,13 @@ function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: 
     onRefresh({
       ...docker,
       containers: docker.containers.map((x) =>
-        x.id === c.id ? { ...x, state: newState, status: action === "stop" ? "Exited" : "Up" } : x,
+        x.id === c.id
+          ? {
+              ...x,
+              state: newState,
+              status: action === "stop" ? "Exited" : "Up",
+            }
+          : x,
       ),
     });
     setPending((p) => ({ ...p, [c.id]: true }));
@@ -44,43 +88,56 @@ function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: 
     <Card
       icon="server"
       title="Docker"
-      action={<span className="panel-count">{docker.containers.length} контейнеров</span>}
+      action={
+        <span className={ui.panelCount}>
+          {docker.containers.length} контейнеров
+        </span>
+      }
     >
       {docker.containers.length === 0 ? (
-        <div className="empty">Нет контейнеров.</div>
+        <div className="py-2.5 font-mono text-xs text-muted">
+          Нет контейнеров.
+        </div>
       ) : (
-        <div className="sys-vm-list" style={{ marginTop: 8 }}>
+        <div className={cn(statList, "mt-2")}>
           {docker.containers.map((c) => {
             const running = c.state === "running";
             const color = running ? "var(--ok)" : "var(--muted)";
             const busy = Boolean(pending[c.id]);
             return (
-              <div key={c.id} className="sys-vm-row" style={{ gap: 8, flexWrap: "wrap" }}>
+              <div key={c.id} className={statRow}>
                 <span
-                  className="dot-led"
+                  className={statusDot}
                   style={{
                     background: color,
-                    boxShadow: running
-                      ? `0 0 8px color-mix(in srgb, ${color} 70%, transparent)`
-                      : "none",
                   }}
                 />
-                <span className="sys-vm-name" style={{ minWidth: 120 }}>{c.name}</span>
-                <span className="sys-vm-type mono" style={{ color: "var(--muted)", fontSize: 11 }}>
-                  {c.state.toUpperCase()}
-                </span>
-                <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                <span className={cn(statName, "min-w-[120px]")}>{c.name}</span>
+                <span className={statTag}>{c.state.toUpperCase()}</span>
+                <div className="ml-auto flex gap-1.5">
                   {!running && (
-                    <button className="btn btn-sm" disabled={busy} onClick={() => act(c, "start")}>
+                    <button
+                      className={ui.button.sm}
+                      disabled={busy}
+                      onClick={() => act(c, "start")}
+                    >
                       Запустить
                     </button>
                   )}
                   {running && (
-                    <button className="btn btn-sm" disabled={busy} onClick={() => act(c, "stop")}>
+                    <button
+                      className={ui.button.sm}
+                      disabled={busy}
+                      onClick={() => act(c, "stop")}
+                    >
                       Стоп
                     </button>
                   )}
-                  <button className="btn btn-sm" disabled={busy} onClick={() => act(c, "restart")}>
+                  <button
+                    className={ui.button.sm}
+                    disabled={busy}
+                    onClick={() => act(c, "restart")}
+                  >
                     Рестарт
                   </button>
                 </div>
@@ -95,44 +152,57 @@ function DockerCard({ docker, onRefresh }: { docker: DockerData; onRefresh: (d: 
 
 function AdguardCard({ adguard }: { adguard: AdguardData }) {
   if (!adguard.configured) {
-    return <Placeholder icon="drop" title="AdGuard" phase="ADGUARD_URL не задан" />;
+    return (
+      <Placeholder icon="drop" title="AdGuard" phase="ADGUARD_URL не задан" />
+    );
   }
   return (
     <Card
       icon="drop"
       title="AdGuard DNS"
-      action={<span className="panel-count mono">{adguard.blockedPercent}% blocked</span>}
+      action={
+        <span className={cn(ui.panelCount, "font-mono")}>
+          {adguard.blockedPercent}% blocked
+        </span>
+      }
     >
-      <div className="sys-gauges" style={{ marginTop: 4 }}>
-        <div className="sys-gauge">
+      <div className={cn(gaugeRow, "mt-1")}>
+        <div className={gaugeItem}>
           <Ring pct={adguard.blockedPercent} size={96} />
-          <div className="sys-gauge-lbl">
-            <div className="sys-gauge-name">BLOCKED</div>
-            <div className="sys-gauge-val mono">{adguard.blocked.toLocaleString("ru-RU")}</div>
+          <div className={gaugeLabel}>
+            <div className={gaugeName}>BLOCKED</div>
+            <div className={gaugeValue}>
+              {adguard.blocked.toLocaleString("ru-RU")}
+            </div>
           </div>
         </div>
-        <div className="sys-gauge" style={{ justifyContent: "center" }}>
-          <div className="sys-gauge-lbl">
-            <div className="sys-gauge-name">ЗАПРОСЫ</div>
-            <div className="sys-gauge-val mono">{adguard.dnsQueries.toLocaleString("ru-RU")}</div>
+        <div className={cn(gaugeItem, "justify-center")}>
+          <div className={gaugeLabel}>
+            <div className={gaugeName}>ЗАПРОСЫ</div>
+            <div className={gaugeValue}>
+              {adguard.dnsQueries.toLocaleString("ru-RU")}
+            </div>
           </div>
         </div>
-        <div className="sys-gauge" style={{ justifyContent: "center" }}>
-          <div className="sys-gauge-lbl">
-            <div className="sys-gauge-name">ЛАТЕНТНОСТЬ</div>
-            <div className="sys-gauge-val mono">{adguard.avgProcessingMs}ms</div>
+        <div className={cn(gaugeItem, "justify-center")}>
+          <div className={gaugeLabel}>
+            <div className={gaugeName}>ЛАТЕНТНОСТЬ</div>
+            <div className={gaugeValue}>{adguard.avgProcessingMs}ms</div>
           </div>
         </div>
       </div>
 
       {adguard.topBlocked.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div className="panel-title" style={{ marginBottom: 8 }}>Топ заблокированных</div>
-          <div className="sys-svc-table">
+        <div className="mt-4">
+          <div className={cn(ui.panelTitle, "mb-2")}>Топ заблокированных</div>
+          <div className={statList}>
             {adguard.topBlocked.map((d) => (
-              <div key={d.domain} className="sys-svc-row">
-                <span className="sys-svc-name">{d.domain}</span>
-                <span className="sys-svc-tag mono" style={{ marginLeft: "auto" }}>{d.count}</span>
+              <div
+                key={d.domain}
+                className={cn(statRow, "grid-cols-[1fr_auto]")}
+              >
+                <span className={statName}>{d.domain}</span>
+                <span className={cn(statTag, "ml-auto")}>{d.count}</span>
               </div>
             ))}
           </div>
@@ -144,10 +214,28 @@ function AdguardCard({ adguard }: { adguard: AdguardData }) {
 
 // /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов, Docker, AdGuard.
 export function SystemPage() {
-  const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
-  const [servicesData, setServicesData] = useState<ServicesData>({ configured: false, services: [] });
-  const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
-  const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
+  const [proxmox, setProxmox] = useState<ProxmoxData>({
+    configured: false,
+    node: null,
+    resource: null,
+    vms: [],
+  });
+  const [servicesData, setServicesData] = useState<ServicesData>({
+    configured: false,
+    services: [],
+  });
+  const [docker, setDocker] = useState<DockerData>({
+    configured: false,
+    containers: [],
+  });
+  const [adguard, setAdguard] = useState<AdguardData>({
+    configured: false,
+    dnsQueries: 0,
+    blocked: 0,
+    blockedPercent: 0,
+    avgProcessingMs: 0,
+    topBlocked: [],
+  });
 
   useEffect(() => {
     getProxmox().then(setProxmox);
@@ -159,45 +247,54 @@ export function SystemPage() {
       getDocker().then(setDocker);
       getAdguard().then(setAdguard);
     }, 30_000);
-    const slowTimer = setInterval(() => getServices().then(setServicesData), 60_000);
-    return () => { clearInterval(fastTimer); clearInterval(slowTimer); };
+    const slowTimer = setInterval(
+      () => getServices().then(setServicesData),
+      60_000,
+    );
+    return () => {
+      clearInterval(fastTimer);
+      clearInterval(slowTimer);
+    };
   }, []);
 
   return (
-    <div className="page">
-      <div className="page-cols">
-        <div className="page-col-main">
+    <div className="flex flex-1 flex-col gap-5">
+      <div className="grid grid-cols-[1.4fr_1fr] items-start gap-[22px] max-[900px]:grid-cols-1">
+        <div className="flex flex-col gap-5">
           {/* Proxmox нода */}
           {!proxmox.configured ? (
-            <Placeholder icon="server" title="Proxmox" phase="Proxmox env не задан" />
-          ) : proxmox.resource ? (
-            <Card
+            <Placeholder
               icon="server"
-              title={`Proxmox · ${proxmox.node ?? "node"}`}
-            >
-              <div className="sys-gauges">
-                <div className="sys-gauge">
+              title="Proxmox"
+              phase="Proxmox env не задан"
+            />
+          ) : proxmox.resource ? (
+            <Card icon="server" title={`Proxmox · ${proxmox.node ?? "node"}`}>
+              <div className={gaugeRow}>
+                <div className={gaugeItem}>
                   <Ring pct={proxmox.resource.cpuPct} size={96} />
-                  <div className="sys-gauge-lbl">
-                    <div className="sys-gauge-name">CPU</div>
-                    <div className="sys-gauge-val mono">{proxmox.resource.cpuPct}%</div>
+                  <div className={gaugeLabel}>
+                    <div className={gaugeName}>CPU</div>
+                    <div className={gaugeValue}>{proxmox.resource.cpuPct}%</div>
                   </div>
                 </div>
-                <div className="sys-gauge">
+                <div className={gaugeItem}>
                   <Ring pct={proxmox.resource.memPct} size={96} />
-                  <div className="sys-gauge-lbl">
-                    <div className="sys-gauge-name">RAM</div>
-                    <div className="sys-gauge-val mono">
-                      {gb(proxmox.resource.memUsed)}/{gb(proxmox.resource.memTotal)} ГБ
+                  <div className={gaugeLabel}>
+                    <div className={gaugeName}>RAM</div>
+                    <div className={gaugeValue}>
+                      {gb(proxmox.resource.memUsed)}/
+                      {gb(proxmox.resource.memTotal)} ГБ
                     </div>
                   </div>
                 </div>
-                <div className="sys-gauge">
+                <div className={gaugeItem}>
                   <Ring pct={proxmox.resource.diskPct} size={96} />
-                  <div className="sys-gauge-lbl">
-                    <div className="sys-gauge-name">DISK</div>
-                    <div className="sys-gauge-val mono">
-                      {gb(proxmox.resource.diskUsed)}/{gb(proxmox.resource.diskTotal)} ГБ
+                  <div className={gaugeLabel}>
+                    <div className={gaugeName}>DISK</div>
+                    <div className={gaugeValue}>
+                      {gb(proxmox.resource.diskUsed)}/
+                      {gb(proxmox.resource.diskTotal)} ГБ
                     </div>
                   </div>
                 </div>
@@ -205,29 +302,34 @@ export function SystemPage() {
 
               {/* VM / LXC */}
               {proxmox.vms.length > 0 && (
-                <div style={{ marginTop: 20 }}>
-                  <div className="panel-title" style={{ marginBottom: 12 }}>Виртуальные машины</div>
-                  <div className="sys-vm-list">
+                <div className="mt-5">
+                  <div className={cn(ui.panelTitle, "mb-3")}>
+                    Виртуальные машины
+                  </div>
+                  <div className={statList}>
                     {proxmox.vms.map((vm) => {
                       const running = vm.status === "running";
                       const color = running ? "var(--ok)" : "var(--muted)";
                       return (
-                        <div key={`${vm.type}-${vm.vmid}`} className="sys-vm-row">
+                        <div key={`${vm.type}-${vm.vmid}`} className={statRow}>
                           <span
-                            className="dot-led"
+                            className={statusDot}
                             style={{
                               background: color,
-                              boxShadow: running
-                                ? `0 0 8px color-mix(in srgb, ${color} 70%, transparent)`
-                                : "none",
                             }}
                           />
-                          <span className="sys-vm-name">{vm.name}</span>
-                          <span className="sys-vm-type mono">{vm.type.toUpperCase()}</span>
+                          <span className={statName}>{vm.name}</span>
+                          <span className={statTag}>
+                            {vm.type.toUpperCase()}
+                          </span>
                           {running ? (
-                            <span className="sys-vm-stat mono">CPU {vm.cpuPct}% · RAM {vm.memPct}%</span>
+                            <span className="font-mono text-xs text-ink-soft">
+                              CPU {vm.cpuPct}% · RAM {vm.memPct}%
+                            </span>
                           ) : (
-                            <span className="sys-vm-stat mono" style={{ color: "var(--muted)" }}>ОСТАНОВЛЕНА</span>
+                            <span className="font-mono text-xs text-muted">
+                              ОСТАНОВЛЕНА
+                            </span>
                           )}
                         </div>
                       );
@@ -238,37 +340,51 @@ export function SystemPage() {
             </Card>
           ) : (
             <Card icon="server" title="Proxmox">
-              <div className="empty">Нода недоступна.</div>
+              <div className="py-2.5 font-mono text-xs text-muted">
+                Нода недоступна.
+              </div>
             </Card>
           )}
         </div>
 
-        <div className="page-col-side">
+        <div className="flex flex-col gap-5">
           {/* Сервисы */}
           {!servicesData.configured ? (
-            <Placeholder icon="cloud" title="Сервисы" phase="services.json не найден" />
+            <Placeholder
+              icon="cloud"
+              title="Сервисы"
+              phase="services.json не найден"
+            />
           ) : (
             <Card
               icon="cloud"
               title="Сервисы"
-              action={<span className="panel-count">{servicesData.services.length} сервисов</span>}
+              action={
+                <span className={ui.panelCount}>
+                  {servicesData.services.length} сервисов
+                </span>
+              }
             >
               {servicesData.services.length === 0 ? (
-                <div className="empty">Нет сервисов для мониторинга.</div>
+                <div className="py-2.5 font-mono text-xs text-muted">
+                  Нет сервисов для мониторинга.
+                </div>
               ) : (
-                <div className="sys-svc-table">
+                <div className={statList}>
                   {servicesData.services.map((s) => (
-                    <div key={s.name} className="sys-svc-row">
+                    <div key={s.name} className={statRow}>
                       <span
-                        className="dot-led"
+                        className={statusDot}
                         style={{
                           background: STAT_VAR[s.status],
-                          boxShadow: `0 0 8px color-mix(in srgb, ${STAT_VAR[s.status]} 70%, transparent)`,
                         }}
                       />
-                      <span className="sys-svc-name">{s.name}</span>
-                      <span className="sys-svc-tag mono">{s.tag}</span>
-                      <span className="sys-svc-st mono" style={{ color: STAT_VAR[s.status] }}>
+                      <span className={statName}>{s.name}</span>
+                      <span className={statTag}>{s.tag}</span>
+                      <span
+                        className="font-mono text-[11px] tracking-[0.04em]"
+                        style={{ color: STAT_VAR[s.status] }}
+                      >
                         {s.status.toUpperCase()}
                       </span>
                     </div>

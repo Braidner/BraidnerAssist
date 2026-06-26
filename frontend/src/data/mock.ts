@@ -30,10 +30,38 @@ export interface Note {
 }
 
 export const habits: Habit[] = [
-  { id: "sleep", name: "Сон", val: "7ч 12м / 8ч", pct: 90, week: [1, 1, 0, 1, 1, 1, 0], icon: "moon" },
-  { id: "sport", name: "Активность", val: "2 / 4 трен.", pct: 50, week: [1, 0, 1, 0, 0, 1, 0], icon: "dumbbell" },
-  { id: "water", name: "Вода", val: "1.6 / 2.5 л", pct: 64, week: [1, 1, 1, 0, 1, 1, 0], icon: "drop" },
-  { id: "focus", name: "Фокус-блоки", val: "3 / 5 блоков", pct: 60, week: [1, 1, 1, 0, 1, 0, 0], icon: "target" },
+  {
+    id: "sleep",
+    name: "Сон",
+    val: "7ч 12м / 8ч",
+    pct: 90,
+    week: [1, 1, 0, 1, 1, 1, 0],
+    icon: "moon",
+  },
+  {
+    id: "sport",
+    name: "Активность",
+    val: "2 / 4 трен.",
+    pct: 50,
+    week: [1, 0, 1, 0, 0, 1, 0],
+    icon: "dumbbell",
+  },
+  {
+    id: "water",
+    name: "Вода",
+    val: "1.6 / 2.5 л",
+    pct: 64,
+    week: [1, 1, 1, 0, 1, 1, 0],
+    icon: "drop",
+  },
+  {
+    id: "focus",
+    name: "Фокус-блоки",
+    val: "3 / 5 блоков",
+    pct: 60,
+    week: [1, 1, 1, 0, 1, 0, 0],
+    icon: "target",
+  },
 ];
 
 export const services: Service[] = [
@@ -52,7 +80,13 @@ export const resources: Resource[] = [
 ];
 
 export const initialNotes: Note[] = [
-  { text: "Идея: Hermes должен сам триажить инбокс утром в 06:00", time: "сегодня 05:51" },
-  { text: "Проверить латентность MCP при stdio vs HTTP под нагрузкой", time: "вчера 22:08" },
+  {
+    text: "Идея: Hermes должен сам триажить инбокс утром в 06:00",
+    time: "сегодня 05:51",
+  },
+  {
+    text: "Проверить латентность MCP при stdio vs HTTP под нагрузкой",
+    time: "вчера 22:08",
+  },
   { text: "Купить термопасту для домашнего сервера", time: "вчера 19:30" },
 ];

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Card } from "../../components/ui/Card.tsx";
 import { fmtUpdated } from "../../lib/format.ts";
+import { cn } from "../../lib/cn.ts";
+import { ui } from "../../lib/ui.ts";
 import {
   getHermes,
   getHermesTasks,
@@ -14,19 +16,19 @@ import {
 
 // LED-класс по статусу AgentTask
 function cmdLed(status: string): string {
-  if (status === "done") return "done";
-  if (status === "active") return "work";
-  if (status === "error") return "error";
-  return "todo";
+  if (status === "done") return "bg-ok";
+  if (status === "active" || status === "in_progress") return "bg-accent";
+  if (status === "error") return "bg-bad";
+  return "bg-muted";
 }
 
 function StatusHeader({ data }: { data: HermesData }) {
-  const statusClass = data.status === "active" ? "busy" : data.status === "error" ? "error" : "";
+  const statusColor = cmdLed(data.status);
   return (
-    <div className={`ag-status ${statusClass}`}>
-      <span className="ag-pulse" />
-      <span className="ag-txt">
-        статус: <b>{data.status}</b>
+    <div className="flex items-center gap-2.5 rounded-card border border-hair bg-raise px-4 py-3">
+      <span className={cn("size-2.5 rounded-full", statusColor)} />
+      <span className="font-mono text-[12.5px] text-ink-soft">
+        статус: <b className="font-bold text-accent">{data.status}</b>
         {data.message ? ` · ${data.message}` : ""}
       </span>
     </div>
@@ -37,14 +39,22 @@ function ActivityFeed({ log }: { log: PanelLogLine[] }) {
   return (
     <Card icon="bot" title="Активность · глобальный фид">
       <div className="scroll" style={{ maxHeight: 320 }}>
-        {log.length === 0 && <div className="empty">Нет записей в логе.</div>}
+        {log.length === 0 && (
+          <div className="py-2.5 font-mono text-xs text-muted">
+            Нет записей в логе.
+          </div>
+        )}
         {log.map((l, i) => (
-          <div key={i} className="log-line">
-            <span className="log-t">{l.t}</span>
+          <div key={i} className="grid grid-cols-[58px_1fr] gap-2 border-t border-hair py-2.5">
+            <span className="font-mono text-[10.5px] text-muted">{l.t}</span>
             <div>
-              <div className="log-msg">{l.msg}</div>
+              <div className="text-[12.5px] leading-snug text-ink-soft">
+                {l.msg}
+              </div>
               <span className="k">{l.k}</span>{" "}
-              <span className="log-tag">· {l.tag}</span>
+              <span className="font-mono text-[10.5px] text-muted/80">
+                · {l.tag}
+              </span>
             </div>
           </div>
         ))}
@@ -79,32 +89,46 @@ function CommandConsole() {
 
   return (
     <Card icon="server" title="Командная консоль">
-      <form onSubmit={handleSend} className="task-input" style={{ marginBottom: 14 }}>
-        <div className="fld neu-in">
+      <form
+        onSubmit={handleSend}
+        className="mb-3.5 flex gap-3"
+        style={{ marginBottom: 14 }}
+      >
+        <div className="flex flex-1 items-center rounded-[14px] border border-hair bg-surface px-4">
           <input
             ref={inputRef}
+            className="w-full bg-transparent py-[13px] font-mono text-[13px] text-ink outline-none placeholder:text-muted disabled:opacity-50"
             placeholder="$ команда Hermes…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={sending}
           />
         </div>
-        <button className="addbtn" type="submit" aria-label="Отправить" disabled={sending}>
+        <button
+          className={cn(ui.button.base, ui.button.icon, "h-[50px] w-[50px] rounded-2xl text-accent")}
+          type="submit"
+          aria-label="Отправить"
+          disabled={sending}
+        >
           →
         </button>
       </form>
 
-      <div className="ag-list">
+      <div className="flex flex-col">
         {commands.length === 0 && (
-          <div className="empty">Очередь команд пуста.</div>
+          <div className="py-2.5 font-mono text-xs text-muted">
+            Очередь команд пуста.
+          </div>
         )}
         {commands.map((c) => (
-          <div key={c.id} className="ag-row" style={{ cursor: "default" }}>
-            <span className={`ag-led ${cmdLed(c.status)}`} />
+          <div key={c.id} className="grid grid-cols-[10px_1fr] items-center gap-3 border-t border-hair px-1 py-3">
+            <span className={cn("size-2 rounded-full", cmdLed(c.status))} />
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="ag-l">{c.command}</div>
-              <div className="ag-m">
-                <span className="st">{c.status}</span>
+              <div className="truncate text-[13.5px] font-medium text-ink">
+                {c.command}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-[11px] text-muted">
+                <span className="text-accent">{c.status}</span>
                 <span>· {fmtUpdated(c.createdAt)}</span>
                 {c.result && <span>· {c.result}</span>}
               </div>
@@ -118,7 +142,11 @@ function CommandConsole() {
 
 // /hermes — полная страница: статус + фид + командная консоль + задачи в работе.
 export function HermesPage() {
-  const [data, setData] = useState<HermesData>({ status: "idle", message: null, log: [] });
+  const [data, setData] = useState<HermesData>({
+    status: "idle",
+    message: null,
+    log: [],
+  });
   const [tasks, setTasks] = useState<HermesTask[]>([]);
 
   useEffect(() => {
@@ -134,37 +162,57 @@ export function HermesPage() {
   const totalLogs = tasks.reduce((s, t) => s + t.logCount, 0);
 
   return (
-    <div className="page">
+    <div className="flex flex-1 flex-col gap-5">
       <StatusHeader data={data} />
 
-      <div className="page-cols">
-        <div className="page-col-main">
+      <div className="grid grid-cols-[1.4fr_1fr] items-start gap-[22px] max-[900px]:grid-cols-1">
+        <div className="flex flex-col gap-5">
           <ActivityFeed log={data.log} />
           <CommandConsole />
         </div>
 
-        <div className="page-col-side">
+        <div className="flex flex-col gap-5">
           <Card
             icon="bot"
             title="Задачи Hermes"
-            action={<span className="panel-count">{tasks.length} · {totalLogs} зап.</span>}
+            action={
+              <span className={ui.panelCount}>
+                {tasks.length} · {totalLogs} зап.
+              </span>
+            }
           >
-            <div className="ag-list">
+            <div className="flex flex-col">
               {tasks.length === 0 && (
-                <div className="empty">Hermes пока не взял задач в работу.</div>
+                <div className="py-2.5 font-mono text-xs text-muted">
+                  Hermes пока не взял задач в работу.
+                </div>
               )}
               {tasks.map((t) => (
-                <div key={t.id} className="ag-row" style={{ cursor: "default" }}>
-                  <span className={`ag-led ${t.status === "done" ? "done" : t.status === "in_progress" ? "work" : "todo"}`} />
+                <div
+                  key={t.id}
+                  className="grid grid-cols-[10px_1fr_auto] items-center gap-3 border-t border-hair px-1 py-3"
+                  style={{ cursor: "default" }}
+                >
+                  <span
+                    className={cn("size-2 rounded-full", cmdLed(t.status))}
+                  />
                   <div style={{ minWidth: 0 }}>
-                    <div className="ag-l">{t.title}</div>
-                    <div className="ag-m">
-                      <span className="st">{t.status}</span>
-                      {t.claimedAt && <span>· взято {fmtUpdated(t.claimedAt)}</span>}
-                      {t.lastActivity && <span>· активность {fmtUpdated(t.lastActivity)}</span>}
+                    <div className="truncate text-[13.5px] font-medium text-ink">
+                      {t.title}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-[11px] text-muted">
+                      <span className="text-accent">{t.status}</span>
+                      {t.claimedAt && (
+                        <span>· взято {fmtUpdated(t.claimedAt)}</span>
+                      )}
+                      {t.lastActivity && (
+                        <span>· активность {fmtUpdated(t.lastActivity)}</span>
+                      )}
                     </div>
                   </div>
-                  <span className="ag-n">{t.logCount}</span>
+                  <span className="rounded-full border border-hair bg-surface px-2 py-0.5 font-mono text-[10.5px] text-muted">
+                    {t.logCount}
+                  </span>
                 </div>
               ))}
             </div>

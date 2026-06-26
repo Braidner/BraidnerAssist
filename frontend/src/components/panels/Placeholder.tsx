@@ -7,15 +7,19 @@ interface PlaceholderProps {
   phase: string;
 }
 
-// Неоморфный плейсхолдер для ещё не подключённых интеграций (Погода/HA/Календарь).
+// Плоский плейсхолдер для ещё не подключённых интеграций (Погода/HA/Календарь).
 export function Placeholder({ icon, title, phase }: PlaceholderProps) {
   const Ic = icons[icon];
   return (
-    <Card icon={icon} title={title} className="is-placeholder">
-      <div className="placeholder-body">
-        <span className="ph-icon neu-sm"><Ic /></span>
-        <span className="ph-text">Не подключено</span>
-        <span className="ph-phase">{phase}</span>
+    <Card icon={icon} title={title} className="justify-center">
+      <div className="flex flex-col items-start gap-1 py-1.5">
+        <span className="mb-2 grid size-[42px] place-items-center rounded-[13px] border border-hair bg-surface text-muted">
+          <Ic />
+        </span>
+        <span className="text-[13px] text-ink-soft">Не подключено</span>
+        <span className="font-mono text-[11px] tracking-[0.04em] text-muted">
+          {phase}
+        </span>
       </div>
     </Card>
   );

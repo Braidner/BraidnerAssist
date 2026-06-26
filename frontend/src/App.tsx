@@ -11,6 +11,7 @@ import { TasksProvider } from "./lib/tasksContext.tsx";
 import { SettingsPanel } from "./components/overlays/SettingsPanel.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
+import { ui } from "./lib/ui.ts";
 import { LoginForm } from "./components/overlays/LoginForm.tsx";
 import { Drawer } from "./components/layout/Drawer.tsx";
 import { Sidebar } from "./components/layout/Sidebar.tsx";
@@ -62,7 +63,10 @@ export function App() {
   }, [authed]);
 
   // ── Handlers ─────────────────────────────────────────────────────
-  const onLogout = () => { clearToken(); setAuthed(false); };
+  const onLogout = () => {
+    clearToken();
+    setAuthed(false);
+  };
 
   // ── Detail page check (hides TopBar) ─────────────────────────────
   const location = useLocation();
@@ -71,7 +75,7 @@ export function App() {
   // ── Render ────────────────────────────────────────────────────────
   if (!authed) {
     return (
-      <div className="mc" data-theme={theme}>
+      <div className={ui.shell} data-theme={theme}>
         <LoginForm onSuccess={() => setAuthed(true)} />
       </div>
     );
@@ -80,43 +84,47 @@ export function App() {
   return (
     <TabsProvider>
       <TasksProvider>
-      <div className="mc" data-theme={theme}>
-        {showSettings && (
-          <SettingsPanel
-            onClose={() => setShowSettings(false)}
-            onSave={() => setShowSettings(false)}
-          />
-        )}
-        {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
-        <CommandPalette />
-        <Drawer />
-
-        <Sidebar open={sbOpen} onClose={() => setSbOpen(false)} onSettings={() => setShowSettings(true)} />
-
-        <div className="main">
-          {!isDetailPage && (
-            <TopBar
-              clock={clock}
-              backend={backend}
-              theme={theme}
-              onToggleTheme={toggle}
-              onLogout={onLogout}
-              onSettings={() => setShowSettings(true)}
-              onLogs={() => setShowLogs(true)}
-              onMenu={() => setSbOpen(true)}
-              versionData={versionData}
+        <div className={ui.shell} data-theme={theme}>
+          {showSettings && (
+            <SettingsPanel
+              onClose={() => setShowSettings(false)}
+              onSave={() => setShowSettings(false)}
             />
           )}
+          {showLogs && <LogsPanel onClose={() => setShowLogs(false)} />}
+          <CommandPalette />
+          <Drawer />
 
-          <Routes>
-            <Route path="/" element={<OverviewPage />} />
-            <Route path="/hermes" element={<HermesPage />} />
-            <Route path="/system" element={<SystemPage />} />
-            <Route path="/media/*" element={<MediaRoutes />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Sidebar
+            open={sbOpen}
+            onClose={() => setSbOpen(false)}
+            onSettings={() => setShowSettings(true)}
+          />
+
+          <div className={ui.main}>
+            {!isDetailPage && (
+              <TopBar
+                clock={clock}
+                backend={backend}
+                theme={theme}
+                onToggleTheme={toggle}
+                onLogout={onLogout}
+                onSettings={() => setShowSettings(true)}
+                onLogs={() => setShowLogs(true)}
+                onMenu={() => setSbOpen(true)}
+                versionData={versionData}
+              />
+            )}
+
+            <Routes>
+              <Route path="/" element={<OverviewPage />} />
+              <Route path="/hermes" element={<HermesPage />} />
+              <Route path="/system" element={<SystemPage />} />
+              <Route path="/media/*" element={<MediaRoutes />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
         </div>
-      </div>
       </TasksProvider>
     </TabsProvider>
   );

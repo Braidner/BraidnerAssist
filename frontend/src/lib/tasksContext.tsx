@@ -1,5 +1,17 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { getTasks, toggleTask, createTask, deleteTask, type PanelTask } from "./api.ts";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  getTasks,
+  toggleTask,
+  createTask,
+  deleteTask,
+  type PanelTask,
+} from "./api.ts";
 
 interface TasksCtx {
   tasks: PanelTask[];
@@ -28,7 +40,10 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     const done = !task.done;
     setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done } : x)));
     toggleTask(task.id, done).then((ok) => {
-      if (!ok) setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: !done } : x)));
+      if (!ok)
+        setTasks((ts) =>
+          ts.map((x) => (x.id === task.id ? { ...x, done: !done } : x)),
+        );
     });
   };
 
@@ -52,7 +67,17 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   const clearSelection = () => setSelectedTask(null);
 
   return (
-    <Ctx.Provider value={{ tasks, selectedTask, clearSelection, onToggleTask, onAddTask, onSelectTask, onDeleteTask }}>
+    <Ctx.Provider
+      value={{
+        tasks,
+        selectedTask,
+        clearSelection,
+        onToggleTask,
+        onAddTask,
+        onSelectTask,
+        onDeleteTask,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

@@ -73,10 +73,10 @@
   --accent: #34dca6; /* green */
   --accent-ink: #052017;
 
-  --font: "Outfit", system-ui, -apple-system, sans-serif;
+  --font: "Syne", system-ui, -apple-system, sans-serif;
   --mono:
     "JetBrains Mono", "Inconsolata", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-ui: "Outfit", system-ui, -apple-system, sans-serif;
+  --font-ui: "Syne", system-ui, -apple-system, sans-serif;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 

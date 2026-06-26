@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { Card } from "../../../components/ui/Card.tsx";
 import { icons } from "../../../components/icons.tsx";
 import { fmtUpdated } from "../../../lib/format.ts";
-import type { PanelTask, Prio } from "../../../lib/api.ts";
+import type { Prio } from "../../../lib/api.ts";
+import { useTasksCtx } from "../../../lib/tasksContext.tsx";
 
 const PRIO_VAR: Record<Prio, string> = {
   bad: "var(--bad)",
@@ -11,16 +12,8 @@ const PRIO_VAR: Record<Prio, string> = {
   info: "var(--info)",
 };
 
-interface TasksPanelProps {
-  tasks: PanelTask[];
-  onToggle: (t: PanelTask) => void;
-  onAdd: (title: string) => void;
-  onSelect: (t: PanelTask) => void;
-  onDelete: (t: PanelTask) => void;
-  flat?: boolean;
-}
-
-export function TasksPanel({ tasks, onToggle, onAdd, onSelect, onDelete, flat }: TasksPanelProps) {
+export function TasksPanel({ flat }: { flat?: boolean }) {
+  const { tasks, onToggleTask: onToggle, onAddTask: onAdd, onSelectTask: onSelect, onDeleteTask: onDelete } = useTasksCtx();
   const open = tasks.filter((t) => !t.done).length;
   const [showDone, setShowDone] = useState(false);
   const visible = showDone ? tasks : tasks.filter((t) => !t.done);

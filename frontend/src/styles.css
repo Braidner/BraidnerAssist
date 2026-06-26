@@ -1,6 +1,9 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @theme inline {
+  /* ── project utility tokens ─────────────────────────────────────── */
   --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -18,7 +21,36 @@
   --color-hair: var(--hair);
   --font-ui: var(--font-ui);
   --font-mono: var(--mono);
-  --radius-card: var(--radius);
+  --font-sans: var(--font-ui);
+  --radius-card: var(--card-radius);
+
+  /* ── shadcn semantic tokens → mapped onto the project palette ─────
+     Two names (accent, muted) are shared with project utilities and keep
+     their project meaning on purpose: shadcn focus/hover surfaces land on
+     the brand green / dim slate, which is on-brand for this dashboard. */
+  --color-background: var(--page);
+  --color-foreground: var(--ink);
+  --color-card: var(--raise);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--raise);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-ink);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--ink);
+  --color-muted-foreground: var(--muted);
+  --color-accent-foreground: var(--accent-ink);
+  --color-destructive: var(--bad);
+  --color-destructive-foreground: var(--accent-ink);
+  --color-border: var(--hair);
+  --color-input: var(--hair);
+  --color-ring: var(--accent);
+
+  /* radius scale consumed by shadcn components (rounded-sm/md/lg/xl) */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
 }
 
 /* Project scale tokens — dense dashboard type ramp, label tracking, custom
@@ -69,7 +101,8 @@
    ============================================================ */
 
 :root {
-  --radius: 19px; /* corner radius */
+  --radius: 0.625rem; /* shadcn component corner radius (10px) */
+  --card-radius: 19px; /* project card corner radius */
   --accent: #34dca6; /* green */
   --accent-ink: #052017;
 
@@ -119,6 +152,12 @@
 }
 
 /* ============================================================ base */
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

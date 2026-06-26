@@ -31,7 +31,7 @@ export function Card({
         <span className={ui.panelTitle}>
           {Ic && (
             <span className="grid place-items-center text-ink-soft">
-              <Ic />
+              <Ic className="size-[15px]" />
             </span>
           )}
           {title}

@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { Card } from "../Card.tsx";
-import { icons } from "../icons.tsx";
-import { fmtUpdated } from "../../lib/format.ts";
-import type { PanelTask, Prio } from "../../lib/api.ts";
+import { Card } from "../../../components/ui/Card.tsx";
+import { icons } from "../../../components/icons.tsx";
+import { fmtUpdated } from "../../../lib/format.ts";
+import type { PanelTask, Prio } from "../../../lib/api.ts";
 
 const PRIO_VAR: Record<Prio, string> = {
   bad: "var(--bad)",

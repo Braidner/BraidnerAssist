@@ -3,13 +3,13 @@
 // MEDIA_ROOT на бэкенде. Не настроен MEDIA_ROOT → секция не показывается.
 
 import { useEffect, useState } from "react";
-import { Card } from "../Card.tsx";
+import { Card } from "../ui/Card.tsx";
 import {
   listFiles, fsMkdir, fsRename, fsMove, fsDelete,
   type FileEntry, type FileListing,
 } from "../../lib/api.ts";
-import { fmtSize } from "./mediaShared.tsx";
-import { useToast } from "../Toast.tsx";
+import { fmtSize } from "../../pages/media/shared/mediaShared.tsx";
+import { useToast } from "../ui/Toast.tsx";
 
 const fmtDate = (ms: number) => (ms ? new Date(ms).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "");
 const icon = (e: FileEntry) =>

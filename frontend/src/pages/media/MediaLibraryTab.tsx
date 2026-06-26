@@ -5,7 +5,7 @@ import {
   refreshJellyfin, getMediaLibrary, jellyfinPosterUrl, jellyfinBackdropUrl,
   type LibraryItem, type ResumeItem,
 } from "../../lib/api.ts";
-import { useToast } from "../Toast.tsx";
+import { useToast } from "../../components/ui/Toast.tsx";
 
 interface MediaLibraryTabProps {
   library: LibraryItem[];

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Card } from "../Card.tsx";
-import { fmtUpdated } from "../../lib/format.ts";
-import { getTaskLogs, type HermesData, type HermesTask, type PanelLogLine } from "../../lib/api.ts";
+import { Card } from "../../../components/ui/Card.tsx";
+import { fmtUpdated } from "../../../lib/format.ts";
+import { getTaskLogs, type HermesData, type HermesTask, type PanelLogLine } from "../../../lib/api.ts";
 
 const STATUS_LABEL: Record<string, string> = {
   in_progress: "в работе",

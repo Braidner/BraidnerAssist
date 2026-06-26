@@ -4,15 +4,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./mediaShared.tsx";
-import { TorrentFilePicker, ContentTorrents } from "./mediaPick.tsx";
+import { Player, ReleasePicker, ImportDrawer, fmtSize } from "./shared/mediaShared.tsx";
+import { TorrentFilePicker, ContentTorrents } from "./shared/mediaPick.tsx";
 import {
   getMoviePageDetail, getMovieDiscoverDetail, addTitle,
   getMediaPlayUrl, getMediaDevices, playOnDevice, jellyfinPosterUrl, jellyfinBackdropUrl, posterUrl,
   seasonSearch, setMonitored, getMediaLibrary,
   type MoviePageDetail, type DownloadItem, type MediaData, type PlayDevice, type LibraryItem,
 } from "../../lib/api.ts";
-import { useToast } from "../Toast.tsx";
+import { useToast } from "../../components/ui/Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 

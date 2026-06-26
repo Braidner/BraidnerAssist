@@ -1,13 +1,13 @@
 // System tab for MediaPage: download queue, active TorrServer streams.
 
-import { Card } from "../Card.tsx";
-import { FileBrowser } from "./FileBrowser.tsx";
+import { Card } from "../../components/ui/Card.tsx";
+import { FileBrowser } from "../../components/panels/FileBrowser.tsx";
 import {
   torrserverStreamUrl,
   type MediaData, type DownloadItem, type TorrServerStream,
 } from "../../lib/api.ts";
-import { ProgressBar, fmtSize, fmtSpeed, fmtEta } from "./mediaShared.tsx";
-import { useToast } from "../Toast.tsx";
+import { ProgressBar, fmtSize, fmtSpeed, fmtEta } from "./shared/mediaShared.tsx";
+import { useToast } from "../../components/ui/Toast.tsx";
 
 const SOURCE_LABEL: Record<DownloadItem["source"], string> = {
   sonarr: "Sonarr",

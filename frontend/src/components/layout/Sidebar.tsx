@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { icons, type IconName } from "./icons.tsx";
+import { icons, type IconName } from "../icons.tsx";
 
 interface NavItem {
   to: string;

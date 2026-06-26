@@ -7,9 +7,9 @@ import Hls from "hls.js";
 import {
   searchReleaseOptions, grabRelease, getImportCandidates, executeImport,
   type DownloadItem, type ReleaseOption, type ManualImportFile,
-} from "../../lib/api.ts";
-import { getToken } from "../../lib/auth.ts";
-import { useToast } from "../Toast.tsx";
+} from "../../../lib/api.ts";
+import { getToken } from "../../../lib/auth.ts";
+import { useToast } from "../../../components/ui/Toast.tsx";
 
 export function ProgressBar({ pct }: { pct: number }) {
   const color = pct >= 100 ? "var(--ok)" : "var(--accent)";

@@ -1,6 +1,6 @@
-import { Card } from "../Card.tsx";
-import { Placeholder } from "./Placeholder.tsx";
-import type { HassData, HassAutomation } from "../../lib/api.ts";
+import { Card } from "../../../components/ui/Card.tsx";
+import { Placeholder } from "../../../components/panels/Placeholder.tsx";
+import type { HassData, HassAutomation } from "../../../lib/api.ts";
 
 interface Props {
   data: HassData;

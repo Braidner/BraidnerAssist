@@ -1,7 +1,7 @@
 // Страница /metrics — история аптайма сервисов со спарклайнами и аптайм-%.
 
-import { Card } from "../Card.tsx";
-import { Placeholder } from "./Placeholder.tsx";
+import { Card } from "../../components/ui/Card.tsx";
+import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import type { UptimeSeries, UptimeSample } from "../../lib/api.ts";
 
 const STATUS_COLOR: Record<string, string> = {

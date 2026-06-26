@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Placeholder } from "./Placeholder.tsx";
+import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import {
   getMediaLibrary, addTorrent, torrentAction, refreshJellyfin,
   lookupTitle, addTitle, searchReleases, posterUrl,
@@ -16,8 +16,8 @@ import {
 } from "../../lib/api.ts";
 import {
   ReleasePicker, ImportDrawer, Player, fmtSize,
-} from "./mediaShared.tsx";
-import { useToast } from "../Toast.tsx";
+} from "./shared/mediaShared.tsx";
+import { useToast } from "../../components/ui/Toast.tsx";
 import { MediaLibraryTab } from "./MediaLibraryTab.tsx";
 import { MediaDiscoverTab } from "./MediaDiscoverTab.tsx";
 import { MediaSystemTab } from "./MediaSystemTab.tsx";

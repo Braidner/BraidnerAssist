@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { login } from "../lib/auth.ts";
+import { login } from "../../lib/auth.ts";
 
 interface Props {
   onSuccess: () => void;

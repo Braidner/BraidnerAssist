@@ -5,15 +5,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Player, ReleasePicker, ImportDrawer, ProgressBar, fmtSize } from "./mediaShared.tsx";
-import { TorrentFilePicker, ContentTorrents } from "./mediaPick.tsx";
+import { Player, ReleasePicker, ImportDrawer, ProgressBar, fmtSize } from "./shared/mediaShared.tsx";
+import { TorrentFilePicker, ContentTorrents } from "./shared/mediaPick.tsx";
 import {
   getSeriesPageDetail, getSeriesDiscoverDetail, addTitle,
   getMediaPlayUrl, jellyfinPosterUrl, jellyfinBackdropUrl, posterUrl, seasonSearch, setMonitored,
   getMediaLibrary,
   type SeriesPageDetail, type DownloadItem, type MediaData, type LibraryItem,
 } from "../../lib/api.ts";
-import { useToast } from "../Toast.tsx";
+import { useToast } from "../../components/ui/Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 const fmtAir = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("ru-RU") : "");

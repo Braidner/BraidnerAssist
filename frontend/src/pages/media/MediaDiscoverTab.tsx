@@ -1,7 +1,7 @@
 // Discover tab for MediaPage: lookup search, recommendations, calendar.
 
 import { useNavigate } from "react-router-dom";
-import { Card } from "../Card.tsx";
+import { Card } from "../../components/ui/Card.tsx";
 import {
   posterUrl,
   type ArrLookupItem, type Recommendation, type CalendarItem, type TmdbItem,

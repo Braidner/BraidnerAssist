@@ -8,9 +8,9 @@ import { useEffect, useState } from "react";
 import {
   searchReleases, previewTorrentFiles, grabSelectedFiles, getContentTorrents, pickMoreFiles, organizeTorrent,
   type SearchResult, type PickFile, type TorrentPreview, type ContentTorrent,
-} from "../../lib/api.ts";
+} from "../../../lib/api.ts";
 import { fmtSize, ProgressBar } from "./mediaShared.tsx";
-import { useToast } from "../Toast.tsx";
+import { useToast } from "../../../components/ui/Toast.tsx";
 
 type Key = { contentType: "movie" | "series"; tmdbId?: number | null; tvdbId?: number | null; title: string };
 

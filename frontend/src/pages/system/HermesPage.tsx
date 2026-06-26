@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Card } from "../Card.tsx";
+import { Card } from "../../components/ui/Card.tsx";
 import { fmtUpdated } from "../../lib/format.ts";
 import {
   getHermesCommands,

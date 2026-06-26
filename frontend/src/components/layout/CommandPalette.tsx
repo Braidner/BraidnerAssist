@@ -5,8 +5,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
-import { icons } from "./icons.tsx";
-import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, type DockerContainer, type AdguardData, type UnifiedSearchResult } from "../lib/api.ts";
+import { icons } from "../icons.tsx";
+import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, type DockerContainer, type AdguardData, type UnifiedSearchResult } from "../../lib/api.ts";
 
 const EMPTY_MEDIA: UnifiedSearchResult = { inLibrary: [], discover: [], releases: [] };
 

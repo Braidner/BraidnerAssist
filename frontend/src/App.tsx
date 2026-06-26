@@ -7,26 +7,26 @@ import {
   setUnauthorizedHandler,
   type PanelTask, type HermesData, type HermesTask, type ServicesData, type WeatherData, type ProxmoxData, type VersionData, type HassData, type DockerData, type UptimeSeries, type AdguardData, type MediaData,
 } from "./lib/api.ts";
-import { SettingsPanel } from "./components/panels/SettingsPanel.tsx";
-import { LogsPanel } from "./components/LogsPanel.tsx";
+import { SettingsPanel } from "./components/overlays/SettingsPanel.tsx";
+import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
 import { getToken, clearToken } from "./lib/auth.ts";
-import { LoginForm } from "./components/LoginForm.tsx";
-import { Drawer } from "./components/Drawer.tsx";
-import { Sidebar } from "./components/Sidebar.tsx";
-import { TopBar } from "./components/panels/TopBar.tsx";
+import { LoginForm } from "./components/overlays/LoginForm.tsx";
+import { Drawer } from "./components/layout/Drawer.tsx";
+import { Sidebar } from "./components/layout/Sidebar.tsx";
+import { TopBar } from "./components/layout/TopBar.tsx";
 import { MiniWidgets } from "./components/panels/StatStrip.tsx";
-import { TasksPanel } from "./components/panels/Tasks.tsx";
-import { HermesLogPanel } from "./components/panels/HermesLog.tsx";
-import { HomeAssistantPanel } from "./components/panels/HomeAssistant.tsx";
-import { HermesPage } from "./components/panels/HermesPage.tsx";
-import { SystemPage } from "./components/panels/SystemPage.tsx";
-import { MetricsPage } from "./components/panels/MetricsPage.tsx";
-import { MediaPage } from "./components/panels/MediaPage.tsx";
-import { MediaSeriesPage } from "./components/panels/MediaSeriesPage.tsx";
-import { MediaMoviePage } from "./components/panels/MediaMoviePage.tsx";
-import { MediaCalendarPage } from "./components/panels/MediaCalendarPage.tsx";
+import { TasksPanel } from "./pages/overview/panels/TasksPanel.tsx";
+import { HermesLogPanel } from "./pages/overview/panels/HermesLogPanel.tsx";
+import { HomeAssistantPanel } from "./pages/overview/panels/HAssistantPanel.tsx";
+import { HermesPage } from "./pages/system/HermesPage.tsx";
+import { SystemPage } from "./pages/system/SystemPage.tsx";
+import { MetricsPage } from "./pages/system/MetricsPage.tsx";
+import { MediaPage } from "./pages/media/MediaPage.tsx";
+import { MediaSeriesPage } from "./pages/media/MediaSeriesPage.tsx";
+import { MediaMoviePage } from "./pages/media/MediaMoviePage.tsx";
+import { MediaCalendarPage } from "./pages/media/MediaCalendarPage.tsx";
 import { StubPage } from "./components/panels/StubPage.tsx";
-import { CommandPalette } from "./components/CommandPalette.tsx";
+import { CommandPalette } from "./components/layout/CommandPalette.tsx";
 
 type Backend = "up" | "down" | "checking";
 

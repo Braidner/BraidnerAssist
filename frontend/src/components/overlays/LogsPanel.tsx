@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { icons } from "./icons.tsx";
-import { getLogs, type LogEntry, type LogLevel } from "../lib/api.ts";
+import { icons } from "../icons.tsx";
+import { getLogs, type LogEntry, type LogLevel } from "../../lib/api.ts";
 
 interface LogsPanelProps {
   onClose: () => void;

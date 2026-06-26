@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { icons, type IconName } from "./icons.tsx";
+import { icons, type IconName } from "../icons.tsx";
 
 interface CardProps {
   icon?: IconName;

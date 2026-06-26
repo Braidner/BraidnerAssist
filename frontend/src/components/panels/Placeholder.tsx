@@ -1,4 +1,4 @@
-import { Card } from "../Card.tsx";
+import { Card } from "../ui/Card.tsx";
 import { icons, type IconName } from "../icons.tsx";
 
 interface PlaceholderProps {

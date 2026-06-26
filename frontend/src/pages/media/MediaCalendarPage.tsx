@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card } from "../Card.tsx";
+import { Card } from "../../components/ui/Card.tsx";
 import { getCalendar, type CalendarItem } from "../../lib/api.ts";
 
 const dayKey = (iso: string) => new Date(iso).toISOString().slice(0, 10);

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Card } from "../Card.tsx";
-import { Ring } from "../Ring.tsx";
-import { Placeholder } from "./Placeholder.tsx";
+import { Card } from "../../components/ui/Card.tsx";
+import { Ring } from "../../components/ui/Ring.tsx";
+import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import type { ProxmoxData, ServicesData, DockerData, DockerContainer, AdguardData } from "../../lib/api.ts";
 import { dockerAction, getDocker } from "../../lib/api.ts";
 

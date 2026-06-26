@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import { icons } from "../icons.tsx";
-import { sendHermesCommand, type PanelTask } from "../../lib/api.ts";
-
-interface DrawerProps {
-  task: PanelTask | null;
-  onClose: () => void;
-}
+import { sendHermesCommand } from "../../lib/api.ts";
+import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
 const PRIO_LABEL: Record<string, string> = {
   bad: "Высокий",
@@ -21,7 +17,8 @@ const PRIO_COLOR: Record<string, string> = {
   info: "var(--info)",
 };
 
-export function Drawer({ task, onClose }: DrawerProps) {
+export function Drawer() {
+  const { selectedTask: task, clearSelection: onClose } = useTasksCtx();
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
 

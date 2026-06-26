@@ -50,8 +50,8 @@ export default defineConfig({
     port: 3000,
     host: true,
     proxy: {
-      "/api": "http://localhost:3001",
-      "/healthz": "http://localhost:3001",
+      "/api": "http://hermes.lan:3001",
+      "/healthz": "http://hermes.lan:3001",
     },
   },
 });

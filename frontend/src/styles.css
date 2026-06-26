@@ -212,13 +212,6 @@ body.sb-locked { overflow: hidden; }
 
 /* ============================================================ header */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-.tb-left { display: flex; align-items: center; gap: 15px; }
-.tb-brand { display: flex; align-items: center; gap: 15px; background: none; border: none; padding: 0; margin: 0; cursor: pointer; text-align: left; }
-.tb-brand:hover .tb-name { opacity: .85; }
-.tb-mark { width: 50px; height: 50px; border-radius: 15px; flex: none; display: grid; place-items: center; color: var(--accent); }
-.tb-name { font-size: 24px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); line-height: 1.05; transition: opacity .15s; }
-.tb-sub { font-size: 11px; color: var(--muted); letter-spacing: .05em; margin-top: 2px; }
-.tb-right { display: flex; align-items: center; gap: 12px; }
 .menu-btn { display: none; width: 44px; height: 44px; flex: none; border: none; cursor: pointer; border-radius: 13px; background: var(--raise); color: var(--ink); place-items: center;
   box-shadow: calc(3px*var(--depth)) calc(3px*var(--depth)) calc(7px*var(--depth)) var(--sd), calc(-3px*var(--depth)) calc(-3px*var(--depth)) calc(6px*var(--depth)) var(--sl); }
 
@@ -246,9 +239,6 @@ body.sb-locked { overflow: hidden; }
   color: var(--accent);
   box-shadow: inset calc(3px*var(--depth)) calc(3px*var(--depth)) calc(6px*var(--depth)) var(--sd), inset calc(-3px*var(--depth)) calc(-3px*var(--depth)) calc(5px*var(--depth)) var(--sl);
 }
-.tb-clock { text-align: right; margin-left: 4px; }
-.tb-time { font-family: var(--font); font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: .01em; }
-.tb-date { font-family: var(--font); font-size: 11px; color: var(--muted); letter-spacing: .06em; margin-top: 4px; }
 
 /* ============================================================ stat carousel */
 .carousel { display: flex; flex-direction: column; }
@@ -379,6 +369,39 @@ body.sb-locked { overflow: hidden; }
   background: rgba(0,0,0,0.02);
   border-color: rgba(0,0,0,0.08);
 }
+
+/* ── Layout utilities ── */
+.flex-col     { display: flex; flex-direction: column; }
+.flex-row     { display: flex; align-items: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.grid-2col    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Overview flat panels (fcard mode) ── */
+.fcard-body { padding: 14px 16px; }
+.ov-grid-2  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ov-toggle-card {
+  padding: 11px 12px; border-radius: 8px; cursor: pointer;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.045);
+  transition: background 0.18s, border-color 0.18s;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ov-toggle-card.on {
+  background: rgba(255,255,255,0.055);
+  border-color: rgba(255,255,255,0.1);
+}
+.ov-mini-toggle {
+  width: 30px; height: 16px; border-radius: 8px; position: relative;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.08);
+  transition: background 0.22s; flex-shrink: 0;
+}
+.ov-mini-toggle.on { background: var(--accent); }
+.ov-mini-knob {
+  position: absolute; top: 1px; width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: left 0.22s;
+}
+.mc[data-theme="light"] .ov-toggle-card { background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.06); }
+.mc[data-theme="light"] .ov-toggle-card.on { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.12); }
 
 .tlist { display: flex; flex-direction: column; }
 .titem { display: flex; align-items: flex-start; gap: 14px; padding: 15px 6px; cursor: pointer; border-radius: 12px; transition: background .15s; position: relative; }
@@ -624,15 +647,6 @@ body.sb-locked { overflow: hidden; }
   box-shadow: calc(2px*var(--depth)) calc(2px*var(--depth)) calc(4px*var(--depth)) var(--sd); }
 .seg-btn:not(.on):hover { color: var(--ink); }
 
-/* Media page tabs (Библиотека / Дискавери / Система) */
-.media-tabs { display: flex; gap: 8px; padding: 6px; border-radius: 14px; background: var(--surface);
-  box-shadow: inset calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd), inset calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(5px*var(--depth)) var(--sl); }
-.media-tab-btn { flex: 1; height: 40px; border: none; cursor: pointer; border-radius: 11px; background: transparent; color: var(--muted);
-  font-family: var(--font-ui); font-size: 13.5px; font-weight: 500; letter-spacing: .01em; transition: color .14s, box-shadow .14s, background .14s; }
-.media-tab-btn.active { color: var(--accent-ink); background: var(--accent);
-  box-shadow: calc(2px*var(--depth)) calc(2px*var(--depth)) calc(4px*var(--depth)) var(--sd); }
-.media-tab-btn:not(.active):hover { color: var(--ink); }
-
 /* Title lookup results (Radarr/Sonarr) */
 .lk-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
 .lk-row { display: flex; gap: 11px; align-items: center; padding: 10px 12px; border-radius: calc(var(--radius) * 0.6); background: var(--surface);
@@ -686,30 +700,14 @@ body.sb-locked { overflow: hidden; }
 
 /* ── Детальная страница фильма/сериала ── */
 .mediadetail-back { margin-bottom: 14px; }
-.mediadetail-head { display: flex; gap: 20px; padding: 20px; margin-bottom: 16px; }
-.mediadetail-poster { flex: none; width: 150px; height: 225px; border-radius: 12px; object-fit: cover; background: var(--groove); }
-.mediadetail-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
 .mediadetail-titlerow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.mediadetail-title { font-family: var(--font-ui); font-size: 22px; font-weight: 600; color: var(--ink); margin: 0; }
-.mediadetail-year { font-size: 14px; color: var(--muted); }
-.mediadetail-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .mediadetail-facts { font-size: 11.5px; color: var(--muted); }
-.mediadetail-overview { font-family: var(--font-ui); font-size: 13px; line-height: 1.5; color: var(--ink); margin: 2px 0 0; opacity: .9; }
-.mediadetail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .mediadetail-import { align-self: flex-start; color: var(--warn, #f59e0b);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn, #f59e0b) 45%, transparent),
     calc(2px*var(--depth)) calc(2px*var(--depth)) calc(5px*var(--depth)) var(--sd),
     calc(-2px*var(--depth)) calc(-2px*var(--depth)) calc(4px*var(--depth)) var(--sl); }
-.mediadetail-filerow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-.mediadetail-ep { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; transition: background .12s; }
-.mediadetail-ep:hover { background: var(--hair); }
-.mediadetail-ep-title { flex: 1; min-width: 0; font-family: var(--font-ui); font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mediadetail-ep-air { font-size: 10.5px; color: var(--muted); flex: none; }
 .mediadetail-missing { font-family: var(--font); font-size: 10px; color: var(--muted); padding: 2px 7px; border-radius: 99px; background: var(--groove); white-space: nowrap; }
-@media (max-width: 640px) {
-  .mediadetail-head { flex-direction: column; align-items: center; text-align: center; }
-  .mediadetail-badges, .mediadetail-filerow, .mediadetail-titlerow { justify-content: center; }
-}
 
 /* ============================================================ Logs panel */
 .logs-panel { min-width: min(92vw, 680px); max-width: 780px; background: var(--raise); border-radius: var(--radius); padding: 24px 26px; }
@@ -744,10 +742,6 @@ body.sb-locked { overflow: hidden; }
 
   .main { padding: 18px 16px 30px; gap: 18px; }
   .topbar { gap: 14px; }
-  .tb-clock { display: none; }
-  .tb-right .chip { display: none; }
-  .tb-name { font-size: 21px; }
-  .tb-sub { font-size: 10px; }
 
   .cols { grid-template-columns: 1fr; gap: 18px; }
   .cols > :nth-child(3) { grid-column: auto; }
@@ -842,17 +836,6 @@ body.sb-locked { overflow: hidden; }
 .cal-wait { flex: none; font-size: 11px; color: var(--warn); }
 .cal-unmon { flex: none; font-size: 11px; color: var(--muted); }
 
-/* ─── Продолжить просмотр (resume) ───────────────────────────────── */
-.resume-row { display: flex; gap: 12px; overflow-x: auto; padding: 8px 2px 4px; scroll-snap-type: x proximity; }
-.resume-tile { position: relative; flex: none; width: 150px; padding: 0; border: none; background: none; cursor: pointer;
-  border-radius: 12px; overflow: hidden; scroll-snap-align: start; text-align: left; }
-.resume-thumb { width: 100%; height: 84px; object-fit: cover; display: block; background: var(--groove); }
-.resume-prog { position: absolute; left: 0; right: 0; top: 78px; padding: 0 6px; }
-.resume-name { display: block; padding: 8px 8px 9px; font-size: 11.5px; line-height: 1.3; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.resume-play { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
-  display: grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--accent) 85%, transparent); color: #06241a; }
-
 /* ─── Сетка библиотеки: оверлеи / фильтры / скелетоны ────────────── */
 .lib-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .media-poster-box { position: relative; display: block; width: calc(100% + 24px); margin: 0 -12px 8px; }
@@ -866,7 +849,7 @@ body.sb-locked { overflow: hidden; }
 @keyframes skel-pulse { 0%,100% { opacity: .5; } 50% { opacity: .85; } }
 
 /* ─── Доступность: видимый фокус на интерактиве ──────────────────── */
-.media-item:focus-visible, .resume-tile:focus-visible, .btn:focus-visible, .seg-btn:focus-visible, .cmdk-item:focus-visible {
+.media-item:focus-visible, .btn:focus-visible, .seg-btn:focus-visible, .cmdk-item:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -880,7 +863,6 @@ body.sb-locked { overflow: hidden; }
   .media-season-head { flex-wrap: wrap; }
   .season-prog { min-width: 80px; }
   .media-ep-thumb { width: 44px; height: 26px; }
-  .resume-tile { width: 130px; }
 }
 
 /* ─── Сводка очереди загрузок ─────────────────────────────────────── */
@@ -1225,14 +1207,6 @@ body.sb-locked { overflow: hidden; }
 }
 .disc-header-title { font-family: "Oswald", var(--font); font-size: 34px; font-weight: 700; letter-spacing: 0.05em; color: var(--ink); line-height: 1; }
 .disc-header-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-.disc-shuffle-btn {
-  margin-left: auto; display: flex; align-items: center; gap: 7px;
-  padding: 9px 18px; border-radius: 8px; cursor: pointer;
-  border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
-  font-family: "Syne", var(--font); font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-  color: var(--ink-soft); transition: background 0.18s, color 0.18s;
-}
-.disc-shuffle-btn:hover { background: rgba(255,255,255,0.08); color: var(--accent); }
 .disc-section { padding: 0 36px; margin-bottom: 50px; }
 .disc-sec-head { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
 .disc-sec-label { font-family: "Oswald", var(--font); font-size: 20px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink); white-space: nowrap; }
@@ -1345,7 +1319,6 @@ body.sb-locked { overflow: hidden; }
   .disc-section { padding: 0 18px; }
   .disc-header { padding: 24px 18px 20px; }
   .disc-header-title { font-size: 26px; }
-  .disc-shuffle-btn { display: none; }
   .poster-card { width: 136px; }
   .watch-card { width: 236px; }
   .det-hero { height: 50vh; min-height: 300px; }

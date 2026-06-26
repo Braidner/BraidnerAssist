@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { NAV_ITEMS } from "./Sidebar.tsx";
 import { icons } from "../icons.tsx";
-import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, type DockerContainer, type AdguardData, type UnifiedSearchResult } from "../../lib/api.ts";
+import { sendHermesCommand, dockerAction, adguardProtection, unifiedSearch, addTitle, addTorrent, getDocker, getAdguard, type DockerData, type AdguardData, type UnifiedSearchResult } from "../../lib/api.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
 const EMPTY_MEDIA: UnifiedSearchResult = { inLibrary: [], discover: [], releases: [] };
@@ -18,12 +18,19 @@ interface Action {
   run: () => void;
 }
 
-interface Props {
-  containers: DockerContainer[];
-  adguard: AdguardData;
-}
+export function CommandPalette() {
+  const [docker, setDocker] = useState<DockerData>({ configured: false, containers: [] });
+  const [adguard, setAdguard] = useState<AdguardData>({ configured: false, dnsQueries: 0, blocked: 0, blockedPercent: 0, avgProcessingMs: 0, topBlocked: [] });
 
-export function CommandPalette({ containers, adguard }: Props) {
+  useEffect(() => {
+    getDocker().then(setDocker);
+    getAdguard().then(setAdguard);
+    const t = setInterval(() => {
+      getDocker().then(setDocker);
+      getAdguard().then(setAdguard);
+    }, 30_000);
+    return () => clearInterval(t);
+  }, []);
   const { onAddTask } = useTasksCtx();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -82,13 +89,13 @@ export function CommandPalette({ containers, adguard }: Props) {
   // Действия с Docker-контейнерами (рестарт).
   const dockerActions: Action[] = useMemo(
     () =>
-      containers.map((c) => ({
+      docker.containers.map((c) => ({
         id: `docker:${c.id}`,
         label: `Перезапустить ${c.name}`,
         hint: "Docker",
         run: async () => { await dockerAction(c.id, "restart"); done(`Перезапущен ${c.name} ✓`); },
       })),
-    [containers],
+    [docker.containers],
   );
 
   // Действия с AdGuard DNS (пауза/возобновление фильтрации).

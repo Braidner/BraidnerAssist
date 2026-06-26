@@ -207,7 +207,7 @@ body.sb-locked { overflow: hidden; }
 .main {
   flex: 1; min-width: 0;
   padding: 26px 30px 36px;
-  display: flex; flex-direction: column; gap: 22px;
+  display: flex; flex-direction: column; gap: 0;
 }
 
 /* ============================================================ header */

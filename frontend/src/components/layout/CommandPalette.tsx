@@ -275,7 +275,7 @@ export function CommandPalette() {
           </span>
           <input
             ref={inputRef}
-            className="flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+            className="flex-1 bg-transparent text-lead text-ink outline-none placeholder:text-muted"
             placeholder="Команда, задача или страница…"
             value={query}
             onChange={(e) => {
@@ -293,7 +293,7 @@ export function CommandPalette() {
         </div>
 
         {feedback ? (
-          <div className="px-4 py-[18px] text-center text-[13.5px] text-accent">
+          <div className="px-4 py-[18px] text-center text-row text-accent">
             {feedback}
           </div>
         ) : (
@@ -307,7 +307,7 @@ export function CommandPalette() {
                 <button
                   key={a.id}
                   className={cn(
-                    "flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-[10px] border border-transparent bg-transparent px-3 py-2.5 text-left text-[13.5px] text-ink transition-colors",
+                    "flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-[10px] border border-transparent bg-transparent px-3 py-2.5 text-left text-row text-ink transition-colors",
                     i === clampedSel &&
                       "border-accent/35 bg-accent/10 text-accent",
                   )}
@@ -315,7 +315,7 @@ export function CommandPalette() {
                   onClick={() => a.run()}
                 >
                   <span className="min-w-0 truncate">{a.label}</span>
-                  <span className="flex-none font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted">
+                  <span className="flex-none font-mono text-label uppercase tracking-2 text-muted">
                     {a.hint}
                   </span>
                 </button>

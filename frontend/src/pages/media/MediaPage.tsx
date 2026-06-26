@@ -205,14 +205,14 @@ function AddTorrentDrawer({
                       </div>
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <span
-                          className="truncate whitespace-nowrap text-[13px] font-medium text-ink"
+                          className="truncate whitespace-nowrap text-body font-medium text-ink"
                           title={it.title}
                         >
                           {it.title}
                           {it.year ? ` (${it.year})` : ""}
                         </span>
                         {it.overview && (
-                          <span className="line-clamp-2 text-[11px] leading-[1.35] text-muted">
+                          <span className="line-clamp-2 text-data leading-[1.35] text-muted">
                             {it.overview}
                           </span>
                         )}

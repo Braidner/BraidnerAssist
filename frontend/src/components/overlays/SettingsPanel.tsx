@@ -53,7 +53,7 @@ export function SettingsPanel({ onClose, onSave }: SettingsPanelProps) {
     >
       <div className="flex w-[min(540px,100%)] flex-col rounded-card border border-hair bg-raise px-7 py-6">
         <div className="mb-[18px] flex items-center justify-between">
-          <span className="flex items-center text-[15px] font-semibold text-ink">
+          <span className="flex items-center text-lead font-semibold text-ink">
             <icons.gear
               style={{ width: 16, height: 16, marginRight: 8, opacity: 0.7 }}
             />
@@ -64,7 +64,7 @@ export function SettingsPanel({ onClose, onSave }: SettingsPanelProps) {
           </button>
         </div>
 
-        <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted">
+        <div className="mb-2.5 font-mono text-label uppercase tracking-3 text-muted">
           Homelab Services
         </div>
 
@@ -99,7 +99,7 @@ export function SettingsPanel({ onClose, onSave }: SettingsPanelProps) {
           Добавить
         </button>
 
-        {error && <div className="mb-2.5 text-[12.5px] text-bad">{error}</div>}
+        {error && <div className="mb-2.5 text-cell text-bad">{error}</div>}
 
         <div className="mt-1 flex justify-end">
           <button className={cn(ui.button.base, "px-5")} onClick={save} disabled={saving}>

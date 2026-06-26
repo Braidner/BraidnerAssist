@@ -73,7 +73,7 @@ export function Drawer() {
         {task && (
           <div className="flex h-full flex-col overflow-y-auto px-[22px] pb-7 pt-6">
             <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-[7px] font-mono text-[11.5px] text-muted">
+              <div className="flex items-center gap-[7px] font-mono text-pill text-muted">
                 {task.kind === "mr" ? (
                   <icons.git style={{ width: 14, height: 14 }} />
                 ) : (
@@ -81,7 +81,7 @@ export function Drawer() {
                 )}
                 <span>{task.kind === "mr" ? "Merge Request" : "Issue"}</span>
                 {task.projectRef && (
-                  <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-muted">
+                  <span className="rounded-md bg-surface-2 px-2 py-0.5 text-data text-muted">
                     {task.projectRef}
                   </span>
                 )}
@@ -98,7 +98,7 @@ export function Drawer() {
             <div className="mb-4 flex flex-wrap gap-1.5">
               {task.prio && (
                 <span
-                  className="rounded-md border px-2 py-0.5 font-mono text-[11px]"
+                  className="rounded-md border px-2 py-0.5 font-mono text-data"
                   style={{
                     borderColor: PRIO_COLOR[task.prio],
                     color: PRIO_COLOR[task.prio],
@@ -115,7 +115,7 @@ export function Drawer() {
             </div>
 
             {task.branchInfo && (
-              <div className="flex items-baseline gap-2.5 border-t border-hair py-2 text-[12.5px]">
+              <div className="flex items-baseline gap-2.5 border-t border-hair py-2 text-cell">
                 <span className="min-w-[70px] text-muted">Ветка</span>
                 <span className="font-mono text-ink-soft">
                   {task.branchInfo}
@@ -124,7 +124,7 @@ export function Drawer() {
             )}
 
             {task.dueDate && (
-              <div className="flex items-baseline gap-2.5 border-t border-hair py-2 text-[12.5px]">
+              <div className="flex items-baseline gap-2.5 border-t border-hair py-2 text-cell">
                 <span className="min-w-[70px] text-muted">Дедлайн</span>
                 <span className="text-ink-soft">
                   {new Date(task.dueDate).toLocaleDateString("ru-RU")}
@@ -133,7 +133,7 @@ export function Drawer() {
             )}
 
             {task.descriptionText ? (
-              <div className="scroll mt-3.5 max-h-[280px] flex-1 whitespace-pre-wrap break-words rounded-xl border border-hair bg-surface-2 p-3.5 text-[13px] leading-relaxed text-ink-soft">
+              <div className="scroll mt-3.5 max-h-[280px] flex-1 whitespace-pre-wrap break-words rounded-xl border border-hair bg-surface-2 p-3.5 text-body leading-relaxed text-ink-soft">
                 {task.descriptionText}
               </div>
             ) : (

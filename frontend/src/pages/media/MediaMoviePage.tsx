@@ -184,9 +184,12 @@ export function MediaMoviePage({
         />
       )}
 
-      {/* det-topbar */}
-      <div className="det-topbar">
-        <button className="det-back" onClick={() => nav("/media")}>
+      {/* topbar */}
+      <div className="sticky top-0 z-10 flex items-center gap-3.5 px-8 py-3.5 bg-page/90 backdrop-blur-xl border-b border-white/[0.055] max-mob:px-4 max-mob:py-3">
+        <button
+          className="flex items-center gap-[7px] border-none bg-transparent cursor-pointer font-ui text-pill font-extrabold tracking-4 uppercase text-ink-soft p-0 flex-none transition-colors hover:text-accent"
+          onClick={() => nav("/media")}
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path
               d="M19 12H5M12 19l-7-7 7-7"
@@ -198,9 +201,9 @@ export function MediaMoviePage({
           </svg>
           <span>НАЗАД</span>
         </button>
-        <span className="det-topbar-title lmono">{det.title}</span>
+        <span className="flex-1 text-center text-cell text-muted truncate lmono">{det.title}</span>
         <button
-          className="det-queue-btn"
+          className="flex items-center gap-[7px] flex-none border border-white/12 rounded-[7px] cursor-pointer bg-white/[0.04] font-ui text-pill font-bold tracking-1 text-white/60 px-3.5 py-[7px] transition-all hover:bg-white/[0.08] hover:text-ink"
           onClick={() => setShowPicker((v) => !v)}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -215,9 +218,9 @@ export function MediaMoviePage({
         </button>
       </div>
 
-      {/* det-hero */}
-      <div className="det-hero">
-        <div className="det-hero-bg" style={{ background: accentGradient }}>
+      {/* hero */}
+      <div className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px]">
+        <div className="absolute inset-0" style={{ background: accentGradient }}>
           <img
             src={jellyfinBackdropUrl(det.jellyfinId)}
             alt=""
@@ -235,44 +238,63 @@ export function MediaMoviePage({
           />
         </div>
         <div
-          className="det-hero-glow"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background: `radial-gradient(ellipse at 55% 40%, ${accent}50 0%, transparent 65%)`,
           }}
         />
-        <div className="det-hero-noise" />
-        <div className="det-hero-vignette" />
-        <div className="det-hero-content">
-          <div className="det-hero-info">
-            <div className="det-eyebrow lmono">ФИЛЬМ</div>
-            <h1 className="det-title">{det.title}</h1>
-            <div className="det-meta lmono">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)' opacity='0.1'/%3E%3C/svg%3E")`,
+            backgroundSize: "180px",
+            mixBlendMode: "overlay",
+            opacity: 0.5,
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to right, rgba(9,9,13,0.96) 0%, rgba(9,9,13,0.55) 50%, transparent 82%), linear-gradient(to top, rgba(9,9,13,0.99) 0%, rgba(9,9,13,0.2) 30%, transparent 55%)",
+          }}
+        />
+        <div className="relative z-[1] h-full flex items-end px-[52px] pb-11 gap-9 max-mob:px-5 max-mob:pb-8 max-mob:gap-[18px]">
+          <div className="flex-1 min-w-0">
+            <div className="text-2xs tracking-6 uppercase text-white/[0.38] mb-2.5 lmono">ФИЛЬМ</div>
+            <h1
+              className="font-[Oswald,var(--font)] text-cinematic font-bold leading-[0.92] tracking-tight-hero text-white m-0 mb-4 max-mob:text-cinematic-mob"
+            >{det.title}</h1>
+            <div className="flex items-center gap-2 flex-wrap text-cell text-white/[0.48] mb-3.5 lmono">
               {det.year && <span>{det.year}</span>}
               {det.runtime && (
                 <>
-                  <span className="det-sep">·</span>
+                  <span className="text-white/20">·</span>
                   <span>{det.runtime} мин</span>
                 </>
               )}
               {det.rating && (
                 <>
-                  <span className="det-sep">·</span>
+                  <span className="text-white/20">·</span>
                   <span>★ {det.rating.toFixed(1)}</span>
                 </>
               )}
             </div>
             {det.genres?.length > 0 && (
-              <div className="det-genres">
+              <div className="flex gap-[7px] flex-wrap">
                 {det.genres.slice(0, 4).map((g) => (
-                  <span key={g} className="det-genre-chip">
+                  <span
+                    key={g}
+                    className="font-ui text-label font-bold tracking-genre uppercase text-white/[0.45] px-2.5 py-[3px] rounded-[4px] border border-white/[0.13]"
+                  >
                     {g}
                   </span>
                 ))}
               </div>
             )}
           </div>
-          <div className="det-poster-wrap">
-            <div className="det-poster-art">
+          <div className="flex-none max-mob:hidden">
+            <div className="w-[130px] aspect-[2/3] rounded-[11px] overflow-hidden relative">
               <div
                 style={{
                   position: "absolute",
@@ -299,9 +321,13 @@ export function MediaMoviePage({
         </div>
       </div>
 
-      {/* det-body */}
-      <div className="det-body">
-        {det.overview && <p className="det-desc">{det.overview}</p>}
+      {/* body */}
+      <div className="px-[52px] pt-[38px] pb-20 max-w-[860px] max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]">
+        {det.overview && (
+          <p className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
+            {det.overview}
+          </p>
+        )}
 
         {/* Status badges */}
         <div
@@ -328,17 +354,17 @@ export function MediaMoviePage({
               {det.size ? ` · ${fmtSize(det.size)}` : ""}
             </span>
           ) : (
-            <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-[10px] text-muted">
+            <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-muted">
               Файл отсутствует
             </span>
           )}
         </div>
 
         {/* Actions */}
-        <div className="det-actions">
+        <div className="flex gap-3 mb-7">
           {det.hasFile && (
             <button
-              className="det-btn-play"
+              className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
               style={{ "--bc": accent } as React.CSSProperties}
               disabled={busy}
               onClick={play}
@@ -355,7 +381,7 @@ export function MediaMoviePage({
             </button>
           )}
           {det.hasFile && devices.length > 0 && (
-            <div className="media-cast" style={{ position: "relative" }}>
+            <div className="relative">
               <button
                 className={ms.button.iconSm}
                 title="Играть на устройстве"
@@ -364,11 +390,11 @@ export function MediaMoviePage({
                 📺
               </button>
               {castOpen && (
-                <div className="media-cast-menu ">
+                <div className="absolute top-[30px] right-0 min-w-[140px] p-1.5 rounded-xl flex flex-col gap-1 z-10 bg-surface border border-hair">
                   {devices.map((dev) => (
                     <button
                       key={dev.id}
-                      className="media-cast-item"
+                      className="text-left bg-none border-none text-ink font-[inherit] px-2 py-1.5 rounded-lg cursor-pointer hover:bg-accent/[0.18] disabled:opacity-50 disabled:cursor-default"
                       onClick={() => {
                         playOnDevice(dev.id, det.jellyfinId);
                         setCastOpen(false);
@@ -434,7 +460,7 @@ export function MediaMoviePage({
 
         {/* Раздачи */}
         <div style={{ marginTop: 20 }}>
-          <div className="det-sec-label">РАЗДАЧИ</div>
+          <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">РАЗДАЧИ</div>
           <button
             className={cn(ms.button.sm, "mb-2")}
             disabled={det.tmdbId == null}
@@ -485,7 +511,7 @@ export function MediaMoviePage({
         {/* ПОХОЖИЕ */}
         {similarItems.length > 0 && (
           <div style={{ marginTop: 32 }}>
-            <div className="det-sec-label">ПОХОЖИЕ</div>
+            <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ПОХОЖИЕ</div>
             <div className={cn(ms.hTrack, ms.posterRow)}>
               {similarItems.map((item) => {
                 const a = titleAccent(item.name);

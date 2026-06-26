@@ -73,11 +73,11 @@ const trackFill =
 const monoUpper = "[font-family:var(--font)] uppercase";
 const statusDot = "size-2 flex-none rounded-full";
 const miniGrid =
-  "grid grid-cols-[1fr_1.2fr_1fr_auto] gap-3 px-6 pb-1 pt-4 max-[860px]:grid-cols-2";
+  "grid grid-cols-[1fr_1.2fr_1fr_auto] gap-3 px-6 pb-1 pt-4 max-mob:grid-cols-2";
 const miniCard =
   "shrink-0 rounded-[10px] border border-hair bg-surface-2 px-4 py-3.5";
 const miniLabel =
-  "mb-2 [font-family:var(--mono)] text-[9px] uppercase tracking-[0.1em] text-muted";
+  "mb-2 [font-family:var(--mono)] text-tiny uppercase tracking-3 text-muted";
 const miniBar = "h-[3px] flex-1 overflow-hidden rounded-[3px] bg-groove";
 const miniBarFill =
   "block h-full rounded-[3px] transition-[width] duration-700 ease-[cubic-bezier(0.22,0.61,0.36,1)]";
@@ -124,7 +124,7 @@ function Carousel({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex flex-col animate-[fade-up_0.34s_var(--ease)_both]">
-      <div className="relative -mx-4 [-webkit-mask-image:linear-gradient(90deg,#000_0,#000_calc(100%-16px),transparent_100%)] [mask-image:linear-gradient(90deg,#000_0,#000_calc(100%-16px),transparent_100%)] max-[860px]:[-webkit-mask-image:linear-gradient(90deg,transparent_0,#000_16px,#000_calc(100%-16px),transparent_100%)] max-[860px]:[mask-image:linear-gradient(90deg,transparent_0,#000_16px,#000_calc(100%-16px),transparent_100%)]">
+      <div className="relative -mx-4 [-webkit-mask-image:linear-gradient(90deg,#000_0,#000_calc(100%-16px),transparent_100%)] [mask-image:linear-gradient(90deg,#000_0,#000_calc(100%-16px),transparent_100%)] max-mob:[-webkit-mask-image:linear-gradient(90deg,transparent_0,#000_16px,#000_calc(100%-16px),transparent_100%)] max-mob:[mask-image:linear-gradient(90deg,transparent_0,#000_16px,#000_calc(100%-16px),transparent_100%)]">
         <div
           className={cn(
             "flex cursor-grab touch-pan-y snap-x snap-proximity gap-3.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 py-1.5 scroll-smooth [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden [&>*]:snap-start",
@@ -151,10 +151,10 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
       <div className={statCard}>
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
-            <span className="[font-family:var(--font)] text-[32px] font-bold leading-[0.9] text-ink">
+            <span className="[font-family:var(--font)] text-display font-bold leading-[0.9] text-ink">
               —
             </span>
-            <span className="mt-1.5 [font-family:var(--font)] text-[9.5px] leading-[1.45] tracking-[0.03em] text-muted">
+            <span className="mt-1.5 [font-family:var(--font)] text-mini leading-[1.45] tracking-1 text-muted">
               ПОГОДА
               <br />
               НЕ НАСТРОЕНО
@@ -169,11 +169,11 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
     <div className={statCard}>
       <div className="flex items-center gap-4">
         <div className="flex flex-col">
-          <span className="whitespace-nowrap [font-family:var(--font)] text-[32px] font-bold leading-[0.9] text-ink">
+          <span className="whitespace-nowrap [font-family:var(--font)] text-display font-bold leading-[0.9] text-ink">
             {current.temp}
-            <sup className="align-super text-[13px] text-ink-soft">°C</sup>
+            <sup className="align-super text-body text-ink-soft">°C</sup>
           </span>
-          <span className="mt-1.5 [font-family:var(--font)] text-[9.5px] leading-[1.45] tracking-[0.03em] text-muted">
+          <span className="mt-1.5 [font-family:var(--font)] text-mini leading-[1.45] tracking-1 text-muted">
             {wmoShort(current.code)}
             <br />
             ВЕТЕР {current.wind} КМ/Ч
@@ -182,16 +182,16 @@ function WeatherStat({ weather }: { weather: WeatherData }) {
         <div className="flex gap-3.5">
           {days.map((d) => (
             <div className="text-left" key={d.date}>
-              <div className="[font-family:var(--font)] text-[9px] tracking-[0.08em] text-muted">
+              <div className="[font-family:var(--font)] text-tiny tracking-3 text-muted">
                 {dayLabel(d.date)}
               </div>
               <div className="mt-0.5 whitespace-nowrap [font-family:var(--font)] text-base font-bold text-ink">
                 {d.max}°
-                <small className="text-[10px] font-medium text-muted">
+                <small className="text-2xs font-medium text-muted">
                   /{d.min}°
                 </small>
               </div>
-              <div className="mt-px [font-family:var(--font)] text-[8px] tracking-[0.05em] text-faint">
+              <div className="mt-px [font-family:var(--font)] text-micro tracking-2 text-faint">
                 {wmoShort(d.code)}
               </div>
             </div>
@@ -216,7 +216,7 @@ function ProxmoxStat({
           <span
             className={cn(
               monoUpper,
-              "text-[10px] tracking-[0.05em] text-muted",
+              "text-2xs tracking-2 text-muted",
             )}
           >
             CPU
@@ -230,7 +230,7 @@ function ProxmoxStat({
           <span
             className={cn(
               monoUpper,
-              "text-[10px] tracking-[0.05em] text-muted",
+              "text-2xs tracking-2 text-muted",
             )}
           >
             RAM
@@ -244,7 +244,7 @@ function ProxmoxStat({
           <span
             className={cn(
               monoUpper,
-              "text-[10px] tracking-[0.05em] text-muted",
+              "text-2xs tracking-2 text-muted",
             )}
           >
             DISK
@@ -256,7 +256,7 @@ function ProxmoxStat({
         </div>
       </div>
       {node && (
-        <div className="mt-1.5 [font-family:var(--font)] text-[9px] tracking-[0.1em] text-faint">
+        <div className="mt-1.5 [font-family:var(--font)] text-tiny tracking-3 text-faint">
           PROXMOX · {node.toUpperCase()}
         </div>
       )}
@@ -291,10 +291,10 @@ function VMStat({
           {name}
         </span>
       </div>
-      <div className="whitespace-nowrap [font-family:var(--font)] text-[11px] tracking-[0.02em] text-ink-soft">
+      <div className="whitespace-nowrap [font-family:var(--font)] text-data tracking-1 text-ink-soft">
         {running ? `CPU ${cpuPct}% · RAM ${memPct}%` : "ОСТАНОВЛЕНА"}
       </div>
-      <div className="whitespace-nowrap [font-family:var(--font)] text-[9px] tracking-[0.1em] text-faint">
+      <div className="whitespace-nowrap [font-family:var(--font)] text-tiny tracking-3 text-faint">
         {type.toUpperCase()}
       </div>
     </div>
@@ -324,7 +324,7 @@ function ServiceStat({
           {name}
         </span>
       </div>
-      <div className="whitespace-nowrap [font-family:var(--font)] text-[11px] tracking-[0.02em] text-ink-soft">
+      <div className="whitespace-nowrap [font-family:var(--font)] text-data tracking-1 text-ink-soft">
         {tag}
       </div>
     </div>
@@ -452,7 +452,7 @@ export function MiniWidgets() {
                 {Math.round(weather.current.temp)}
                 <sup className="align-super text-sm font-normal">°</sup>
               </div>
-              <div className="mt-1 [font-family:var(--mono)] text-[9px] tracking-[0.04em] text-muted">
+              <div className="mt-1 [font-family:var(--mono)] text-tiny tracking-1 text-muted">
                 ВЕТЕР {weather.current.wind} м/с
               </div>
             </div>
@@ -461,11 +461,11 @@ export function MiniWidgets() {
                 const date = new Date(d.date);
                 return (
                   <div key={d.date} className="flex items-center gap-1.5">
-                    <span className="w-[18px] [font-family:var(--mono)] text-[9px] text-muted">
+                    <span className="w-[18px] [font-family:var(--mono)] text-tiny text-muted">
                       {days[date.getDay()]}
                     </span>
                     <span style={{ fontSize: 11 }}>{wxIcon(d.code)}</span>
-                    <span className="[font-family:var(--mono)] text-[9.5px] text-ink-soft">
+                    <span className="[font-family:var(--mono)] text-mini text-ink-soft">
                       {Math.round(d.max)}°
                     </span>
                   </div>
@@ -474,7 +474,7 @@ export function MiniWidgets() {
             </div>
           </div>
         ) : (
-          <div className="mt-1 [font-family:var(--mono)] text-[11px] text-muted">
+          <div className="mt-1 [font-family:var(--mono)] text-data text-muted">
             —
           </div>
         )}
@@ -495,7 +495,7 @@ export function MiniWidgets() {
               { k: "DISK", pct: diskPct, val: diskVal },
             ].map((r) => (
               <div key={r.k} className="flex items-center gap-[9px]">
-                <span className="w-7 shrink-0 [font-family:var(--mono)] text-[9px] text-muted">
+                <span className="w-7 shrink-0 [font-family:var(--mono)] text-tiny text-muted">
                   {r.k}
                 </span>
                 <div className={miniBar}>
@@ -507,14 +507,14 @@ export function MiniWidgets() {
                     }}
                   />
                 </div>
-                <span className="w-[58px] shrink-0 text-right [font-family:var(--mono)] text-[9.5px] text-ink-soft">
+                <span className="w-[58px] shrink-0 text-right [font-family:var(--mono)] text-mini text-ink-soft">
                   {r.val}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="mt-1 [font-family:var(--mono)] text-[11px] text-muted">
+          <div className="mt-1 [font-family:var(--mono)] text-data text-muted">
             —
           </div>
         )}
@@ -525,7 +525,7 @@ export function MiniWidgets() {
         <div className="mb-2 flex items-center justify-between">
           <div className={cn(miniLabel, "mb-0")}>Сервисы</div>
           {serviceList.length > 0 && (
-            <div className="[font-family:var(--mono)] text-[9px] text-accent">
+            <div className="[font-family:var(--mono)] text-tiny text-accent">
               {onlineCount}/{serviceList.length} online
             </div>
           )}
@@ -545,14 +545,14 @@ export function MiniWidgets() {
                           : "var(--bad)",
                   }}
                 />
-                <span className="flex-1 truncate whitespace-nowrap [font-family:var(--font)] text-[11px] text-ink-soft">
+                <span className="flex-1 truncate whitespace-nowrap [font-family:var(--font)] text-data text-ink-soft">
                   {s.name}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="[font-family:var(--mono)] text-[11px] text-muted">
+          <div className="[font-family:var(--mono)] text-data text-muted">
             —
           </div>
         )}
@@ -567,7 +567,7 @@ export function MiniWidgets() {
           <div className="[font-family:var(--mono)] text-5xl font-bold leading-none text-accent">
             {activeCount}
           </div>
-          <div className="mt-1 [font-family:var(--mono)] text-[9.5px] tracking-[0.04em] text-muted">
+          <div className="mt-1 [font-family:var(--mono)] text-mini tracking-1 text-muted">
             АКТИВНЫХ
           </div>
         </div>

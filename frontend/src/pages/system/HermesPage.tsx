@@ -27,7 +27,7 @@ function StatusHeader({ data }: { data: HermesData }) {
   return (
     <div className="flex items-center gap-2.5 rounded-card border border-hair bg-raise px-4 py-3">
       <span className={cn("size-2.5 rounded-full", statusColor)} />
-      <span className="font-mono text-[12.5px] text-ink-soft">
+      <span className="font-mono text-cell text-ink-soft">
         статус: <b className="font-bold text-accent">{data.status}</b>
         {data.message ? ` · ${data.message}` : ""}
       </span>
@@ -46,13 +46,13 @@ function ActivityFeed({ log }: { log: PanelLogLine[] }) {
         )}
         {log.map((l, i) => (
           <div key={i} className="grid grid-cols-[58px_1fr] gap-2 border-t border-hair py-2.5">
-            <span className="font-mono text-[10.5px] text-muted">{l.t}</span>
+            <span className="font-mono text-label text-muted">{l.t}</span>
             <div>
-              <div className="text-[12.5px] leading-snug text-ink-soft">
+              <div className="text-cell leading-snug text-ink-soft">
                 {l.msg}
               </div>
               <span className="k">{l.k}</span>{" "}
-              <span className="font-mono text-[10.5px] text-muted/80">
+              <span className="font-mono text-label text-muted/80">
                 · {l.tag}
               </span>
             </div>
@@ -97,7 +97,7 @@ function CommandConsole() {
         <div className="flex flex-1 items-center rounded-[14px] border border-hair bg-surface px-4">
           <input
             ref={inputRef}
-            className="w-full bg-transparent py-[13px] font-mono text-[13px] text-ink outline-none placeholder:text-muted disabled:opacity-50"
+            className="w-full bg-transparent py-[13px] font-mono text-body text-ink outline-none placeholder:text-muted disabled:opacity-50"
             placeholder="$ команда Hermes…"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -124,10 +124,10 @@ function CommandConsole() {
           <div key={c.id} className="grid grid-cols-[10px_1fr] items-center gap-3 border-t border-hair px-1 py-3">
             <span className={cn("size-2 rounded-full", cmdLed(c.status))} />
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="truncate text-[13.5px] font-medium text-ink">
+              <div className="truncate text-row font-medium text-ink">
                 {c.command}
               </div>
-              <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-[11px] text-muted">
+              <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-data text-muted">
                 <span className="text-accent">{c.status}</span>
                 <span>· {fmtUpdated(c.createdAt)}</span>
                 {c.result && <span>· {c.result}</span>}
@@ -197,10 +197,10 @@ export function HermesPage() {
                     className={cn("size-2 rounded-full", cmdLed(t.status))}
                   />
                   <div style={{ minWidth: 0 }}>
-                    <div className="truncate text-[13.5px] font-medium text-ink">
+                    <div className="truncate text-row font-medium text-ink">
                       {t.title}
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-[11px] text-muted">
+                    <div className="mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5 font-mono text-data text-muted">
                       <span className="text-accent">{t.status}</span>
                       {t.claimedAt && (
                         <span>· взято {fmtUpdated(t.claimedAt)}</span>
@@ -210,7 +210,7 @@ export function HermesPage() {
                       )}
                     </div>
                   </div>
-                  <span className="rounded-full border border-hair bg-surface px-2 py-0.5 font-mono text-[10.5px] text-muted">
+                  <span className="rounded-full border border-hair bg-surface px-2 py-0.5 font-mono text-label text-muted">
                     {t.logCount}
                   </span>
                 </div>

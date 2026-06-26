@@ -31,14 +31,14 @@ function gb(bytes: number): number {
 
 const statList = "flex flex-col gap-0";
 const statRow =
-  "grid grid-cols-[12px_1fr_auto_auto] items-center gap-2.5 border-t border-hair py-2 text-[13px]";
-const statName = "min-w-0 truncate text-[13.5px] font-medium text-ink";
-const statTag = "font-mono text-[11px] text-muted";
+  "grid grid-cols-[12px_1fr_auto_auto] items-center gap-2.5 border-t border-hair py-2 text-body";
+const statName = "min-w-0 truncate text-row font-medium text-ink";
+const statTag = "font-mono text-data text-muted";
 const gaugeRow = "flex flex-wrap gap-7 px-0 pb-1 pt-2";
 const gaugeItem = "flex items-center gap-3.5";
 const gaugeLabel = "flex flex-col gap-1";
-const gaugeName = "font-mono text-[10px] uppercase tracking-[0.1em] text-muted";
-const gaugeValue = "font-mono text-[13px] font-bold text-ink";
+const gaugeName = "font-mono text-2xs uppercase tracking-3 text-muted";
+const gaugeValue = "font-mono text-body font-bold text-ink";
 const statusDot = "size-2.5 rounded-full";
 
 function DockerCard({
@@ -382,7 +382,7 @@ export function SystemPage() {
                       <span className={statName}>{s.name}</span>
                       <span className={statTag}>{s.tag}</span>
                       <span
-                        className="font-mono text-[11px] tracking-[0.04em]"
+                        className="font-mono text-data tracking-1"
                         style={{ color: STAT_VAR[s.status] }}
                       >
                         {s.status.toUpperCase()}

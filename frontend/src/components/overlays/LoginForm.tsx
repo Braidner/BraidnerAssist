@@ -48,10 +48,10 @@ export function LoginForm({ onSuccess }: Props) {
               <line x1="18" y1="12" x2="21" y2="12" />
             </svg>
           </div>
-          <div className="font-mono text-lg font-bold uppercase tracking-[0.16em] text-ink">
+          <div className="font-mono text-lg font-bold uppercase tracking-5 text-ink">
             Mission Control
           </div>
-          <div className="mt-1 text-xs tracking-[0.08em] text-muted">
+          <div className="mt-1 text-xs tracking-3 text-muted">
             braidner · self-hosted · LAN-only
           </div>
         </div>
@@ -59,7 +59,7 @@ export function LoginForm({ onSuccess }: Props) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] uppercase tracking-[0.12em] text-muted">
+            <label className="text-data uppercase tracking-4 text-muted">
               Логин
             </label>
             <input
@@ -74,7 +74,7 @@ export function LoginForm({ onSuccess }: Props) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] uppercase tracking-[0.12em] text-muted">
+            <label className="text-data uppercase tracking-4 text-muted">
               Пароль
             </label>
             <input

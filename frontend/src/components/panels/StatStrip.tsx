@@ -1,5 +1,5 @@
-import { useRef, type ReactNode } from "react";
-import type { WeatherData, ServicesData, ProxmoxData, ProxmoxResource } from "../../lib/api.ts";
+import { useRef, useEffect, useState, type ReactNode } from "react";
+import { getWeather, getProxmox, getServices, type WeatherData, type ServicesData, type ProxmoxData, type ProxmoxResource } from "../../lib/api.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
 const WMO_SHORT: Record<number, string> = {
@@ -205,14 +205,21 @@ export function StatStrip({ weather, proxmox, services }: StatStripProps) {
 // MiniWidgets — flat strip of summary cards for the overview layout
 // ---------------------------------------------------------------------------
 
-interface MiniWidgetsProps {
-  weather: WeatherData | null;
-  proxmox: ProxmoxData | null;
-  services: ServicesData | null;
-}
-
-export function MiniWidgets({ weather, proxmox, services }: MiniWidgetsProps) {
+export function MiniWidgets() {
   const { tasks } = useTasksCtx();
+  const [weather, setWeather] = useState<WeatherData>({ configured: false, current: null, forecast: [] });
+  const [proxmox, setProxmox] = useState<ProxmoxData>({ configured: false, node: null, resource: null, vms: [] });
+  const [services, setServices] = useState<ServicesData>({ configured: false, services: [] });
+
+  useEffect(() => {
+    getWeather().then(setWeather);
+    getProxmox().then(setProxmox);
+    getServices().then(setServices);
+    const weatherT = setInterval(() => getWeather().then(setWeather), 1_800_000);
+    const proxmoxT = setInterval(() => getProxmox().then(setProxmox), 30_000);
+    const servicesT = setInterval(() => getServices().then(setServices), 60_000);
+    return () => { clearInterval(weatherT); clearInterval(proxmoxT); clearInterval(servicesT); };
+  }, []);
   const activeCount = tasks.filter(t => !t.done).length;
   const serviceList = services?.services ?? [];
   const onlineCount = serviceList.filter(s => s.status === 'ok').length;

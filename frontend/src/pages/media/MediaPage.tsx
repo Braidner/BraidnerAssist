@@ -36,7 +36,7 @@ import {
   type CalendarItem,
   type ResumeItem,
   type TmdbItem,
-} from "../../lib/api.ts";
+} from "@/lib/api.ts";
 import {
   ReleasePicker,
   ImportDrawer,
@@ -48,7 +48,7 @@ import { MediaLibraryTab } from "./MediaLibraryTab.tsx";
 import { MediaDiscoverTab } from "./MediaDiscoverTab.tsx";
 import { MediaSystemTab } from "./MediaSystemTab.tsx";
 import { cn } from "../../lib/cn.ts";
-import { ui } from "../../lib/ui.ts";
+import { ui } from "@/lib/ui.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 
 // Дравер «Добавить»: основной путь — поиск тайтла в Radarr/Sonarr (правильный
@@ -683,6 +683,7 @@ export function MediaPage({
 
       {tab === "discover" && (
         <MediaDiscoverTab
+          library={library}
           tmdb={media.tmdb}
           dq={dq}
           setDq={setDq}

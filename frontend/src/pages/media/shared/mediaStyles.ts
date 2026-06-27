@@ -1,5 +1,5 @@
-import { cn } from "../../../lib/cn.ts";
-import { ui } from "../../../lib/ui.ts";
+import { cn } from "@/lib/utils.ts";
+import { ui } from "@/lib/ui.ts";
 
 export const media = {
   page: "flex flex-1 flex-col gap-5",
@@ -121,4 +121,36 @@ export const media = {
   posterInfo: "mt-2",
   posterTitle: "truncate text-sm font-semibold text-ink",
   posterSub: "mt-1 font-mono text-2xs text-muted",
+
+  // Hero enrichments
+  heroMetaRow: "mb-3 flex flex-wrap items-center gap-2 font-mono text-xs text-white/60",
+  heroMetaSep: "text-white/25",
+  heroGenreTag:
+    "rounded-[5px] border border-white/20 px-2 py-0.5 text-2xs font-medium uppercase tracking-genre text-white/80",
+  heroDesc:
+    "mb-5 max-w-[420px] text-body leading-relaxed text-white/70 line-clamp-2",
+  heroGhostBtn:
+    "flex cursor-pointer items-center gap-2 rounded-[7px] border border-white/30 bg-transparent px-[22px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white/90 transition-colors hover:border-white/60",
+
+  // Discovery page
+  discPage: "pb-[72px]",
+  discHeader: "mb-8 flex items-center gap-4",
+  discHeaderIcon:
+    "grid size-14 shrink-0 place-items-center rounded-2xl bg-surface text-accent",
+  discHeaderTitle:
+    "[font-family:Oswald,var(--font)] text-[34px] font-bold uppercase leading-none text-ink",
+  discHeaderSub: "mt-1 font-mono text-data text-muted",
+  discShuffleBtn:
+    "ml-auto flex cursor-pointer items-center gap-2 rounded-[11px] border border-hair bg-surface px-4 py-2 [font-family:Syne,var(--font)] text-cell font-bold tracking-2 text-ink transition-colors hover:border-accent hover:text-accent",
+  discSection: "mb-8",
+  discSecHead: "mb-3 flex items-center gap-3",
+  discSecLabel:
+    "[font-family:Syne,var(--font)] text-xs font-extrabold uppercase tracking-5 text-ink",
+  discSecLine: "h-px flex-1 bg-hair",
+  discSecCount: "font-mono text-data text-muted",
+  posterRankBadge:
+    "pointer-events-none absolute bottom-1 right-1 z-[1] select-none [font-family:Oswald,var(--font)] text-[52px] font-bold leading-none text-white/[0.07]",
+
+  // Search toggle in discover
+  discSearchBar: "mb-6 flex items-stretch gap-2",
 };

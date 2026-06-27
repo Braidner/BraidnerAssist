@@ -1,305 +1,375 @@
-// Discover tab for MediaPage: lookup search, recommendations, calendar.
+// Discover tab for MediaPage: cinematic discovery layout with sections.
 
-import { useNavigate } from "react-router-dom";
-import { Card } from "../../components/ui/Card.tsx";
+import {useState} from "react";
+import {useNavigate} from "react-router-dom";
 import {
-  posterUrl,
-  type ArrLookupItem,
-  type Recommendation,
-  type CalendarItem,
-  type TmdbItem,
-} from "../../lib/api.ts";
-import { cn } from "../../lib/cn.ts";
-import { media as ms } from "./shared/mediaStyles.ts";
-
-// Относительный день выхода для компактной карточки расписания.
-function relDay(iso: string | null): string {
-  if (!iso) return "";
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return "";
-  const diff = Math.round((t - Date.now()) / 86_400_000);
-  if (diff <= 0) return "вышло";
-  if (diff === 1) return "завтра";
-  if (diff <= 21) return `+${diff} дн`;
-  return new Date(iso).toLocaleDateString("ru-RU");
-}
+    posterUrl,
+    jellyfinPosterUrl,
+    type ArrLookupItem,
+    type Recommendation,
+    type CalendarItem,
+    type TmdbItem,
+    type LibraryItem,
+} from "@/lib/api.ts";
+import {cn} from "../../lib/cn.ts";
+import {media as ms} from "./shared/mediaStyles.ts";
 
 interface MediaDiscoverTabProps {
-  tmdb: boolean;
-  dq: string;
-  setDq: (v: string) => void;
-  dres: ArrLookupItem[];
-  tmRes: TmdbItem[];
-  trending: TmdbItem[];
-  dsearching: boolean;
-  recs: Recommendation[];
-  calendar: CalendarItem[];
-  busy: string | null;
-  onAddRec: (rec: Recommendation) => void;
-  onOpenDiscover: (it: ArrLookupItem) => void;
-  onOpenTmdb: (it: TmdbItem) => void;
+    library: LibraryItem[];
+    tmdb: boolean;
+    dq: string;
+    setDq: (v: string) => void;
+    dres: ArrLookupItem[];
+    tmRes: TmdbItem[];
+    trending: TmdbItem[];
+    dsearching: boolean;
+    recs: Recommendation[];
+    calendar: CalendarItem[];
+    busy: string | null;
+    onAddRec: (rec: Recommendation) => void;
+    onOpenDiscover: (it: ArrLookupItem) => void;
+    onOpenTmdb: (it: TmdbItem) => void;
+}
+
+/* ─── Compass SVG ─── */
+function CompassIcon({size = 26}: {size?: number}) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+            <path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+    );
+}
+
+/* ─── Shuffle SVG ─── */
+function ShuffleIcon({size = 15}: {size?: number}) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <path d="M16 3h5v5M4 20L21 3M16 21h5v-5M4 4l8 8" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+    );
+}
+
+/* ─── Poster card for discover sections ─── */
+interface DiscPosterCardProps {
+    title: string;
+    year?: number | null;
+    sub?: string;
+    imgUrl?: string | null;
+    accent?: string;
+    seasonCount?: number | null;
+    rating?: number | null;
+    rank?: number;
+    onClick: () => void;
+    addBtn?: {label: string; disabled?: boolean; onClick: (e: React.MouseEvent) => void};
+}
+
+function DiscPosterCard({title, year, sub, imgUrl, accent = "#00b8ae", seasonCount, rating, rank, onClick, addBtn}: DiscPosterCardProps) {
+    const initials = title.split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
+    const bg = `radial-gradient(ellipse at 60% 40%, ${accent}88 0%, ${accent}22 50%, #050508 100%)`;
+
+    return (
+        <div className={ms.posterCard} onClick={onClick} style={{cursor: "pointer"}}>
+            <div className={ms.posterArt} style={{"--pa": accent} as React.CSSProperties}>
+                {imgUrl ? (
+                    <img
+                        src={imgUrl}
+                        alt=""
+                        loading="lazy"
+                        style={{position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover"}}
+                        onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
+                    />
+                ) : null}
+                <div style={{position: "absolute", inset: 0, background: bg, zIndex: 0}}/>
+                <div style={{position: "absolute", bottom: "-10%", right: "-4%", lineHeight: 1, fontFamily: "'Oswald', sans-serif", fontSize: 100, color: "rgba(255,255,255,0.07)", userSelect: "none", pointerEvents: "none", zIndex: 0}}>
+                    {initials}
+                </div>
+                {/* Season badge */}
+                {seasonCount ? <span className={ms.posterBadge}>{seasonCount} сез.</span> : null}
+                {/* Rank badge */}
+                {rank != null ? <span className={ms.posterRankBadge}>{rank}</span> : null}
+                {/* Hover overlay */}
+                <div className={cn(ms.posterOverlay, "z-5")}>
+                    <div className={ms.roundPlay}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="6,3 21,12 6,21"/>
+                        </svg>
+                    </div>
+                    {rating != null && (
+                        <div className={ms.posterGenres} style={{display: "flex", alignItems: "center", gap: 3}}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="#ffd700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                            {rating.toFixed(1)}
+                        </div>
+                    )}
+                </div>
+            </div>
+            <div className={ms.posterInfo}>
+                <div className={ms.posterTitle}>{title}</div>
+                <div className={ms.posterSub}>
+                    {sub ?? ""}{year ? (sub ? ` · ${year}` : `${year}`) : ""}
+                </div>
+            </div>
+            {addBtn && (
+                <button
+                    className={cn(ms.button.accentSm, "mt-1.5 w-full")}
+                    disabled={addBtn.disabled}
+                    onClick={addBtn.onClick}
+                >
+                    {addBtn.disabled ? "…" : addBtn.label}
+                </button>
+            )}
+        </div>
+    );
+}
+
+/* ─── Section with horizontal poster track ─── */
+interface DiscSectionProps {
+    label: string;
+    count: number;
+    children: React.ReactNode;
+}
+
+function DiscSection({label, count, children}: DiscSectionProps) {
+    return (
+        <div className={ms.discSection}>
+            <div className={ms.discSecHead}>
+                <span className={ms.discSecLabel}>{label}</span>
+                <div className={ms.discSecLine}/>
+                <span className={ms.discSecCount}>{count} тайтлов</span>
+            </div>
+            <div className={cn(ms.hTrack, ms.posterRow)}>{children}</div>
+        </div>
+    );
+}
+
+/* ─── Search results grid (reused from old discover) ─── */
+function SearchGrid({
+    dq, tmdb, dsearching, dres, tmRes, busy,
+    onOpenDiscover, onOpenTmdb,
+}: Pick<MediaDiscoverTabProps, "dq"|"tmdb"|"dsearching"|"dres"|"tmRes"|"busy"|"onOpenDiscover"|"onOpenTmdb">) {
+    if (!dq.trim()) return null;
+
+    const isSearching = dq.trim().length > 0;
+    const items = tmdb ? (isSearching ? tmRes : []) : (isSearching ? dres : []);
+    const loading = isSearching && dsearching && items.length === 0;
+
+    return (
+        <div className="mb-6">
+            {loading ? (
+                <div className={ms.grid}>
+                    {Array.from({length: 6}).map((_, i) => <div key={i} className={ms.skeleton}/>)}
+                </div>
+            ) : isSearching && items.length === 0 ? (
+                <div className={cn(ms.empty, "mt-2.5")}>Ничего не найдено.</div>
+            ) : isSearching ? (
+                <div className={ms.grid}>
+                    {tmdb
+                        ? tmRes.map((it) => (
+                            <button key={it.kind + it.tmdbId} className={ms.item} title={it.title}
+                                disabled={busy === "tmdb" + it.tmdbId} onClick={() => onOpenTmdb(it)}>
+                                <span className={ms.posterBox}>
+                                    {it.poster
+                                        ? <img className={ms.itemPoster} src={posterUrl(it.poster)} alt="" loading="lazy" onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}/>
+                                        : <span className={cn(ms.itemPoster, "grid place-items-center text-xl opacity-50")}>{it.kind === "movie" ? "🎬" : "📺"}</span>}
+                                </span>
+                                <span className={ms.itemName}>{it.title}</span>
+                                <span className={ms.itemMeta}>{it.kind === "movie" ? "фильм" : "сериал"}{it.year ? ` · ${it.year}` : ""}</span>
+                                <span className={ms.itemPlay}>{busy === "tmdb" + it.tmdbId ? "…" : "›"}</span>
+                            </button>
+                        ))
+                        : dres.map((it) => (
+                            <button key={it.kind + it.id} className={ms.item} title={it.title} onClick={() => onOpenDiscover(it)}>
+                                <span className={ms.posterBox}>
+                                    {it.poster
+                                        ? <img className={ms.itemPoster} src={posterUrl(it.poster)} alt="" loading="lazy" onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}/>
+                                        : <span className={cn(ms.itemPoster, "grid place-items-center text-xl opacity-50")}>{it.kind === "movie" ? "🎬" : "📺"}</span>}
+                                    {it.added && <span className={ms.seenBadge} title="Уже в библиотеке">✓</span>}
+                                </span>
+                                <span className={ms.itemName}>{it.title}</span>
+                                <span className={ms.itemMeta}>{it.kind === "movie" ? "фильм" : "сериал"}{it.year ? ` · ${it.year}` : ""}</span>
+                                <span className={ms.itemPlay}>›</span>
+                            </button>
+                        ))
+                    }
+                </div>
+            ) : null}
+        </div>
+    );
 }
 
 export function MediaDiscoverTab({
-  tmdb,
-  dq,
-  setDq,
-  dres,
-  tmRes,
-  trending,
-  dsearching,
-  recs,
-  calendar,
-  busy,
-  onAddRec,
-  onOpenDiscover,
-  onOpenTmdb,
+    library,
+    tmdb,
+    dq,
+    setDq,
+    dres,
+    tmRes,
+    trending,
+    dsearching,
+    recs,
+    calendar: _calendar,
+    busy,
+    onAddRec,
+    onOpenDiscover,
+    onOpenTmdb,
 }: MediaDiscoverTabProps) {
-  const nav = useNavigate();
+    const nav = useNavigate();
+    const [searchOpen, setSearchOpen] = useState(false);
 
-  const renderTmdbGrid = (items: TmdbItem[]) => (
-    <div className={ms.grid}>
-      {items.map((it) => (
-        <button
-          key={it.kind + it.tmdbId}
-          className={ms.item}
-          title={it.title}
-          disabled={busy === "tmdb" + it.tmdbId}
-          onClick={() => onOpenTmdb(it)}
-        >
-          <span className={ms.posterBox}>
-            {it.poster ? (
-              <img
-                className={ms.itemPoster}
-                src={posterUrl(it.poster)}
-                alt=""
-                loading="lazy"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
-              />
-            ) : (
-              <span
-                className={cn(
-                  ms.itemPoster,
-                  "grid place-items-center text-xl opacity-50",
-                )}
-              >
-                {it.kind === "movie" ? "🎬" : "📺"}
-              </span>
-            )}
-          </span>
-          <span className={ms.itemName}>{it.title}</span>
-          <span className={ms.itemMeta}>
-            {it.kind === "movie" ? "🎬 фильм" : "📺 сериал"}
-            {it.year ? ` · ${it.year}` : ""}
-          </span>
-          <span className={ms.itemPlay}>
-            {busy === "tmdb" + it.tmdbId ? "…" : "›"}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
+    const trendingByRating = [...trending].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+    const seriesItems = library.filter((i) => i.type === "Series");
+    const movieItems = library.filter((i) => i.type === "Movie");
 
-  return (
-    <div className={ms.pageMain}>
-      {/* Найти и добавить — поиск по всем тайтлам Sonarr/Radarr; пусто → подборки */}
-      <Card
-        icon="pulse"
-        title="Найти и добавить"
-        action={
-          <span className={ms.panelCount}>
-            {dq.trim()
-              ? tmdb
-                ? tmRes.length
-                : dres.length
-              : tmdb
-                ? trending.length
-                : recs.length}
-          </span>
-        }
-      >
-        <div className={cn(ms.field, "mt-1")}>
-          <input
-            className={ms.input}
-            placeholder="Поиск фильмов и сериалов…"
-            value={dq}
-            onChange={(e) => setDq(e.target.value)}
-          />
-          {dq && (
-            <button
-              className={ms.button.iconSm}
-              title="Очистить"
-              onClick={() => setDq("")}
-            >
-              ✕
-            </button>
-          )}
-        </div>
+    const ACCENT_COLORS = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
+    const itemAccent = (name: string) => ACCENT_COLORS[name.charCodeAt(0) % ACCENT_COLORS.length];
 
-        {tmdb ? (
-          dq.trim() ? (
-            dsearching && tmRes.length === 0 ? (
-              <div className={ms.grid}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className={ms.skeleton} />
-                ))}
-              </div>
-            ) : tmRes.length === 0 ? (
-              <div className={cn(ms.empty, "mt-2.5")}>Ничего не найдено.</div>
-            ) : (
-              renderTmdbGrid(tmRes)
-            )
-          ) : trending.length > 0 ? (
-            renderTmdbGrid(trending)
-          ) : (
-            <div className={cn(ms.empty, "mt-2.5")}>
-              Введи название, чтобы найти фильм или сериал.
-            </div>
-          )
-        ) : dq.trim() ? (
-          dsearching && dres.length === 0 ? (
-            <div className={ms.grid}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className={ms.skeleton} />
-              ))}
-            </div>
-          ) : dres.length === 0 ? (
-            <div className={cn(ms.empty, "mt-2.5")}>Ничего не найдено.</div>
-          ) : (
-            <div className={ms.grid}>
-              {dres.map((it) => (
-                <button
-                  key={it.kind + it.id}
-                  className={ms.item}
-                  title={it.title}
-                  onClick={() => onOpenDiscover(it)}
-                >
-                  <span className={ms.posterBox}>
-                    {it.poster ? (
-                      <img
-                        className={ms.itemPoster}
-                        src={posterUrl(it.poster)}
-                        alt=""
-                        loading="lazy"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display =
-                            "none";
-                        }}
-                      />
-                    ) : (
-                      <span
-                        className={cn(
-                          ms.itemPoster,
-                          "grid place-items-center text-xl opacity-50",
-                        )}
-                      >
-                        {it.kind === "movie" ? "🎬" : "📺"}
-                      </span>
-                    )}
-                    {it.added && (
-                      <span className={ms.seenBadge} title="Уже в библиотеке">
-                        ✓
-                      </span>
-                    )}
-                  </span>
-                  <span className={ms.itemName}>{it.title}</span>
-                  <span className={ms.itemMeta}>
-                    {it.kind === "movie" ? "🎬 фильм" : "📺 сериал"}
-                    {it.year ? ` · ${it.year}` : ""}
-                  </span>
-                  <span className={ms.itemPlay}>›</span>
-                </button>
-              ))}
-            </div>
-          )
-        ) : recs.length > 0 ? (
-          <div className={ms.grid}>
-            {recs.map((r) => {
-              const key = "rec" + r.kind + r.id;
-              return (
-                <div key={key} className={ms.item}>
-                  {r.poster ? (
-                    <img
-                      className={ms.itemPoster}
-                      src={posterUrl(r.poster)}
-                      alt=""
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display =
-                          "none";
-                      }}
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        ms.itemPoster,
-                        "grid place-items-center text-xl opacity-50",
-                      )}
-                    >
-                      {r.kind === "movie" ? "🎬" : "📺"}
-                    </span>
-                  )}
-                  <span className={ms.itemName}>{r.title}</span>
-                  <span className={ms.itemMeta}>
-                    {r.kind === "movie" ? "фильм" : "сериал"}
-                    {r.year ? ` · ${r.year}` : ""}
-                  </span>
-                  <button
-                    className={cn(ms.button.accentSm, "mt-1.5 w-full")}
-                    disabled={busy === key}
-                    onClick={() => onAddRec(r)}
-                  >
-                    {busy === key ? "…" : "+ Добавить"}
-                  </button>
+    const handleShuffle = () => {
+        if (library.length === 0) return;
+        const it = library[Math.floor(Math.random() * library.length)];
+        nav(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`);
+    };
+
+    const handleSearchToggle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSearchOpen((v) => !v);
+        if (searchOpen) setDq("");
+    };
+
+    return (
+        <div className={ms.discPage}>
+            {/* Header */}
+            <div className={ms.discHeader}>
+                <div className={ms.discHeaderIcon}>
+                    <CompassIcon size={26}/>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className={cn(ms.empty, "mt-2.5")}>
-            Введи название фильма или сериала, чтобы найти и открыть карточку.
-          </div>
-        )}
-      </Card>
+                <div>
+                    <div className={ms.discHeaderTitle}>ДИСКАВЕРИ</div>
+                    <div className={ms.discHeaderSub}>{library.length} тайтлов в библиотеке</div>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                    {/* Search icon toggle */}
+                    <button
+                        className={cn(ms.discShuffleBtn, "ml-0 px-3")}
+                        onClick={handleSearchToggle}
+                        title="Поиск"
+                    >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                    </button>
+                    <button className={ms.discShuffleBtn} onClick={handleShuffle}>
+                        <ShuffleIcon size={15}/> Случайный
+                    </button>
+                </div>
+            </div>
 
-      {/* Скоро выйдет — ближайшие эпизоды/релизы (полное — на /media/calendar) */}
-      {calendar.length > 0 && (
-        <Card
-          icon="chart"
-          title="Скоро выйдет"
-          action={
-            <button
-              className={ms.button.sm}
-              onClick={() => nav("/media/calendar")}
-            >
-              Всё расписание
-            </button>
-          }
-        >
-          <div className={ms.calendarRows}>
-            {calendar.slice(0, 6).map((it, i) => (
-              <div key={i} className={ms.calendarRow}>
-                <span className={ms.calendarKind}>
-                  {it.kind === "series" ? "📺" : "🎬"}
-                </span>
-                <span className={ms.calendarTitle} title={it.title}>
-                  {it.title}
-                  {it.kind === "series" && it.seasonNumber != null && (
-                    <span className={ms.calendarEp}>
-                      {" "}
-                      S{it.seasonNumber}
-                      {it.episodeNumber != null ? `E${it.episodeNumber}` : ""}
-                    </span>
-                  )}
-                </span>
-                <span className={ms.calendarWhen}>{relDay(it.airDate)}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-    </div>
-  );
+            {/* Expandable search */}
+            {searchOpen && (
+                <div className={ms.discSearchBar}>
+                    <input
+                        autoFocus
+                        className={ms.input}
+                        placeholder="Поиск фильмов и сериалов…"
+                        value={dq}
+                        onChange={(e) => setDq(e.target.value)}
+                    />
+                    {dq && (
+                        <button className={ms.button.iconSm} title="Очистить" onClick={() => setDq("")}>✕</button>
+                    )}
+                </div>
+            )}
+
+            {/* Search results (only when search is open and has query) */}
+            {searchOpen && dq.trim() && (
+                <SearchGrid dq={dq} tmdb={tmdb} dsearching={dsearching} dres={dres} tmRes={tmRes}
+                    busy={busy} onOpenDiscover={onOpenDiscover} onOpenTmdb={onOpenTmdb}/>
+            )}
+
+            {/* Top Rating — TMDB trending sorted by rating */}
+            {trendingByRating.length > 0 && (
+                <DiscSection label="ТОП РЕЙТИНГ" count={trendingByRating.length}>
+                    {trendingByRating.map((it, i) => (
+                        <DiscPosterCard
+                            key={it.kind + it.tmdbId}
+                            title={it.title}
+                            year={it.year}
+                            sub={it.kind === "movie" ? "фильм" : "сериал"}
+                            imgUrl={it.poster ? posterUrl(it.poster) : null}
+                            accent={itemAccent(it.title)}
+                            rating={it.rating}
+                            rank={i + 1}
+                            onClick={() => onOpenTmdb(it)}
+                        />
+                    ))}
+                </DiscSection>
+            )}
+
+            {/* Series from library */}
+            {seriesItems.length > 0 && (
+                <DiscSection label="СЕРИАЛЫ" count={seriesItems.length}>
+                    {seriesItems.map((it) => (
+                        <DiscPosterCard
+                            key={it.id}
+                            title={it.name}
+                            year={it.year}
+                            sub="сериал"
+                            imgUrl={jellyfinPosterUrl(it.id)}
+                            accent={itemAccent(it.name)}
+                            seasonCount={it.childCount}
+                            onClick={() => nav(`/media/series/${it.id}`)}
+                        />
+                    ))}
+                </DiscSection>
+            )}
+
+            {/* Movies from library */}
+            {movieItems.length > 0 && (
+                <DiscSection label="ФИЛЬМЫ" count={movieItems.length}>
+                    {movieItems.map((it) => (
+                        <DiscPosterCard
+                            key={it.id}
+                            title={it.name}
+                            year={it.year}
+                            sub="фильм"
+                            imgUrl={jellyfinPosterUrl(it.id)}
+                            accent={itemAccent(it.name)}
+                            onClick={() => nav(`/media/movie/${it.id}`)}
+                        />
+                    ))}
+                </DiscSection>
+            )}
+
+            {/* Recommendations (if no library content yet) */}
+            {recs.length > 0 && seriesItems.length === 0 && movieItems.length === 0 && (
+                <DiscSection label="РЕКОМЕНДАЦИИ" count={recs.length}>
+                    {recs.map((r) => {
+                        const key = "rec" + r.kind + r.id;
+                        return (
+                            <DiscPosterCard
+                                key={key}
+                                title={r.title}
+                                year={r.year}
+                                sub={r.kind === "movie" ? "фильм" : "сериал"}
+                                imgUrl={r.poster ? posterUrl(r.poster) : null}
+                                accent={itemAccent(r.title)}
+                                onClick={() => {}}
+                                addBtn={{
+                                    label: "+ Добавить",
+                                    disabled: busy === key,
+                                    onClick: (e) => { e.stopPropagation(); onAddRec(r); },
+                                }}
+                            />
+                        );
+                    })}
+                </DiscSection>
+            )}
+
+            {/* Empty state */}
+            {library.length === 0 && trending.length === 0 && recs.length === 0 && (
+                <div className={cn(ms.empty, "mt-8 text-center")}>
+                    Библиотека пуста. Добавь первый тайтл через поиск.
+                </div>
+            )}
+        </div>
+    );
 }

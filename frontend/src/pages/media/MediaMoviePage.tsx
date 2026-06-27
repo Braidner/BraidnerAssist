@@ -2,8 +2,8 @@
 // метаданными, статус файла (качество/размер или «отсутствует»), встроенный
 // плеер + игра на устройство, поиск раздач и ручной импорт застрявшей раздачи.
 
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ReleasePicker,
   ImportDrawer,
@@ -41,6 +41,11 @@ import {
 import { useToast } from "../../components/ui/Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
+type AutoplayLocationState = {
+  autoplay?: boolean;
+  autoplayItemId?: string;
+  autoplayTitle?: string;
+} | null;
 
 export function MediaMoviePage({
   media,
@@ -53,6 +58,7 @@ export function MediaMoviePage({
 }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [d, setD] = useState<MoviePageDetail | null | "loading">("loading");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -65,6 +71,7 @@ export function MediaMoviePage({
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const [devices, setDevices] = useState<PlayDevice[]>([]);
   const [castOpen, setCastOpen] = useState(false);
+  const autoplayConsumedRef = useRef<string | null>(null);
 
   // discover-карточка резолвится по tmdbId (id = tmdbId), library — по Jellyfin-id.
   const fetchDetail = () =>
@@ -86,6 +93,23 @@ export function MediaMoviePage({
     setBusy(false);
     if (url && d && d !== "loading") setPlayer({ url, title: d.title });
   };
+
+  useEffect(() => {
+    const state = location.state as AutoplayLocationState;
+    if (source !== "library" || d === "loading" || !d || !state?.autoplay) return;
+    if (!d.hasFile) return;
+
+    const autoplayId = state.autoplayItemId ?? id;
+    const key = `${source}:${id}:${autoplayId}`;
+    if (autoplayConsumedRef.current === key) return;
+    autoplayConsumedRef.current = key;
+
+    const timer = setTimeout(() => {
+      void play();
+    }, 260);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, id, location.state, source]);
 
   if (d === "loading")
     return (

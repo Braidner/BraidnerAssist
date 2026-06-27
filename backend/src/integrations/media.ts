@@ -277,8 +277,11 @@ export async function getSeriesDetail(seriesId: string): Promise<SeriesDetail> {
 // Полная карточка Jellyfin-элемента (для шапки детальной страницы + played).
 interface JfFullItem {
   Name?: string;
+  Type?: string;
   Overview?: string;
   Genres?: string[];
+  SeriesId?: string;
+  ParentId?: string;
   ProviderIds?: Record<string, string>;
   Studios?: { Name?: string }[];
   CommunityRating?: number;
@@ -294,7 +297,7 @@ async function jellyfinItem(id: string): Promise<JfFullItem | null> {
     ? `${config.media.jellyfin.url}/Users/${userId}/Items/${id}`
     : `${config.media.jellyfin.url}/Items/${id}`;
   const url = new URL(base);
-  url.searchParams.set("Fields", "Overview,Genres,ProviderIds,Studios,CommunityRating,ProductionYear,RunTimeTicks,Status");
+  url.searchParams.set("Fields", "Overview,Genres,SeriesId,ParentId,ProviderIds,Studios,CommunityRating,ProductionYear,RunTimeTicks,Status");
   const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
   if (!res.ok) return null;
   return (await res.json()) as JfFullItem;
@@ -1655,6 +1658,18 @@ export interface ResumeItem {
   kind: "movie" | "episode";
   positionPct: number;
   year: number | null;
+  seriesId: string | null;
+}
+
+async function resolveResumeSeriesId(item: {
+  Id: string;
+  Type?: string;
+  SeriesId?: string;
+}): Promise<string | null> {
+  if (item.Type === "Movie") return null;
+  if (item.SeriesId) return item.SeriesId;
+  const detail = await jellyfinItem(item.Id);
+  return detail?.SeriesId ?? null;
 }
 
 // «Продолжить просмотр» из Jellyfin — недосмотренные фильмы/эпизоды с позицией.
@@ -1666,27 +1681,29 @@ export async function getContinueWatching(): Promise<ResumeItem[]> {
   url.searchParams.set("Limit", "20");
   url.searchParams.set("MediaTypes", "Video");
   url.searchParams.set("Recursive", "true");
-  url.searchParams.set("Fields", "SeriesName,UserData,RunTimeTicks,ProductionYear");
+  url.searchParams.set("Fields", "SeriesName,SeriesId,ParentId,UserData,RunTimeTicks,ProductionYear");
   const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
   if (!res.ok) throw new Error(`Jellyfin Resume ${res.status}`);
   const body = (await res.json()) as {
     Items?: {
-      Id: string; Name?: string; SeriesName?: string; Type?: string;
+      Id: string; Name?: string; SeriesName?: string; SeriesId?: string; ParentId?: string; Type?: string;
       ProductionYear?: number; RunTimeTicks?: number;
       UserData?: { PlaybackPositionTicks?: number };
     }[];
   };
-  return (body.Items ?? []).map((it) => {
+  return Promise.all((body.Items ?? []).map(async (it) => {
     const runtime = it.RunTimeTicks ?? 0;
     const pos = it.UserData?.PlaybackPositionTicks ?? 0;
+    const kind = it.Type === "Movie" ? "movie" as const : "episode" as const;
     return {
       id: it.Id,
       title: it.SeriesName ? `${it.SeriesName} — ${it.Name ?? ""}` : it.Name ?? "—",
-      kind: it.Type === "Movie" ? "movie" as const : "episode" as const,
+      kind,
       positionPct: runtime > 0 ? Math.round((pos / runtime) * 100) : 0,
       year: it.ProductionYear ?? null,
+      seriesId: kind === "movie" ? null : await resolveResumeSeriesId(it),
     };
-  });
+  }));
 }
 
 export interface UnifiedSearch {

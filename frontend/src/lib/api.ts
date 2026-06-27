@@ -1035,6 +1035,7 @@ export interface ResumeItem {
   kind: "movie" | "episode";
   positionPct: number;
   year: number | null;
+  seriesId: string | null;
 }
 export async function getContinueWatching(): Promise<ResumeItem[]> {
   try {

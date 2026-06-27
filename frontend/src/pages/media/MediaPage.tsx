@@ -25,7 +25,6 @@ import {
   torrserverStreamUrl,
   getCalendar,
   getContinueWatching,
-  getMediaPlayUrl,
   type MediaData,
   type DownloadItem,
   type LibraryItem,
@@ -509,11 +508,20 @@ export function MediaPage({
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
   const playResume = async (it: ResumeItem) => {
-    setBusy("res" + it.id);
-    const url = await getMediaPlayUrl(it.id);
-    setBusy(null);
-    if (url) setPlayer({ url, title: it.title, direct: false });
-    else toast.error("Не удалось запустить воспроизведение");
+    if (it.kind === "movie") {
+      nav(`/media/movie/${it.id}`, {
+        state: { autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
+      });
+      return;
+    }
+    if (it.seriesId) {
+      nav(`/media/series/${it.seriesId}`, {
+        state: { autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
+      });
+      return;
+    }
+
+    toast.error("Не удалось открыть страницу сериала для продолжения просмотра");
   };
 
   const onWatchNow = async (url: string, title: string, key: string) => {

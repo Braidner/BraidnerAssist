@@ -3,8 +3,8 @@
 // качество, дата, превью), прогресс по сезону, встроенный плеер, поиск раздач
 // на сезон, bulk-поиск недостающих и ручной импорт застрявшей раздачи.
 
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ReleasePicker,
   ImportDrawer,
@@ -42,6 +42,11 @@ import {
 import { useToast } from "../../components/ui/Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
+type AutoplayLocationState = {
+  autoplay?: boolean;
+  autoplayItemId?: string;
+  autoplayTitle?: string;
+} | null;
 const fmtAir = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("ru-RU") : "";
 
@@ -71,6 +76,7 @@ export function MediaSeriesPage({
 }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [d, setD] = useState<SeriesPageDetail | null | "loading">("loading");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -84,6 +90,7 @@ export function MediaSeriesPage({
   const [showPick, setShowPick] = useState(false);
   const [pickReload, setPickReload] = useState(0);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
+  const autoplayConsumedRef = useRef<string | null>(null);
 
   // discover-карточка резолвится по tvdbId (id = tvdbId), library — по Jellyfin-id.
   const fetchDetail = () =>
@@ -107,6 +114,46 @@ export function MediaSeriesPage({
       setActiveEpisodeId(jellyfinId);
     }
   };
+
+  useEffect(() => {
+    const state = location.state as AutoplayLocationState;
+    if (source !== "library" || d === "loading" || !d || !state?.autoplay) return;
+
+    const playable = d.seasons
+      .flatMap((season) =>
+        season.episodes
+          .filter((ep) => ep.jellyfinId)
+          .map((ep) => ({
+            jellyfinId: ep.jellyfinId as string,
+            title: `${d.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
+            seasonNumber: ep.seasonNumber,
+            episodeNumber: ep.episodeNumber ?? 0,
+            played: ep.played,
+          })),
+      )
+      .sort(
+        (a, b) =>
+          a.seasonNumber - b.seasonNumber ||
+          a.episodeNumber - b.episodeNumber,
+      );
+    const target =
+      (state.autoplayItemId
+        ? playable.find((ep) => ep.jellyfinId === state.autoplayItemId)
+        : null) ??
+      playable.find((ep) => !ep.played) ??
+      playable[0];
+    if (!target) return;
+
+    const key = `${source}:${id}:${target.jellyfinId}`;
+    if (autoplayConsumedRef.current === key) return;
+    autoplayConsumedRef.current = key;
+
+    const timer = setTimeout(() => {
+      void play(target.jellyfinId, state.autoplayTitle ?? target.title);
+    }, 260);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d, id, location.state, source]);
 
   if (d === "loading")
     return (

@@ -37,7 +37,7 @@ interface MediaLibraryTabProps {
 interface LibraryHeroProps {
     heroItem: LibraryItem | null;
     resume: ResumeItem[];
-    openDetail: (it: LibraryItem) => void;
+    openDetail: (it: LibraryItem, autoplay?: boolean) => void;
 }
 
 type HeroDetail = MoviePageDetail | SeriesPageDetail | null;
@@ -70,8 +70,10 @@ export function MediaLibraryTab({
     const nav = useNavigate();
     const toast = useToast();
 
-    const openDetail = (it: LibraryItem) =>
-        nav(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`);
+    const openDetail = (it: LibraryItem, autoplay = false) =>
+        nav(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`, {
+            state: autoplay ? {autoplay: true} : undefined,
+        });
 
     // Pick hero once when library loads; re-pick if library changes significantly
     const heroRef = useRef<LibraryItem | null>(null);
@@ -313,7 +315,7 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
                 <div className={ms.libActions} style={{animation: "heroSlide 0.55s 0.46s cubic-bezier(.22,.61,.36,1) both"}}>
                     <button
                         className={ms.playButton}
-                        onClick={(e) => { e.stopPropagation(); openDetail(heroItem); }}
+                        onClick={(e) => { e.stopPropagation(); openDetail(heroItem, true); }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <polygon points="6,3 21,12 6,21"/>

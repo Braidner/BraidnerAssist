@@ -2,14 +2,21 @@
 // метаданными, статус файла (качество/размер или «отсутствует»), встроенный
 // плеер + игра на устройство, поиск раздач и ручной импорт застрявшей раздачи.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  useVideoPlayer,
   ReleasePicker,
   ImportDrawer,
-  fmtSize,
 } from "./shared/mediaShared.tsx";
+import {
+  DetailBody,
+  DetailHero,
+  DetailStatusBadges,
+  DetailTopBar,
+  SimilarRail,
+  StuckImportButtons,
+  type DetailPlayer,
+} from "./shared/mediaDetail.tsx";
 import { TorrentFilePicker, ContentTorrents } from "./shared/mediaPick.tsx";
 import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
@@ -21,7 +28,6 @@ import {
   getMediaDevices,
   playOnDevice,
   jellyfinPosterUrl,
-  jellyfinBackdropUrl,
   posterUrl,
   seasonSearch,
   setMonitored,
@@ -50,9 +56,7 @@ export function MediaMoviePage({
   const toast = useToast();
   const [d, setD] = useState<MoviePageDetail | null | "loading">("loading");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
-  const [player, setPlayer] = useState<{ url: string; title: string } | null>(
-    null,
-  );
+  const [player, setPlayer] = useState<DetailPlayer>(null);
   const [busy, setBusy] = useState(false);
   const [act, setAct] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -61,41 +65,6 @@ export function MediaMoviePage({
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const [devices, setDevices] = useState<PlayDevice[]>([]);
   const [castOpen, setCastOpen] = useState(false);
-  const heroRef = useRef<HTMLDivElement>(null);
-  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [controlsVisible, setControlsVisible] = useState(true);
-
-  const { videoRef, vidPlaying, setVidPlaying, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, seekTo } =
-    useVideoPlayer(player?.url ?? null);
-
-  const revealControls = useCallback(() => {
-    setControlsVisible(true);
-    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 2800);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
-    } else {
-      void heroRef.current?.requestFullscreen();
-    }
-    revealControls();
-  };
-
-  // Esc closes player
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") setPlayer(null); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, []);
-
-  useEffect(() => {
-    if (player) revealControls();
-    return () => {
-      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    };
-  }, [player, revealControls]);
 
   // discover-карточка резолвится по tmdbId (id = tmdbId), library — по Jellyfin-id.
   const fetchDetail = () =>
@@ -198,231 +167,43 @@ export function MediaMoviePage({
         />
       )}
 
-      {/* topbar */}
-      <div className="sticky top-0 z-10 flex items-center gap-3.5 px-8 py-3.5 bg-page/90 backdrop-blur-xl border-b border-white/[0.055] max-mob:px-4 max-mob:py-3" style={{animation: "detIn 0.3s 0s cubic-bezier(.22,.61,.36,1) both"}}>
-        <button
-          className="flex items-center gap-[7px] border-none bg-transparent cursor-pointer font-ui text-pill font-extrabold tracking-4 uppercase text-ink-soft p-0 flex-none transition-colors hover:text-accent"
-          onClick={() => nav("/media")}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M19 12H5M12 19l-7-7 7-7"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>НАЗАД</span>
-        </button>
-        <span className="flex-1 text-center text-cell text-muted truncate lmono">{det.title}</span>
-        <button
-          className="flex items-center gap-[7px] flex-none border border-white/12 rounded-[7px] cursor-pointer bg-white/[0.04] font-ui text-pill font-bold tracking-1 text-white/60 px-3.5 py-[7px] transition-all hover:bg-white/[0.08] hover:text-ink"
-          onClick={() => setShowPicker((v) => !v)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
-          </svg>
-          В очередь
-        </button>
-      </div>
+      <DetailTopBar
+        title={det.title}
+        onBack={() => nav("/media")}
+        onQueueClick={() => setShowPicker((v) => !v)}
+      />
 
-      {/* hero — video crossfades in behind content */}
-      <div
-        ref={heroRef}
-        className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px] fullscreen:h-screen fullscreen:min-h-screen fullscreen:w-screen"
-        style={{animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both"}}
-        onMouseMove={player ? revealControls : undefined}
-        onTouchStart={player ? revealControls : undefined}
-      >
-        {/* backdrop: image fades out, video fades in */}
-        <div className="absolute inset-0 bg-black">
-          <img
-            src={jellyfinBackdropUrl(det.jellyfinId)}
-            alt=""
-            style={{
-              position: "absolute", inset: 0, width: "100%", height: "100%",
-              objectFit: "cover", objectPosition: "top center",
-              opacity: player ? 0 : 1, transition: "opacity 1.2s ease",
-            }}
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-          <video
-            ref={videoRef}
-            style={{
-              position: "absolute", inset: 0, width: "100%", height: "100%",
-              objectFit: "cover",
-              opacity: player ? 1 : 0, transition: "opacity 1.2s ease",
-            }}
-            onPlay={() => setVidPlaying(true)}
-            onPause={() => setVidPlaying(false)}
-            onDurationChange={(e) => setVidDuration(e.currentTarget.duration)}
-            onTimeUpdate={(e) => setVidTime(e.currentTarget.currentTime)}
-          />
-        </div>
+      <DetailHero
+        kindLabel="ФИЛЬМ"
+        title={det.title}
+        jellyfinId={det.jellyfinId}
+        posterSrc={posterSrc}
+        player={player}
+        year={det.year}
+        runtimeLabel={det.runtime ? `${det.runtime} мин` : null}
+        rating={det.rating}
+        genres={det.genres}
+        onClosePlayer={() => setPlayer(null)}
+      />
 
-        {/* grain */}
-        <div className="absolute inset-0 pointer-events-none" style={{backgroundImage:`url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)' opacity='0.1'/%3E%3C/svg%3E")`,backgroundSize:"180px",mixBlendMode:"overlay",opacity:0.5}}/>
-
-        {/* light vignette, no extra darkening when playback starts */}
-        <div className="absolute inset-0" style={{background: "linear-gradient(to right, rgba(9,9,13,0.72) 0%, rgba(9,9,13,0.32) 44%, rgba(9,9,13,0.06) 72%, transparent 100%), linear-gradient(to top, rgba(9,9,13,0.58) 0%, rgba(9,9,13,0.12) 28%, transparent 52%)"}}/>
-
-        {/* content overlay */}
-        <div
-          className="relative z-[1] h-full flex items-end px-[52px] pb-11 gap-9 transition-all duration-500 ease-out max-mob:px-5 max-mob:pb-8 max-mob:gap-[18px]"
-          style={{
-            opacity: player && !controlsVisible ? 0 : 1,
-            pointerEvents: player && !controlsVisible ? "none" : "auto",
-            transform: player && !controlsVisible ? "translateY(34px)" : "translateY(0)",
-          }}
-        >
-          <div className="flex-1 min-w-0">
-            <div className="text-2xs tracking-6 uppercase mb-2.5 lmono" style={{color: player ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.38)", transition: "color 0.6s"}}>
-              {player ? (vidPlaying ? "▶ ВОСПРОИЗВОДИТСЯ" : "⏸ ПАУЗА") : "ФИЛЬМ"}
-            </div>
-            <h1 className="font-[Oswald,var(--font)] text-cinematic font-bold leading-[0.92] tracking-tight-hero text-white m-0 mb-4 max-mob:text-cinematic-mob">{det.title}</h1>
-            <div className="flex items-center gap-2 flex-wrap text-cell text-white/[0.48] mb-3.5 lmono">
-              {det.year && <span>{det.year}</span>}
-              {det.runtime && (<><span className="text-white/20">·</span><span>{det.runtime} мин</span></>)}
-              {det.rating && (<><span className="text-white/20">·</span><span>★ {det.rating.toFixed(1)}</span></>)}
-            </div>
-            {det.genres?.length > 0 && (
-              <div className="flex gap-[7px] flex-wrap">
-                {det.genres.slice(0, 4).map((g) => (
-                  <span key={g} className="font-ui text-label font-bold tracking-genre uppercase text-white/[0.45] px-2.5 py-[3px] rounded-[4px] border border-white/[0.13]">{g}</span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* poster becomes a subtle now-playing plate when video starts */}
-          <div
-            className="flex-none max-mob:hidden"
-            style={{
-              opacity: player ? 0.82 : 1,
-              transform: player ? "translateY(-6px) scale(0.92)" : "none",
-              transition: "opacity 1s ease, transform 1s cubic-bezier(.22,.61,.36,1)",
-            }}
-          >
-            <div className="w-[130px] aspect-[2/3] rounded-[11px] overflow-hidden relative shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
-              <div style={{position:"absolute",inset:0,background:"#09090d"}}/>
-              <img src={posterSrc} alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}} onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}/>
-            </div>
-          </div>
-        </div>
-
-        {/* hero player controls */}
-        {player && (
-          <div
-            className="absolute inset-x-0 bottom-0 z-10 px-[52px] pb-5 transition-all duration-500 ease-out max-mob:px-5"
-            style={{
-              opacity: controlsVisible ? 1 : 0,
-              pointerEvents: controlsVisible ? "auto" : "none",
-              transform: controlsVisible ? "translateY(0)" : "translateY(calc(100% + 24px))",
-            }}
-          >
-            <div className="flex items-center gap-3 rounded-[14px] border border-white/10 bg-black/35 px-3 py-2 text-white shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-              <button
-                className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/12 text-white transition-all hover:bg-white/22"
-                onClick={() => {
-                  togglePlay();
-                  revealControls();
-                }}
-                title={vidPlaying ? "Пауза" : "Воспроизвести"}
-              >
-                {vidPlaying ? (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16" rx="1" />
-                    <rect x="14" y="4" width="4" height="16" rx="1" />
-                  </svg>
-                ) : (
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="6,3 21,12 6,21" />
-                  </svg>
-                )}
-              </button>
-              <span className="w-[84px] font-mono text-2xs text-white/60 tabular-nums">
-                {Math.floor(vidTime / 60)}:{String(Math.floor(vidTime % 60)).padStart(2, "0")}
-                {vidDuration > 0 ? ` / ${Math.floor(vidDuration / 60)}:${String(Math.floor(vidDuration % 60)).padStart(2, "0")}` : ""}
-              </span>
-              <div
-                className="h-1 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/18"
-                onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); seekTo((e.clientX - r.left) / r.width); revealControls(); }}
-              >
-                <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{width: vidDuration > 0 ? `${(vidTime/vidDuration)*100}%` : "0%"}}/>
-              </div>
-              <button
-                className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
-                onClick={toggleFullscreen}
-                title="Во весь экран"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-                  <path d="M16 3h3a2 2 0 0 1 2 2v3" />
-                  <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
-                  <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
-                </svg>
-              </button>
-              <button
-                className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
-                onClick={() => {
-                  setPlayer(null);
-                  setControlsVisible(true);
-                }}
-                title="Остановить (Esc)"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                  <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* body */}
-      <div className="px-[52px] pt-5 pb-20 max-w-[860px] max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]" style={{animation: "detIn 0.38s 0.12s cubic-bezier(.22,.61,.36,1) both"}}>
+      <DetailBody className="pt-5">
         {det.overview && (
           <p className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
             {det.overview}
           </p>
         )}
 
-        {/* Status badges */}
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            marginBottom: 12,
+        <DetailStatusBadges
+          status={det.status}
+          inArr={det.inArr}
+          arrName="Radarr"
+          provider={det.studio}
+          file={{
+            hasFile: det.hasFile,
+            quality: det.quality,
+            size: det.size,
           }}
-        >
-          {det.status && <span className={ms.badge}>{det.status}</span>}
-          {!det.inArr && (
-            <span
-              className={ms.reject}
-              title="Нет в Radarr — данные из Jellyfin"
-            >
-              только Jellyfin
-            </span>
-          )}
-          {det.studio && <span className={ms.lang}>{det.studio}</span>}
-          {det.hasFile ? (
-            <span className={ms.badge}>
-              {det.quality ?? "файл есть"}
-              {det.size ? ` · ${fmtSize(det.size)}` : ""}
-            </span>
-          ) : (
-            <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-muted">
-              Файл отсутствует
-            </span>
-          )}
-        </div>
+        />
 
         {/* Actions */}
         <div className="flex gap-3 mb-7">
@@ -509,16 +290,11 @@ export function MediaMoviePage({
               )}
             </>
           )}
-          {stuck.map((s) => (
-            <button
-              key={s.downloadId ?? s.hash}
-              className={cn(ms.button.sm, "self-start text-warn")}
-              title={s.importMessage}
-              onClick={() => setImportItem(s)}
-            >
-              ⚠ Импорт застрявшей
-            </button>
-          ))}
+          <StuckImportButtons
+            items={stuck}
+            label="⚠ Импорт застрявшей"
+            onSelect={setImportItem}
+          />
         </div>
 
         {/* Раздачи */}
@@ -571,86 +347,8 @@ export function MediaMoviePage({
           )}
         </div>
 
-        {/* ПОХОЖИЕ */}
-        {similarItems.length > 0 && (
-          <div style={{ marginTop: 32 }}>
-            <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ПОХОЖИЕ</div>
-            <div className={cn(ms.hTrack, ms.posterRow)}>
-              {similarItems.map((item) => {
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(ms.posterCard, "group")}
-                    onClick={() =>
-                      nav(
-                        `/media/${item.type === "Series" ? "series" : "movie"}/${item.id}`,
-                      )
-                    }
-                  >
-                    <div className={ms.posterArt}>
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "#09090d",
-                          zIndex: 0,
-                        }}
-                      />
-                      <img
-                        src={jellyfinPosterUrl(item.id)}
-                        alt=""
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          zIndex: 1,
-                        }}
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display =
-                            "none";
-                        }}
-                      />
-                      <div
-                        className={ms.posterOverlay}
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "linear-gradient(to top, rgba(0,0,0,0.72), transparent 58%)",
-                          zIndex: 3,
-                          display: "flex",
-                          alignItems: "flex-end",
-                          justifyContent: "flex-end",
-                          padding: 8,
-                        }}
-                      >
-                        <div className={ms.roundPlay}>
-                          <svg
-                            width="17"
-                            height="17"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                          >
-                            <polygon points="6,3 21,12 6,21" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                    <div className={ms.posterInfo}>
-                      <div className={ms.posterTitle}>{item.name}</div>
-                      <div className={ms.posterSub}>
-                        {item.type === "Series" ? "сериал" : "фильм"}
-                        {item.year ? ` · ${item.year}` : ""}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+        <SimilarRail items={similarItems} />
+      </DetailBody>
     </div>
   );
 }

@@ -154,11 +154,17 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     `arrFindByExternalId` по tvdb/tmdb — ничего НЕ добавляет), played-статус и плеер из Jellyfin. Сериал
     показывает ВСЕ эпизоды (вкл. отсутствующие) с датой выхода, «скачано/нет», качеством и размером (Sonarr
     `/api/v3/episode?includeEpisodeFile=true`); фильм — статус файла (качество/размер или «отсутствует»). Если
-    тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: встроенный HLS-плеер,
-    `ReleasePicker` на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
+    тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: cinematic hero-player:
+    клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), title/meta/genres/poster остаются
+    поверх как player chrome, нижняя панель (play/pause, seek, stop, fullscreen) и инфо-слой auto-hide
+    синхронно уезжают вниз после idle и возвращаются на mouse/touch. Также есть `ReleasePicker`
+    на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
     ручного импорта застрявшей раздачи (`ImportDrawer`, если в очереди есть `importPending`-раздача этого тайтла).
-    Старый `SeriesDrawer` удалён; общие компоненты (`Player`/`ReleasePicker`/`ImportDrawer`/форматтеры) вынесены
-    в `components/panels/mediaShared.tsx`. (`GET /media/series/:id` — Jellyfin-only seasons — остаётся для обратной
+    Старый `SeriesDrawer` удалён; общие detail-компоненты (`DetailTopBar`/`DetailHero`/`DetailBody`/
+    `DetailStatusBadges`/`StuckImportButtons`/`SimilarRail`) вынесены в
+    `frontend/src/pages/media/shared/mediaDetail.tsx`; HLS/modal/TorrServer player, `ReleasePicker`,
+    `ImportDrawer` и форматтеры — в `frontend/src/pages/media/shared/mediaShared.tsx`.
+    (`GET /media/series/:id` — Jellyfin-only seasons — остаётся для обратной
     совместимости.) Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
     `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
@@ -324,6 +330,10 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   поиск в Cmd-K, тост-система, полиш сетки/детальной/мобилки. Env: добавлен `TORRSERVER_*`. ✅ ГОТОВО
 - **Batch v6.1 — фикс воспроизведения** (151ba1c): nginx `/api/` резал большие HLS-плейлисты из-за
   upgrade-заголовков → убраны, `Connection ""`+`proxy_buffering off`. См. раздел «Деплой». ✅ ГОТОВО
+- **Media detail cinematic refactor** (2026-06-27): detail pages фильмов/сериалов переведены
+  на общий cinematic `DetailHero` (HLS в hero-фоне, fullscreen, auto-hide chrome), общий
+  `DetailTopBar`/`DetailBody`/`DetailStatusBadges`/`SimilarRail`; дублирующая JSX-разметка
+  убрана из `MediaMoviePage`/`MediaSeriesPage`, старый `InlinePlayer` удалён. ✅ ГОТОВО
 - **Refactor — self-contained widgets + TabsContext** (fa19b5d → 20e7658): `App.tsx` split на
   domain-файлы (`TabsContext`, `OverviewPage`, `MediaRoutes`); затем полный рефакторинг — каждый виджет
   самостоятельно делает fetch/polling, `App.tsx` стал lean (~120 строк, только auth+routing+UI chrome).

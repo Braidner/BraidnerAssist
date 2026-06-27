@@ -273,6 +273,25 @@
       `ApiKey`/`DeviceId`/`PlaySessionId`) — показывает «[BLOCKED]»/503 даже когда nginx вернул 200.
       Путает in-browser репро — проверять на уровне nginx/curl.
 
+## Batch v6.2 — cinematic detail hero + React refactor (2026-06-27)
+
+- [x] Detail pages получили cinematic hero-player: клик «Смотреть» плавно запускает HLS-видео
+      внутри hero-фона, без модального overlay; title/meta/genres/poster остаются поверх как player chrome.
+- [x] Player chrome: play/pause, progress/seek, stop, fullscreen (`requestFullscreen` на hero),
+      auto-hide через idle ~2.8с; нижняя панель и инфо-слой синхронно уезжают вниз и исчезают,
+      возвращаются на mouse/touch.
+- [x] Визуальный cleanup: убран per-title цветной backdrop/glow, оставлен чистый темный hero с легким
+      vignette; при старте просмотра нет дополнительного затемнения поверх видео.
+- [x] React refactor detail pages: общий reusable слой вынесен в
+      `frontend/src/pages/media/shared/mediaDetail.tsx`:
+      `DetailTopBar`, `DetailHero`, `DetailBody`, `DetailStatusBadges`,
+      `StuckImportButtons`, `SimilarRail`.
+- [x] `MediaMoviePage.tsx` и `MediaSeriesPage.tsx` очищены от дублирующей hero/topbar/player/similar
+      разметки; страницы оставляют fetch/state/domain actions и уникальные секции (movie actions,
+      seasons/episodes). Старый мертвый `InlinePlayer` удален из `mediaShared.tsx`.
+- [x] Проверено: `cd frontend && npx tsc --noEmit`, `cd frontend && npm run build`; browser smoke:
+      movie detail → «Смотреть» → video state/fullscreen/auto-hide; series detail рендерится.
+
 ---
 
 ## REST API (план)

@@ -1,0 +1,458 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  jellyfinBackdropUrl,
+  jellyfinPosterUrl,
+  type DownloadItem,
+  type LibraryItem,
+} from "@/lib/api.ts";
+import { cn } from "@/lib/cn.ts";
+import { media as ms } from "./mediaStyles.ts";
+import { fmtSize, useVideoPlayer } from "./mediaShared.tsx";
+
+export type DetailPlayer = { url: string; title: string } | null;
+
+function fmtPlayerTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+export function DetailTopBar({
+  title,
+  onBack,
+  onQueueClick,
+}: {
+  title: string;
+  onBack: () => void;
+  onQueueClick: () => void;
+}) {
+  return (
+    <div className="sticky top-0 z-10 flex items-center gap-3.5 border-b border-white/[0.055] bg-page/90 px-8 py-3.5 backdrop-blur-xl max-mob:px-4 max-mob:py-3" style={{ animation: "detIn 0.3s 0s cubic-bezier(.22,.61,.36,1) both" }}>
+      <button
+        className="flex flex-none cursor-pointer items-center gap-[7px] border-none bg-transparent p-0 font-ui text-pill font-extrabold uppercase tracking-4 text-ink-soft transition-colors hover:text-accent"
+        onClick={onBack}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M19 12H5M12 19l-7-7 7-7"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span>НАЗАД</span>
+      </button>
+      <span className="lmono flex-1 truncate text-center text-cell text-muted">{title}</span>
+      <button
+        className="flex flex-none cursor-pointer items-center gap-[7px] rounded-[7px] border border-white/12 bg-white/[0.04] px-3.5 py-[7px] font-ui text-pill font-bold tracking-1 text-white/60 transition-all hover:bg-white/[0.08] hover:text-ink"
+        onClick={onQueueClick}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+        </svg>
+        В очередь
+      </button>
+    </div>
+  );
+}
+
+export function DetailBody({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "max-w-[860px] px-[52px] pb-20 max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]",
+        className,
+      )}
+      style={{ animation: "detIn 0.38s 0.12s cubic-bezier(.22,.61,.36,1) both" }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function DetailStatusBadges({
+  status,
+  inArr,
+  arrName,
+  provider,
+  file,
+}: {
+  status?: string | null;
+  inArr: boolean;
+  arrName: string;
+  provider?: string | null;
+  file?: {
+    hasFile: boolean;
+    quality?: string | null;
+    size?: number | null;
+  };
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap gap-1.5">
+      {status && <span className={ms.badge}>{status}</span>}
+      {!inArr && (
+        <span className={ms.reject} title={`Нет в ${arrName} — данные из Jellyfin`}>
+          только Jellyfin
+        </span>
+      )}
+      {provider && <span className={ms.lang}>{provider}</span>}
+      {file ? (
+        file.hasFile ? (
+          <span className={ms.badge}>
+            {file.quality ?? "файл есть"}
+            {file.size ? ` · ${fmtSize(file.size)}` : ""}
+          </span>
+        ) : (
+          <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-muted">
+            Файл отсутствует
+          </span>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+export function StuckImportButtons({
+  items,
+  onSelect,
+  label,
+}: {
+  items: DownloadItem[];
+  onSelect: (item: DownloadItem) => void;
+  label: string;
+}) {
+  return (
+    <>
+      {items.map((item) => (
+        <button
+          key={item.downloadId ?? item.hash}
+          className={cn(ms.button.sm, "self-start text-warn")}
+          title={item.importMessage}
+          onClick={() => onSelect(item)}
+        >
+          {label}
+        </button>
+      ))}
+    </>
+  );
+}
+
+export function DetailHero({
+  kindLabel,
+  title,
+  jellyfinId,
+  posterSrc,
+  player,
+  year,
+  runtimeLabel,
+  rating,
+  genres,
+  onClosePlayer,
+}: {
+  kindLabel: string;
+  title: string;
+  jellyfinId: string;
+  posterSrc?: string;
+  player: DetailPlayer;
+  year?: number | string | null;
+  runtimeLabel?: string | null;
+  rating?: number | null;
+  genres?: string[];
+  onClosePlayer: () => void;
+}) {
+  const heroRef = useRef<HTMLDivElement>(null);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const {
+    videoRef,
+    vidPlaying,
+    setVidPlaying,
+    vidDuration,
+    setVidDuration,
+    vidTime,
+    setVidTime,
+    togglePlay,
+    seekTo,
+  } = useVideoPlayer(player?.url ?? null);
+
+  const revealControls = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 2800);
+  }, []);
+
+  const stopPlayer = useCallback(() => {
+    onClosePlayer();
+    setControlsVisible(true);
+  }, [onClosePlayer]);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void heroRef.current?.requestFullscreen();
+    }
+    revealControls();
+  };
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stopPlayer();
+    };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [stopPlayer]);
+
+  useEffect(() => {
+    if (player) revealControls();
+    return () => {
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    };
+  }, [player, revealControls]);
+
+  return (
+    <div
+      ref={heroRef}
+      className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px] fullscreen:h-screen fullscreen:min-h-screen fullscreen:w-screen"
+      style={{ animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both" }}
+      onMouseMove={player ? revealControls : undefined}
+      onTouchStart={player ? revealControls : undefined}
+    >
+      <div className="absolute inset-0 bg-black">
+        <img
+          src={jellyfinBackdropUrl(jellyfinId)}
+          alt=""
+          className="absolute inset-0 size-full object-cover object-top"
+          style={{ opacity: player ? 0 : 1, transition: "opacity 1.2s ease" }}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+        <video
+          ref={videoRef}
+          className="absolute inset-0 size-full object-cover"
+          style={{ opacity: player ? 1 : 0, transition: "opacity 1.2s ease" }}
+          onPlay={() => setVidPlaying(true)}
+          onPause={() => setVidPlaying(false)}
+          onDurationChange={(e) => setVidDuration(e.currentTarget.duration)}
+          onTimeUpdate={(e) => setVidTime(e.currentTarget.currentTime)}
+        />
+      </div>
+
+      <div
+        className="pointer-events-none absolute inset-0 opacity-50 mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)' opacity='0.1'/%3E%3C/svg%3E\")",
+          backgroundSize: "180px",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to right, rgba(9,9,13,0.72) 0%, rgba(9,9,13,0.32) 44%, rgba(9,9,13,0.06) 72%, transparent 100%), linear-gradient(to top, rgba(9,9,13,0.58) 0%, rgba(9,9,13,0.12) 28%, transparent 52%)",
+        }}
+      />
+
+      <div
+        className="relative z-[1] flex h-full items-end gap-9 px-[52px] pb-11 transition-all duration-500 ease-out max-mob:gap-[18px] max-mob:px-5 max-mob:pb-8"
+        style={{
+          opacity: player && !controlsVisible ? 0 : 1,
+          pointerEvents: player && !controlsVisible ? "none" : "auto",
+          transform: player && !controlsVisible ? "translateY(34px)" : "translateY(0)",
+        }}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="lmono mb-2.5 text-2xs uppercase tracking-6" style={{ color: player ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.38)", transition: "color 0.6s" }}>
+            {player ? (vidPlaying ? "▶ ВОСПРОИЗВОДИТСЯ" : "⏸ ПАУЗА") : kindLabel}
+          </div>
+          <h1 className="m-0 mb-4 font-[Oswald,var(--font)] text-cinematic font-bold leading-[0.92] tracking-tight-hero text-white max-mob:text-cinematic-mob">{title}</h1>
+          <div className="lmono mb-3.5 flex flex-wrap items-center gap-2 text-cell text-white/[0.48]">
+            {year && <span>{year}</span>}
+            {runtimeLabel && (
+              <>
+                <span className="text-white/20">·</span>
+                <span>{runtimeLabel}</span>
+              </>
+            )}
+            {rating && (
+              <>
+                <span className="text-white/20">·</span>
+                <span>★ {rating.toFixed(1)}</span>
+              </>
+            )}
+          </div>
+          {genres && genres.length > 0 && (
+            <div className="flex flex-wrap gap-[7px]">
+              {genres.slice(0, 4).map((g) => (
+                <span key={g} className="rounded-[4px] border border-white/[0.13] px-2.5 py-[3px] font-ui text-label font-bold uppercase tracking-genre text-white/[0.45]">{g}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div
+          className="flex-none max-mob:hidden"
+          style={{
+            opacity: player ? 0.82 : 1,
+            transform: player ? "translateY(-6px) scale(0.92)" : "none",
+            transition: "opacity 1s ease, transform 1s cubic-bezier(.22,.61,.36,1)",
+          }}
+        >
+          <div className="relative aspect-[2/3] w-[130px] overflow-hidden rounded-[11px] shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+            <div className="absolute inset-0 bg-[#09090d]" />
+            <img
+              src={posterSrc}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {player && (
+        <div
+          className="absolute inset-x-0 bottom-0 z-10 px-[52px] pb-5 transition-all duration-500 ease-out max-mob:px-5"
+          style={{
+            opacity: controlsVisible ? 1 : 0,
+            pointerEvents: controlsVisible ? "auto" : "none",
+            transform: controlsVisible ? "translateY(0)" : "translateY(calc(100% + 24px))",
+          }}
+        >
+          <div className="flex items-center gap-3 rounded-[14px] border border-white/10 bg-black/35 px-3 py-2 text-white shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <button
+              className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/12 text-white transition-all hover:bg-white/22"
+              onClick={() => {
+                togglePlay();
+                revealControls();
+              }}
+              title={vidPlaying ? "Пауза" : "Воспроизвести"}
+            >
+              {vidPlaying ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="6,3 21,12 6,21" />
+                </svg>
+              )}
+            </button>
+            <span className="w-[84px] font-mono text-2xs tabular-nums text-white/60">
+              {fmtPlayerTime(vidTime)}
+              {vidDuration > 0 ? ` / ${fmtPlayerTime(vidDuration)}` : ""}
+            </span>
+            <div
+              className="h-1 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/18"
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                seekTo((e.clientX - r.left) / r.width);
+                revealControls();
+              }}
+            >
+              <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: vidDuration > 0 ? `${(vidTime / vidDuration) * 100}%` : "0%" }} />
+            </div>
+            <button
+              className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+              onClick={toggleFullscreen}
+              title="Во весь экран"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+                <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+                <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+              </svg>
+            </button>
+            <button
+              className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+              onClick={stopPlayer}
+              title="Остановить (Esc)"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SimilarRail({
+  items,
+  onOpen,
+}: {
+  items: LibraryItem[];
+  onOpen?: (item: LibraryItem) => void;
+}) {
+  const nav = useNavigate();
+  if (items.length === 0) return null;
+
+  const openItem =
+    onOpen ??
+    ((item: LibraryItem) =>
+      nav(`/media/${item.type === "Series" ? "series" : "movie"}/${item.id}`));
+
+  return (
+    <div className="mt-8">
+      <div className="mb-4 font-ui text-label font-extrabold uppercase tracking-section text-muted">ПОХОЖИЕ</div>
+      <div className={cn(ms.hTrack, ms.posterRow)}>
+        {items.map((item) => (
+          <div key={item.id} className={cn(ms.posterCard, "group")} onClick={() => openItem(item)}>
+            <div className={ms.posterArt}>
+              <div className="absolute inset-0 z-0 bg-[#09090d]" />
+              <img
+                src={jellyfinPosterUrl(item.id)}
+                alt=""
+                className="absolute inset-0 z-[1] size-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+              {item.childCount ? (
+                <span className={ms.posterBadge} style={{ position: "relative", zIndex: 2 }}>
+                  {item.childCount} сез.
+                </span>
+              ) : null}
+              <div className={cn(ms.posterOverlay, "bg-[linear-gradient(to_top,rgba(0,0,0,0.72),transparent_58%)]")}>
+                <div className={ms.roundPlay}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="6,3 21,12 6,21" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className={ms.posterInfo}>
+              <div className={ms.posterTitle}>{item.name}</div>
+              <div className={ms.posterSub}>
+                {item.type === "Series" ? "сериал" : "фильм"}
+                {item.year ? ` · ${item.year}` : ""}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

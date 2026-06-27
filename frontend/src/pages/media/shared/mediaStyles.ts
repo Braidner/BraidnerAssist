@@ -82,7 +82,7 @@ export const media = {
   progTrack: "h-1 flex-1 overflow-hidden rounded bg-white/15",
   progFill: "h-full rounded",
   progLabel: "text-data text-white/50",
-  section: "mt-8",
+  section: "mt-8 px-10",
   sectionHead: "mb-3 flex items-center gap-3",
   sectionTitle:
     "[font-family:Syne,var(--font)] text-xs font-extrabold uppercase tracking-5 text-ink",

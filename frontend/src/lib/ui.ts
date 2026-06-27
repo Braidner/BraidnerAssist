@@ -6,7 +6,8 @@ const focus =
 export const ui = {
   focus,
   shell:
-    "mc min-h-screen bg-page text-ink antialiased [font-family:var(--font-ui)]",
+    "mc min-h-screen flex-col bg-page text-ink antialiased [font-family:var(--font-ui)]",
+  content: "flex min-h-0 flex-1",
   main:
     "flex min-w-0 flex-1 flex-col pb-9 max-mob:gap-[18px] max-mob:px-4 max-mob:pb-[30px] max-mob:pt-[18px] max-[480px]:px-3",
   surface:
@@ -28,7 +29,7 @@ export const ui = {
     icon: "w-9 px-0",
     iconSm: "h-[30px] w-[30px] px-0",
     accent:
-      "border-accent/70 bg-accent text-accent-ink hover:bg-accent hover:text-accent-ink active:text-accent-ink",
+      "border-accent/70 bg-accent text-accent-ink shadow-[var(--accent-glow-sm)] hover:bg-accent hover:text-accent-ink hover:shadow-[var(--accent-glow)] active:text-accent-ink",
   },
   input: cn(
     "min-w-0 rounded-[10px] border border-hair bg-surface px-3 py-2 text-body text-ink outline-none transition-colors placeholder:text-muted",

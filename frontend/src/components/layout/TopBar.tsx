@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import { useEffect, useState } from "react";
 import {LogOut, Moon, Settings, Sun} from "lucide-react";
 import type {Theme} from "@/theme.ts";
 import type {VersionData} from "@/lib/api.ts";
@@ -6,17 +6,17 @@ import {useTabsState} from "../../lib/tabsContext.tsx";
 import {cn} from "../../lib/cn.ts";
 import {Button} from "@/components/ui/button";
 import {Tabs, TabsList, TabsTrigger} from "@/components/ui/tabs.tsx";
+import { icons } from "../icons.tsx";
 
 type Backend = "up" | "down" | "checking";
 
 interface TopBarProps {
-	clock: Date;
 	backend: Backend;
+	menuOpen: boolean;
 	theme: Theme;
 	onToggleTheme: () => void;
 	onLogout: () => void;
 	onSettings: () => void;
-	onLogs: () => void;
 	onMenu: () => void;
 	versionData: VersionData | null;
 }
@@ -38,10 +38,13 @@ const months = [
 ];
 
 export function TopBar({
+	                       backend,
+	                       menuOpen,
 	                       theme,
 	                       onToggleTheme,
 	                       onLogout,
 	                       onSettings,
+	                       onMenu,
 	                       versionData,
                        }: TopBarProps) {
 	const {tabs, activeTab, onTabChange} = useTabsState();
@@ -57,14 +60,35 @@ export function TopBar({
 	const versionLabel = versionData
 		? `v${versionData.version}${versionData.sha ? " " + versionData.sha.slice(0, 7) : ""}`
 		: "";
+	const backendTone = backend === "up" ? "bg-accent" : backend === "down" ? "bg-bad" : "bg-warn";
+	const backendLabel = backend === "up" ? "Backend online" : backend === "down" ? "Backend offline" : "Backend check";
 
 	return (
-		<div className="sticky top-0 z-20 border-b border-hair bg-page/92 backdrop-blur-xl">
-			<div className="flex min-h-11 items-center justify-between gap-4">
-				<div
-					className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+		<header className="sticky top-0 z-40 w-full border-b border-hair bg-page/92 backdrop-blur-xl">
+			<div className="flex min-h-12 w-full items-center justify-between gap-4 px-4 max-[480px]:px-3">
+				<button
+					type="button"
+					className="flex min-w-0 flex-none cursor-pointer items-center gap-3 rounded-xl border border-transparent py-1.5 pr-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/70"
+					onClick={onMenu}
+					aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
+					aria-expanded={menuOpen}
+				>
+					<span className="grid size-9 flex-none place-items-center rounded-xl border border-accent/50 bg-raise text-accent shadow-[var(--accent-glow-sm)]">
+						<icons.target className="size-5" />
+					</span>
+					<span className="hidden min-w-0 sm:block">
+						<span className="block truncate text-body font-bold leading-none tracking-1 text-ink">
+							Mission Control
+						</span>
+						<span className="mt-1 block font-mono text-tiny uppercase tracking-4 text-muted">
+							braidner
+						</span>
+					</span>
+				</button>
+
+				<div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
 					<Tabs value={activeTab + ""}>
-						<TabsList variant="line" className="px-10 gap-10">
+						<TabsList variant="line" className="gap-5 px-3 sm:gap-8 sm:px-6">
 							{(tabs ?? []).map((tab, i) => (
 								<TabsTrigger key={i} value={i + ""} className="px-6 pb-4 text-[13px] font-bold tracking-[0.04em]" onClick={() => onTabChange?.(i)}>{tab}</TabsTrigger>
 							))}
@@ -93,6 +117,10 @@ export function TopBar({
               )}
             </span>
 					)}
+					<span
+						className={cn("size-2.5 rounded-full shadow-[var(--accent-glow-sm)]", backendTone)}
+						title={backendLabel}
+					/>
 					<div className="h-6 w-px bg-hair"/>
 					<Button
 						variant="ghost"
@@ -125,6 +153,6 @@ export function TopBar({
 					</div>
 				</div>
 			</div>
-		</div>
+		</header>
 	);
 }

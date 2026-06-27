@@ -25,40 +25,36 @@ interface SidebarProps {
 export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
   const navItem = (active = false) =>
     cn(
-      "group relative flex h-12 items-center gap-0 rounded-[14px] bg-transparent p-0 text-ink-soft no-underline transition-colors hover:text-ink max-mob:h-14 max-mob:gap-4 max-mob:px-2",
-      active && "active text-accent",
+      "group relative flex h-12 items-center gap-0 overflow-hidden rounded-[14px] bg-transparent px-0 text-ink-soft no-underline transition-colors hover:bg-accent/10 hover:text-ink max-mob:gap-4 max-mob:px-2",
+      open && "gap-4 px-2",
+      active && "active text-accent shadow-[var(--accent-glow-sm)]",
     );
 
   return (
     <>
       <div
         className={cn(
-          "pointer-events-none fixed inset-0 z-[39] hidden bg-black/50 opacity-0 backdrop-blur-sm transition-opacity duration-300 max-mob:block",
+          "pointer-events-none fixed inset-0 z-[35] hidden bg-black/50 opacity-0 backdrop-blur-sm transition-opacity duration-300 max-mob:block",
           open && "pointer-events-auto opacity-100",
         )}
         onClick={onClose}
       />
       <aside
         className={cn(
-          "sticky top-0 z-30 flex h-screen w-[76px] flex-none flex-col items-stretch gap-1.5 overflow-hidden border-r border-hair bg-page px-3.5 py-[22px]",
-          "max-mob:fixed max-mob:inset-y-0 max-mob:left-0 max-mob:z-40 max-mob:h-full max-mob:w-[min(82vw,320px)] max-mob:-translate-x-full max-mob:px-[18px] max-mob:py-6 max-mob:transition-transform max-mob:duration-300",
+          "sticky top-12 z-30 flex h-[calc(100vh-3rem)] w-[76px] flex-none flex-col items-stretch gap-1.5 overflow-hidden border-r border-hair bg-page px-3.5 py-[22px] transition-[width,padding,transform] duration-300",
+          open && "w-[260px] px-[18px]",
+          "max-mob:fixed max-mob:inset-0 max-mob:z-50 max-mob:h-screen max-mob:w-screen max-mob:-translate-x-full max-mob:border-r-0 max-mob:px-[22px] max-mob:py-6 max-mob:shadow-[30px_0_70px_rgba(0,0,0,0.34)]",
           open && "max-mob:translate-x-0",
         )}
+        aria-label="Главное меню"
       >
-        <div className="mb-4 flex items-center justify-center gap-[13px] whitespace-nowrap px-0.5 pb-1 pt-1.5 max-mob:justify-start max-mob:px-1.5 max-mob:pb-2">
-          <span className="grid size-[46px] flex-none place-items-center rounded-[14px] border border-hair bg-raise text-accent">
-            <icons.target className="size-6" />
-          </span>
-          <span className="hidden max-mob:block">
-            <div className="text-head font-bold tracking-normal text-ink">
-              Mission Control
-            </div>
-            <div className="mt-0.5 font-mono text-data tracking-1 text-muted">
-              braidner
-            </div>
-          </span>
+        <div className="mb-3 hidden items-center gap-3 px-1 pb-2 pt-0.5 max-mob:flex">
+          <div className="min-w-0">
+            <div className="text-head font-bold tracking-normal text-ink">Навигация</div>
+            <div className="mt-0.5 font-mono text-data tracking-1 text-muted">Mission Control</div>
+          </div>
           <button
-            className={cn(ui.iconButton, "ml-auto hidden max-mob:grid")}
+            className={cn(ui.iconButton, "ml-auto")}
             onClick={onClose}
             aria-label="Закрыть"
           >
@@ -80,7 +76,12 @@ export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
               <span className="grid size-12 flex-none place-items-center max-mob:size-10">
                 <Ic className="size-[21px]" />
               </span>
-              <span className="hidden whitespace-nowrap text-lead font-medium tracking-1 max-mob:inline">
+              <span
+                className={cn(
+                  "whitespace-nowrap text-lead font-medium tracking-1 opacity-0 transition-opacity duration-200 max-mob:opacity-100",
+                  open && "opacity-100",
+                )}
+              >
                 {label}
               </span>
               <span className="absolute left-[7px] top-1/2 hidden h-[22px] w-1 -translate-y-1/2 rounded-full bg-accent group-[.active]:block" />
@@ -100,7 +101,12 @@ export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
           <span className="grid size-12 flex-none place-items-center max-mob:size-10">
             <icons.gear className="size-[21px]" />
           </span>
-          <span className="hidden whitespace-nowrap text-lead font-medium tracking-1 max-mob:inline">
+          <span
+            className={cn(
+              "whitespace-nowrap text-lead font-medium tracking-1 opacity-0 transition-opacity duration-200 max-mob:opacity-100",
+              open && "opacity-100",
+            )}
+          >
             Настройки
           </span>
         </button>

@@ -27,7 +27,7 @@
   /* ── shadcn semantic tokens → mapped onto the project palette ─────
      Two names (accent, muted) are shared with project utilities and keep
      their project meaning on purpose: shadcn focus/hover surfaces land on
-     the brand green / dim slate, which is on-brand for this dashboard. */
+     the red brand accent / dim slate, which is on-brand for this dashboard. */
   --color-background: var(--page);
   --color-foreground: var(--ink);
   --color-card: var(--raise);
@@ -105,6 +105,9 @@
   --card-radius: 19px; /* project card corner radius */
   --accent: #e53333; /* red */
   --accent-ink: #1a0505;
+  --accent-glow-sm: 0 0 18px color-mix(in srgb, var(--accent) 34%, transparent);
+  --accent-glow: 0 0 28px color-mix(in srgb, var(--accent) 52%, transparent);
+  --accent-glow-lg: 0 0 42px color-mix(in srgb, var(--accent) 58%, transparent);
 
   --font: "Syne", system-ui, -apple-system, sans-serif;
   --mono:  "Syne", system-ui, -apple-system, sans-serif;
@@ -173,6 +176,20 @@
   transform: translateX(-50%) !important;
   border-radius: 2px 2px 0 0 !important;
   box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+@layer utilities {
+  .accent-glow {
+    box-shadow: var(--accent-glow);
+  }
+
+  .text-accent {
+    text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+
+  .bg-accent {
+    box-shadow: var(--accent-glow-sm);
+  }
 }
 
 /* ============================================================ base */

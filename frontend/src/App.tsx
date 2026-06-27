@@ -35,20 +35,26 @@ export function App() {
   }, []);
 
   // ── UI state ──────────────────────────────────────────────────────
-  const [clock] = useState(() => new Date());
   const [backend, setBackend] = useState<Backend>("checking");
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [sbOpen, setSbOpen] = useState(false);
 
-  // useEffect(() => {
-  //   const t = setInterval(() => setClock(new Date()), 1000);
-  //   return () => clearInterval(t);
-  // }, []);
-
   useEffect(() => {
-    document.body.classList.toggle("sb-locked", sbOpen);
+    const syncBodyLock = () => {
+      document.body.classList.toggle(
+        "sb-locked",
+        sbOpen && window.matchMedia("(max-width: 53.75rem)").matches,
+      );
+    };
+
+    syncBodyLock();
+    window.addEventListener("resize", syncBodyLock);
+    return () => {
+      window.removeEventListener("resize", syncBodyLock);
+      document.body.classList.remove("sb-locked");
+    };
   }, [sbOpen]);
 
   useEffect(() => {
@@ -81,8 +87,6 @@ export function App() {
     );
   }
 
-  console.log("test")
-
   return (
     <TabsProvider>
       <TasksProvider>
@@ -96,34 +100,35 @@ export function App() {
           <CommandPalette />
           <Drawer />
 
-          <Sidebar
-            open={sbOpen}
-            onClose={() => setSbOpen(false)}
-            onSettings={() => setShowSettings(true)}
-          />
+          {!isDetailPage && (
+            <TopBar
+              backend={backend}
+              menuOpen={sbOpen}
+              theme={theme}
+              onToggleTheme={toggle}
+              onLogout={onLogout}
+              onSettings={() => setShowSettings(true)}
+              onMenu={() => setSbOpen((open) => !open)}
+              versionData={versionData}
+            />
+          )}
 
-          <div className={ui.main}>
-            {!isDetailPage && (
-              <TopBar
-                clock={clock}
-                backend={backend}
-                theme={theme}
-                onToggleTheme={toggle}
-                onLogout={onLogout}
-                onSettings={() => setShowSettings(true)}
-                onLogs={() => setShowLogs(true)}
-                onMenu={() => setSbOpen(true)}
-                versionData={versionData}
-              />
-            )}
+          <div className={ui.content}>
+            <Sidebar
+              open={sbOpen}
+              onClose={() => setSbOpen(false)}
+              onSettings={() => setShowSettings(true)}
+            />
 
-            <Routes>
-              <Route path="/" element={<OverviewPage />} />
-              <Route path="/hermes" element={<HermesPage />} />
-              <Route path="/system" element={<SystemPage />} />
-              <Route path="/media/*" element={<MediaRoutes />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <div className={ui.main}>
+              <Routes>
+                <Route path="/" element={<OverviewPage />} />
+                <Route path="/hermes" element={<HermesPage />} />
+                <Route path="/system" element={<SystemPage />} />
+                <Route path="/media/*" element={<MediaRoutes />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
           </div>
         </div>
       </TasksProvider>

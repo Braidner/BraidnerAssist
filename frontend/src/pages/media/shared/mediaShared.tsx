@@ -172,6 +172,53 @@ export function Player({
   );
 }
 
+// ── Hook: manages HLS/direct video in a <video> ref ─────────────────────
+export function useVideoPlayer(url: string | null, direct = false) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [vidPlaying, setVidPlaying] = useState(false);
+  const [vidDuration, setVidDuration] = useState(0);
+  const [vidTime, setVidTime] = useState(0);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!url) { video.src = ""; video.load(); return; }
+    let hls: Hls | null = null;
+    if (direct) {
+      video.src = url;
+      void video.play().catch(() => {});
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        xhrSetup: (xhr) => {
+          const token = getToken();
+          if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        },
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => void video.play().catch(() => {}));
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = url;
+      void video.play().catch(() => {});
+    }
+    return () => { hls?.destroy(); };
+  }, [url, direct]);
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) void v.play(); else v.pause();
+  };
+
+  const seekTo = (pct: number) => {
+    const v = videoRef.current;
+    if (!v || !vidDuration) return;
+    v.currentTime = pct * vidDuration;
+  };
+
+  return { videoRef, vidPlaying, setVidPlaying, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, seekTo };
+}
+
 // ── Inline cinematic player — fills the hero section in-place ──────────
 export function InlinePlayer({
   url,

@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils.ts";
 import { ui } from "@/lib/ui.ts";
 
 export const media = {
-  page: "flex flex-1 flex-col gap-5",
+  page: "flex flex-1 flex-col",
   pageCols:
     "grid grid-cols-[1.4fr_1fr] items-start gap-[22px] max-[900px]:grid-cols-1",
   pageMain: "flex flex-col gap-5",

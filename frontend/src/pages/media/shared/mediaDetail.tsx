@@ -12,6 +12,7 @@ import { media as ms } from "./mediaStyles.ts";
 import { fmtSize, useVideoPlayer } from "./mediaShared.tsx";
 
 export type DetailPlayer = { url: string; title: string } | null;
+export type QueueItem = { jellyfinId: string; title: string };
 
 function fmtPlayerTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -161,6 +162,9 @@ export function DetailHero({
   runtimeLabel,
   rating,
   genres,
+  previousItem,
+  nextItem,
+  onPlayQueueItem,
   onClosePlayer,
 }: {
   kindLabel: string;
@@ -172,11 +176,16 @@ export function DetailHero({
   runtimeLabel?: string | null;
   rating?: number | null;
   genres?: string[];
+  previousItem?: QueueItem | null;
+  nextItem?: QueueItem | null;
+  onPlayQueueItem?: (item: QueueItem) => void;
   onClosePlayer: () => void;
 }) {
   const heroRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [seekFeedback, setSeekFeedback] = useState<string | null>(null);
   const {
     videoRef,
     vidPlaying,
@@ -187,7 +196,9 @@ export function DetailHero({
     setVidTime,
     togglePlay,
     seekTo,
+    seekBy,
   } = useVideoPlayer(player?.url ?? null);
+  const displayTitle = player?.title ?? title;
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -198,7 +209,24 @@ export function DetailHero({
   const stopPlayer = useCallback(() => {
     onClosePlayer();
     setControlsVisible(true);
+    setSeekFeedback(null);
   }, [onClosePlayer]);
+
+  const flashSeekFeedback = useCallback((label: string) => {
+    setSeekFeedback(label);
+    if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+    seekFeedbackTimerRef.current = setTimeout(() => setSeekFeedback(null), 700);
+  }, []);
+
+  const playQueueItem = useCallback((item: QueueItem | null | undefined) => {
+    if (!item || !onPlayQueueItem) return;
+    onPlayQueueItem(item);
+    revealControls();
+  }, [onPlayQueueItem, revealControls]);
+
+  const playNextItem = useCallback(() => {
+    playQueueItem(nextItem);
+  }, [nextItem, playQueueItem]);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
@@ -211,16 +239,46 @@ export function DetailHero({
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") stopPlayer();
+      if (!player) return;
+      const target = e.target as HTMLElement | null;
+      const isTextEntry = target?.closest(
+        'input, textarea, select, [contenteditable="true"]',
+      );
+      if (isTextEntry) return;
+
+      if (e.key === "Escape") {
+        stopPlayer();
+        return;
+      }
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();
+        togglePlay();
+        revealControls();
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        seekBy(-15);
+        flashSeekFeedback("-15s");
+        revealControls();
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        seekBy(15);
+        flashSeekFeedback("+15s");
+        revealControls();
+      }
     };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
-  }, [stopPlayer]);
+  }, [flashSeekFeedback, player, revealControls, seekBy, stopPlayer, togglePlay]);
 
   useEffect(() => {
     if (player) revealControls();
     return () => {
       if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
     };
   }, [player, revealControls]);
 
@@ -250,6 +308,7 @@ export function DetailHero({
           onPause={() => setVidPlaying(false)}
           onDurationChange={(e) => setVidDuration(e.currentTarget.duration)}
           onTimeUpdate={(e) => setVidTime(e.currentTarget.currentTime)}
+          onEnded={playNextItem}
         />
       </div>
 
@@ -281,7 +340,7 @@ export function DetailHero({
           <div className="lmono mb-2.5 text-2xs uppercase tracking-6" style={{ color: player ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.38)", transition: "color 0.6s" }}>
             {player ? (vidPlaying ? "▶ ВОСПРОИЗВОДИТСЯ" : "⏸ ПАУЗА") : kindLabel}
           </div>
-          <h1 className="m-0 mb-4 font-[Oswald,var(--font)] text-cinematic font-bold leading-[0.92] tracking-tight-hero text-white max-mob:text-cinematic-mob">{title}</h1>
+          <h1 className="m-0 mb-4 font-[Oswald,var(--font)] text-cinematic font-bold leading-[0.92] tracking-tight-hero text-white max-mob:text-cinematic-mob">{displayTitle}</h1>
           <div className="lmono mb-3.5 flex flex-wrap items-center gap-2 text-cell text-white/[0.48]">
             {year && <span>{year}</span>}
             {runtimeLabel && (
@@ -330,6 +389,18 @@ export function DetailHero({
 
       {player && (
         <div
+          className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/12 bg-black/45 px-5 py-3 font-ui text-lead-lg font-extrabold text-white shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300"
+          style={{
+            opacity: seekFeedback ? 1 : 0,
+            transform: `translate(-50%, -50%) scale(${seekFeedback ? 1 : 0.94})`,
+          }}
+        >
+          {seekFeedback}
+        </div>
+      )}
+
+      {player && (
+        <div
           className="absolute inset-x-0 bottom-0 z-10 px-[52px] pb-5 transition-all duration-500 ease-out max-mob:px-5"
           style={{
             opacity: controlsVisible ? 1 : 0,
@@ -338,8 +409,20 @@ export function DetailHero({
           }}
         >
           <div className="flex items-center gap-3 rounded-[14px] border border-white/10 bg-black/35 px-3 py-2 text-white shadow-[0_18px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            {previousItem && onPlayQueueItem && (
+              <button
+                className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+                onClick={() => playQueueItem(previousItem)}
+                title={`Предыдущая серия: ${previousItem.title}`}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="11,12 20,5 20,19" />
+                  <rect x="4" y="5" width="3" height="14" rx="1" />
+                </svg>
+              </button>
+            )}
             <button
-              className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/12 text-white transition-all hover:bg-white/22"
+              className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/12 text-white transition-all hover:bg-white/22"
               onClick={() => {
                 togglePlay();
                 revealControls();
@@ -357,7 +440,19 @@ export function DetailHero({
                 </svg>
               )}
             </button>
-            <span className="w-[84px] font-mono text-2xs tabular-nums text-white/60">
+            {nextItem && onPlayQueueItem && (
+              <button
+                className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+                onClick={() => playQueueItem(nextItem)}
+                title={`Следующая серия: ${nextItem.title}`}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="13,12 4,5 4,19" />
+                  <rect x="17" y="5" width="3" height="14" rx="1" />
+                </svg>
+              </button>
+            )}
+            <span className="w-[84px] flex-none font-mono text-2xs tabular-nums text-white/60">
               {fmtPlayerTime(vidTime)}
               {vidDuration > 0 ? ` / ${fmtPlayerTime(vidDuration)}` : ""}
             </span>
@@ -371,8 +466,16 @@ export function DetailHero({
             >
               <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: vidDuration > 0 ? `${(vidTime / vidDuration) * 100}%` : "0%" }} />
             </div>
+            {nextItem && (
+              <span
+                className="hidden max-w-[220px] flex-none truncate font-ui text-pill font-bold text-white/45 min-[760px]:block"
+                title={`Далее: ${nextItem.title}`}
+              >
+                Далее: {nextItem.title}
+              </span>
+            )}
             <button
-              className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+              className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
               onClick={toggleFullscreen}
               title="Во весь экран"
             >
@@ -384,7 +487,7 @@ export function DetailHero({
               </svg>
             </button>
             <button
-              className="grid size-9 place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+              className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
               onClick={stopPlayer}
               title="Остановить (Esc)"
             >

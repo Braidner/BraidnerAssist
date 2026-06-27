@@ -216,7 +216,14 @@ export function useVideoPlayer(url: string | null, direct = false) {
     v.currentTime = pct * vidDuration;
   };
 
-  return { videoRef, vidPlaying, setVidPlaying, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, seekTo };
+  const seekBy = (deltaSeconds: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const maxTime = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : Infinity;
+    v.currentTime = Math.max(0, Math.min(maxTime, v.currentTime + deltaSeconds));
+  };
+
+  return { videoRef, vidPlaying, setVidPlaying, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, seekTo, seekBy };
 }
 
 // ── Интерактивный выбор раздачи (Sonarr/Radarr /release) ──────────────

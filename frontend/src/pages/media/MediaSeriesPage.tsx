@@ -19,6 +19,7 @@ import {
   SimilarRail,
   StuckImportButtons,
   type DetailPlayer,
+  type QueueItem,
 } from "./shared/mediaDetail.tsx";
 import { TorrentFilePicker, ContentTorrents } from "./shared/mediaPick.tsx";
 import { cn } from "../../lib/cn.ts";
@@ -74,6 +75,7 @@ export function MediaSeriesPage({
   const [d, setD] = useState<SeriesPageDetail | null | "loading">("loading");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [player, setPlayer] = useState<DetailPlayer>(null);
+  const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [act, setAct] = useState<string | null>(null);
   const [openSeason, setOpenSeason] = useState<number | null>(null);
@@ -100,7 +102,10 @@ export function MediaSeriesPage({
     setBusy(jellyfinId);
     const url = await getMediaPlayUrl(jellyfinId);
     setBusy(null);
-    if (url) setPlayer({ url, title });
+    if (url) {
+      setPlayer({ url, title });
+      setActiveEpisodeId(jellyfinId);
+    }
   };
 
   if (d === "loading")
@@ -119,6 +124,30 @@ export function MediaSeriesPage({
     );
 
   const det = d;
+
+  const episodeQueue: QueueItem[] = det.seasons
+    .flatMap((season) =>
+      season.episodes
+        .filter((ep) => ep.jellyfinId)
+        .map((ep) => ({
+          jellyfinId: ep.jellyfinId as string,
+          title: `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
+          seasonNumber: ep.seasonNumber,
+          episodeNumber: ep.episodeNumber ?? 0,
+        })),
+    )
+    .sort(
+      (a, b) =>
+        a.seasonNumber - b.seasonNumber ||
+        a.episodeNumber - b.episodeNumber,
+    )
+    .map(({ jellyfinId, title }) => ({ jellyfinId, title }));
+  const activeIndex = activeEpisodeId
+    ? episodeQueue.findIndex((item) => item.jellyfinId === activeEpisodeId)
+    : -1;
+  const previousItem = activeIndex > 0 ? episodeQueue[activeIndex - 1] : null;
+  const nextItem =
+    activeIndex >= 0 ? (episodeQueue[activeIndex + 1] ?? null) : null;
   const tvdbId = det.tvdbId;
 
   const patchSeasonMon = (sn: number, val: boolean) =>
@@ -225,7 +254,13 @@ export function MediaSeriesPage({
         runtimeLabel={det.runtime ? `${det.runtime} мин / эп.` : null}
         rating={det.rating}
         genres={det.genres}
-        onClosePlayer={() => setPlayer(null)}
+        previousItem={previousItem}
+        nextItem={nextItem}
+        onPlayQueueItem={(item) => play(item.jellyfinId, item.title)}
+        onClosePlayer={() => {
+          setPlayer(null);
+          setActiveEpisodeId(null);
+        }}
       />
 
       <DetailBody className="pt-[38px]">

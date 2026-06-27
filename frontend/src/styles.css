@@ -107,8 +107,8 @@
   --accent-ink: #052017;
 
   --font: "Syne", system-ui, -apple-system, sans-serif;
-  --mono:
-    "JetBrains Mono", "Inconsolata", ui-monospace, "SF Mono", Menlo, monospace;
+  --mono:  "Syne", system-ui, -apple-system, sans-serif;
+  /*--mono: "JetBrains Mono", "Inconsolata", ui-monospace, "SF Mono", Menlo, monospace;*/
   --font-ui: "Syne", system-ui, -apple-system, sans-serif;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }

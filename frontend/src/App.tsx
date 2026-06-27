@@ -35,17 +35,17 @@ export function App() {
   }, []);
 
   // ── UI state ──────────────────────────────────────────────────────
-  const [clock, setClock] = useState(() => new Date());
+  const [clock] = useState(() => new Date());
   const [backend, setBackend] = useState<Backend>("checking");
   const [versionData, setVersionData] = useState<VersionData | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [sbOpen, setSbOpen] = useState(false);
 
-  useEffect(() => {
-    const t = setInterval(() => setClock(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  // useEffect(() => {
+  //   const t = setInterval(() => setClock(new Date()), 1000);
+  //   return () => clearInterval(t);
+  // }, []);
 
   useEffect(() => {
     document.body.classList.toggle("sb-locked", sbOpen);
@@ -80,6 +80,8 @@ export function App() {
       </div>
     );
   }
+
+  console.log("test")
 
   return (
     <TabsProvider>

@@ -59,12 +59,12 @@ export function TopBar({
 		: "";
 
 	return (
-		<div className="sticky top-0 z-20 border-b border-hair bg-page/92 py-3 backdrop-blur-xl">
+		<div className="sticky top-0 z-20 border-b border-hair bg-page/92 backdrop-blur-xl">
 			<div className="flex min-h-11 items-center justify-between gap-4">
 				<div
 					className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
 					<Tabs value={activeTab + ""}>
-						<TabsList variant="line">
+						<TabsList variant="line" className="px-10 gap-10">
 							{(tabs ?? []).map((tab, i) => (
 								<TabsTrigger value={i + ""} onClick={() => onTabChange?.(i)}>{tab}</TabsTrigger>
 							))}

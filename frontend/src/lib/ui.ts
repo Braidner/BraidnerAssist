@@ -8,7 +8,7 @@ export const ui = {
   shell:
     "mc min-h-screen bg-page text-ink antialiased [font-family:var(--font-ui)]",
   main:
-    "flex min-w-0 flex-1 flex-col px-[30px] pb-9 pt-[26px] max-mob:gap-[18px] max-mob:px-4 max-mob:pb-[30px] max-mob:pt-[18px] max-[480px]:px-3",
+    "flex min-w-0 flex-1 flex-col pb-9 max-mob:gap-[18px] max-mob:px-4 max-mob:pb-[30px] max-mob:pt-[18px] max-[480px]:px-3",
   surface:
     "rounded-card border border-hair bg-raise transition-colors duration-150",
   panel:

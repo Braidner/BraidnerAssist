@@ -30,7 +30,7 @@ import {
   type DownloadItem,
   type MediaData,
   type LibraryItem,
-} from "../../lib/api.ts";
+} from "@/lib/api.ts";
 import { useToast } from "../../components/ui/Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
@@ -226,7 +226,7 @@ export function MediaSeriesPage({
       )}
 
       {/* topbar */}
-      <div className="sticky top-0 z-10 flex items-center gap-3.5 px-8 py-3.5 bg-page/90 backdrop-blur-xl border-b border-white/[0.055] max-mob:px-4 max-mob:py-3">
+      <div className="sticky top-0 z-10 flex items-center gap-3.5 px-8 py-3.5 bg-page/90 backdrop-blur-xl border-b border-white/[0.055] max-mob:px-4 max-mob:py-3" style={{animation: "detIn 0.3s 0s cubic-bezier(.22,.61,.36,1) both"}}>
         <button
           className="flex items-center gap-[7px] border-none bg-transparent cursor-pointer font-ui text-pill font-extrabold tracking-4 uppercase text-ink-soft p-0 flex-none transition-colors hover:text-accent"
           onClick={() => nav("/media")}
@@ -260,7 +260,7 @@ export function MediaSeriesPage({
       </div>
 
       {/* hero */}
-      <div className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px]">
+      <div className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px]" style={{animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both"}}>
         <div className="absolute inset-0" style={{ background: accentGradient }}>
           <img
             src={jellyfinBackdropUrl(det.jellyfinId)}
@@ -363,7 +363,7 @@ export function MediaSeriesPage({
       </div>
 
       {/* body */}
-      <div className="px-[52px] pt-[38px] pb-20 max-w-[860px] max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]">
+      <div className="px-[52px] pt-[38px] pb-20 max-w-[860px] max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]" style={{animation: "detIn 0.38s 0.12s cubic-bezier(.22,.61,.36,1) both"}}>
         {det.overview && (
           <p className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
             {det.overview}

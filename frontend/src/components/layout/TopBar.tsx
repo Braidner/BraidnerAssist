@@ -66,7 +66,7 @@ export function TopBar({
 					<Tabs value={activeTab + ""}>
 						<TabsList variant="line" className="px-10 gap-10">
 							{(tabs ?? []).map((tab, i) => (
-								<TabsTrigger value={i + ""} onClick={() => onTabChange?.(i)}>{tab}</TabsTrigger>
+								<TabsTrigger value={i + ""} className="px-6 pb-4 text-[13px] font-bold tracking-[0.04em]" onClick={() => onTabChange?.(i)}>{tab}</TabsTrigger>
 							))}
 						</TabsList>
 					</Tabs>

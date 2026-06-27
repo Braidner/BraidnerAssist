@@ -77,7 +77,7 @@ export const media = {
   libHeroMeta: "mb-3.5 flex flex-wrap items-center gap-2",
   libActions: "mb-6 flex gap-3",
   playButton:
-    "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white transition-colors",
+    "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white transition-[filter,transform] shadow-[0_0_28px_color-mix(in_srgb,var(--bc,var(--accent))_50%,transparent)] hover:brightness-[1.2] hover:-translate-y-0.5",
   progRow: "flex max-w-[360px] items-center gap-3",
   progTrack: "h-1 flex-1 overflow-hidden rounded bg-white/15",
   progFill: "h-full rounded",
@@ -89,7 +89,7 @@ export const media = {
   countBadge:
     "rounded-full bg-surface px-2 py-0.5 font-mono text-2xs text-muted",
   hTrack:
-    "flex gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+    "flex gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [mask-image:linear-gradient(to_right,transparent,#000_28px,#000_calc(100%-28px),transparent)]",
   posterRow: "gap-5",
   scanButton:
     "ml-auto flex cursor-pointer items-center gap-1.5 rounded-[7px] border border-hair bg-raise px-3 py-2 [font-family:Syne,var(--font)] text-data font-bold uppercase tracking-3 text-muted transition-colors hover:text-ink",
@@ -98,20 +98,20 @@ export const media = {
     "rounded-full border border-hair bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:text-ink",
   filterTabOn: "bg-accent text-accent-ink hover:text-accent-ink",
   watchCard: "w-[260px] flex-none cursor-pointer",
-  watchThumb: "relative aspect-video overflow-hidden rounded-xl bg-groove",
+  watchThumb: "relative aspect-video overflow-hidden rounded-xl bg-groove transition-[transform,box-shadow] group-hover:scale-[1.04] group-hover:-translate-y-0.75 group-hover:shadow-[0_16px_40px_rgba(0,0,0,0.7)]",
   watchVignette:
-    "absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.55),transparent_65%)]",
+    "absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.55),transparent_65%)] transition-[background] group-hover:bg-[linear-gradient(to_top,rgba(0,0,0,0.7),rgba(0,0,0,0.2)_60%)]",
   watchPlayLayer:
-    "absolute inset-0 grid place-items-center opacity-0 transition-opacity hover:opacity-100",
+    "absolute inset-0 grid place-items-center opacity-0 transition-opacity group-hover:opacity-100",
   roundPlay:
-    "grid size-11 place-items-center rounded-full bg-white/90 text-black",
+    "grid size-11 place-items-center rounded-full bg-white/90 text-black scale-[0.8] transition-transform group-hover:scale-100",
   watchProg: "absolute bottom-0 left-0 right-0 h-1 bg-white/20",
   watchInfo: "mt-2",
   watchTitle: "truncate text-sm font-semibold text-ink",
   watchMeta: "mt-1 font-mono text-2xs",
   posterCard: "w-40 flex-none cursor-pointer",
   posterArt:
-    "relative aspect-[2/3] overflow-hidden rounded-[10px] bg-groove transition-transform hover:-translate-y-1",
+    "relative aspect-[2/3] overflow-hidden rounded-[10px] bg-groove transition-[transform,box-shadow] group-hover:scale-[1.06] group-hover:-translate-y-1 group-hover:shadow-[0_20px_50px_rgba(0,0,0,0.8)]",
   posterBadge:
     "absolute right-2 top-2 z-[2] rounded-full bg-black/70 px-2 py-1 text-2xs font-semibold text-white",
   posterOverlay:
@@ -145,7 +145,7 @@ export const media = {
   discSection: "mb-8",
   discSecHead: "mb-3 flex items-center gap-3",
   discSecLabel:
-    "[font-family:Syne,var(--font)] text-xs font-extrabold uppercase tracking-5 text-ink",
+    "[font-family:Oswald,var(--font)] text-xl font-bold uppercase tracking-3 text-ink",
   discSecLine: "h-px flex-1 bg-hair",
   discSecCount: "font-mono text-data text-muted",
   posterRankBadge:

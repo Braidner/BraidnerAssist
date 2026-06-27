@@ -103,8 +103,8 @@
 :root {
   --radius: 0.625rem; /* shadcn component corner radius (10px) */
   --card-radius: 19px; /* project card corner radius */
-  --accent: #34dca6; /* green */
-  --accent-ink: #052017;
+  --accent: #e53333; /* red */
+  --accent-ink: #1a0505;
 
   --font: "Syne", system-ui, -apple-system, sans-serif;
   --mono:  "Syne", system-ui, -apple-system, sans-serif;
@@ -149,6 +149,26 @@
   --bad: #d2587a;
   --pink: #d2587a;
   --info: #4a7dd4;
+}
+
+/* ============================================================ animations */
+@keyframes heroSlide {
+  from { transform: translateY(18px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+@keyframes detIn {
+  from { transform: translateY(22px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* active tab underline — centered 55% + glow */
+[data-variant="line"] [data-state="active"]::after {
+  background: var(--accent) !important;
+  width: 55% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-radius: 2px 2px 0 0 !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 /* ============================================================ base */

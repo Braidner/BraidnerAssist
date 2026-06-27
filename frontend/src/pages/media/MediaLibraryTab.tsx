@@ -93,10 +93,10 @@ export function MediaLibraryTab({
                     </div>
                     <div className={ms.hTrack}>
                         {resume.map((it) => {
-                            const colors = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
-                            const accent = colors[it.title.charCodeAt(0) % colors.length];
+                            const COLORS = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
+                            const accent = COLORS[it.title.charCodeAt(0) % COLORS.length];
                             return (
-                                <div key={it.id} className={ms.watchCard} onClick={() => onPlayResume(it)}>
+                                <div key={it.id} className={cn(ms.watchCard, "group")} onClick={() => onPlayResume(it)}>
                                     <div className={ms.watchThumb}>
                                         <div className="absolute inset-0">
                                             <img
@@ -191,12 +191,9 @@ export function MediaLibraryTab({
                     <div className={cn(ms.hTrack, ms.posterRow)}>
                         {shownLibrary.map((it) => {
                             const isSeries = it.type === "Series";
-                            const colors = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
-                            const accent = colors[it.name.charCodeAt(0) % colors.length];
-                            const initials = it.name.split(" ").slice(0, 2).map((w: string) => w[0] || "").join("").toUpperCase();
                             return (
-                                <div key={it.id} className={ms.posterCard} onClick={() => openDetail(it)}>
-                                    <div className={ms.posterArt} style={{"--pa": accent} as React.CSSProperties}>
+                                <div key={it.id} className={cn(ms.posterCard, "group")} onClick={() => openDetail(it)}>
+                                    <div className={ms.posterArt}>
                                         <img
                                             src={jellyfinPosterUrl(it.id)}
                                             alt=""
@@ -204,10 +201,7 @@ export function MediaLibraryTab({
                                             style={{position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover"}}
                                             onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
                                         />
-                                        <div style={{position: "absolute", inset: 0, background: `radial-gradient(ellipse at 60% 40%, ${accent}88 0%, ${accent}22 50%, #050508 100%)`, zIndex: 0}}/>
-                                        <div style={{position: "absolute", bottom: "-10%", right: "-4%", lineHeight: 1, fontFamily: "'Oswald', sans-serif", fontSize: 100, color: "rgba(255,255,255,0.07)", userSelect: "none", pointerEvents: "none", zIndex: 0}}>
-                                            {initials}
-                                        </div>
+                                        <div style={{position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)", zIndex: 0}}/>
                                         {isSeries && it.childCount ? (
                                             <span className={ms.posterBadge}>{it.childCount} сез.</span>
                                         ) : null}
@@ -257,10 +251,6 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
 
     if (!heroItem) return null;
 
-    const colors = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
-    const accent = colors[heroItem.name.charCodeAt(0) % colors.length];
-    const bg = `radial-gradient(ellipse at 60% 40%, ${accent}88 0%, ${accent}22 50%, #050508 100%)`;
-
     // Cross-reference with resume list
     const resumeItem = resume.find((r) => r.id === heroItem.id);
     const isResuming = !!resumeItem;
@@ -272,7 +262,7 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
 
     return (
         <div className={ms.libHero} style={{cursor: "pointer"}} onClick={() => openDetail(heroItem)}>
-            <div className={ms.libHeroBg} style={{background: bg}}>
+            <div className={ms.libHeroBg} style={{background: "#09090d"}}>
                 <img
                     src={jellyfinBackdropUrl(heroItem.id)}
                     alt=""
@@ -280,21 +270,21 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
                     onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
                 />
             </div>
-            <div className={ms.libHeroGlow} style={{background: `radial-gradient(ellipse at 74% 50%, ${accent}40 0%, transparent 58%)`}}/>
+            <div className={ms.libHeroGlow} style={{background: "radial-gradient(ellipse at 74% 50%, rgba(255,255,255,0.02) 0%, transparent 58%)"}}/>
             <div className={ms.libHeroGrain}/>
             <div className={ms.libHeroVignette}/>
             <div className={ms.libHeroBody}>
                 {/* Eyebrow */}
-                <div className={ms.libEyebrow}>
-                    <span className="size-1.5 shrink-0 rounded-full" style={{background: accent}}/>
+                <div className={ms.libEyebrow} style={{animation: "heroSlide 0.55s 0.08s cubic-bezier(.22,.61,.36,1) both"}}>
+                    <span className="size-1.5 shrink-0 rounded-full bg-accent"/>
                     {isResuming ? "ПРОДОЛЖИТЬ ПРОСМОТР" : "В БИБЛИОТЕКЕ"}
                 </div>
 
                 {/* Title */}
-                <h1 className={ms.libHeroTitle}>{heroItem.name}</h1>
+                <h1 className={ms.libHeroTitle} style={{animation: "heroSlide 0.65s 0.16s cubic-bezier(.22,.61,.36,1) both"}}>{heroItem.name}</h1>
 
                 {/* Meta row */}
-                <div className={ms.heroMetaRow}>
+                <div className={ms.heroMetaRow} style={{animation: "heroSlide 0.55s 0.28s cubic-bezier(.22,.61,.36,1) both"}}>
                     {heroItem.year && <span>{heroItem.year}</span>}
                     {runtime && (
                         <>
@@ -317,13 +307,12 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
                 </div>
 
                 {/* Description */}
-                {overview && <p className={ms.heroDesc}>{overview}</p>}
+                {overview && <p className={ms.heroDesc} style={{animation: "heroSlide 0.55s 0.38s cubic-bezier(.22,.61,.36,1) both"}}>{overview}</p>}
 
                 {/* Actions */}
-                <div className={ms.libActions}>
+                <div className={ms.libActions} style={{animation: "heroSlide 0.55s 0.46s cubic-bezier(.22,.61,.36,1) both"}}>
                     <button
                         className={ms.playButton}
-                        style={{"--bc": accent} as React.CSSProperties}
                         onClick={(e) => { e.stopPropagation(); openDetail(heroItem); }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -344,9 +333,9 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
 
                 {/* Progress bar (resume only) */}
                 {isResuming && resumeItem && (
-                    <div className={ms.progRow}>
+                    <div className={ms.progRow} style={{animation: "heroSlide 0.55s 0.54s cubic-bezier(.22,.61,.36,1) both"}}>
                         <div className={ms.progTrack}>
-                            <div className={ms.progFill} style={{width: resumeItem.positionPct + "%", background: accent}}/>
+                            <div className={ms.progFill} style={{width: resumeItem.positionPct + "%"}}/>
                         </div>
                         <span className={ms.progLabel}>{Math.round(resumeItem.positionPct)}% просмотрено</span>
                     </div>

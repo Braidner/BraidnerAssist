@@ -56,7 +56,6 @@ interface DiscPosterCardProps {
     year?: number | null;
     sub?: string;
     imgUrl?: string | null;
-    accent?: string;
     seasonCount?: number | null;
     rating?: number | null;
     rank?: number;
@@ -64,13 +63,10 @@ interface DiscPosterCardProps {
     addBtn?: {label: string; disabled?: boolean; onClick: (e: React.MouseEvent) => void};
 }
 
-function DiscPosterCard({title, year, sub, imgUrl, accent = "#00b8ae", seasonCount, rating, rank, onClick, addBtn}: DiscPosterCardProps) {
-    const initials = title.split(" ").slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
-    const bg = `radial-gradient(ellipse at 60% 40%, ${accent}88 0%, ${accent}22 50%, #050508 100%)`;
-
+function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, onClick, addBtn}: DiscPosterCardProps) {
     return (
-        <div className={ms.posterCard} onClick={onClick} style={{cursor: "pointer"}}>
-            <div className={ms.posterArt} style={{"--pa": accent} as React.CSSProperties}>
+        <div className={cn(ms.posterCard, "group")} onClick={onClick} style={{cursor: "pointer"}}>
+            <div className={ms.posterArt}>
                 {imgUrl ? (
                     <img
                         src={imgUrl}
@@ -80,10 +76,7 @@ function DiscPosterCard({title, year, sub, imgUrl, accent = "#00b8ae", seasonCou
                         onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
                     />
                 ) : null}
-                <div style={{position: "absolute", inset: 0, background: bg, zIndex: 0}}/>
-                <div style={{position: "absolute", bottom: "-10%", right: "-4%", lineHeight: 1, fontFamily: "'Oswald', sans-serif", fontSize: 100, color: "rgba(255,255,255,0.07)", userSelect: "none", pointerEvents: "none", zIndex: 0}}>
-                    {initials}
-                </div>
+                <div style={{position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)", zIndex: 0}}/>
                 {/* Season badge */}
                 {seasonCount ? <span className={ms.posterBadge}>{seasonCount} сез.</span> : null}
                 {/* Rank badge */}
@@ -220,9 +213,6 @@ export function MediaDiscoverTab({
     const seriesItems = library.filter((i) => i.type === "Series");
     const movieItems = library.filter((i) => i.type === "Movie");
 
-    const ACCENT_COLORS = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
-    const itemAccent = (name: string) => ACCENT_COLORS[name.charCodeAt(0) % ACCENT_COLORS.length];
-
     const handleShuffle = () => {
         if (library.length === 0) return;
         const it = library[Math.floor(Math.random() * library.length)];
@@ -295,7 +285,6 @@ export function MediaDiscoverTab({
                             year={it.year}
                             sub={it.kind === "movie" ? "фильм" : "сериал"}
                             imgUrl={it.poster ? posterUrl(it.poster) : null}
-                            accent={itemAccent(it.title)}
                             rating={it.rating}
                             rank={i + 1}
                             onClick={() => onOpenTmdb(it)}
@@ -314,7 +303,6 @@ export function MediaDiscoverTab({
                             year={it.year}
                             sub="сериал"
                             imgUrl={jellyfinPosterUrl(it.id)}
-                            accent={itemAccent(it.name)}
                             seasonCount={it.childCount}
                             onClick={() => nav(`/media/series/${it.id}`)}
                         />
@@ -332,7 +320,6 @@ export function MediaDiscoverTab({
                             year={it.year}
                             sub="фильм"
                             imgUrl={jellyfinPosterUrl(it.id)}
-                            accent={itemAccent(it.name)}
                             onClick={() => nav(`/media/movie/${it.id}`)}
                         />
                     ))}
@@ -351,7 +338,6 @@ export function MediaDiscoverTab({
                                 year={r.year}
                                 sub={r.kind === "movie" ? "фильм" : "сериал"}
                                 imgUrl={r.poster ? posterUrl(r.poster) : null}
-                                accent={itemAccent(r.title)}
                                 onClick={() => {}}
                                 addBtn={{
                                     label: "+ Добавить",

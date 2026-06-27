@@ -75,7 +75,7 @@ export const media = {
   libHeroTitle:
     "mb-3.5 [font-family:Oswald,var(--font)] text-hero font-bold leading-[0.92] text-white max-narrow:text-5xl",
   libHeroMeta: "mb-3.5 flex flex-wrap items-center gap-2",
-  libActions: "mb-6 flex gap-3",
+  libActions: "mb-6 flex flex-wrap gap-3",
   playButton:
     "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white transition-[filter,transform] shadow-[0_0_28px_color-mix(in_srgb,var(--bc,var(--accent))_50%,transparent)] hover:brightness-[1.2] hover:-translate-y-0.5",
   progRow: "flex max-w-[360px] items-center gap-3",
@@ -131,6 +131,8 @@ export const media = {
     "mb-5 max-w-[420px] text-body leading-relaxed text-white/70 line-clamp-2",
   heroGhostBtn:
     "flex cursor-pointer items-center gap-2 rounded-[7px] border border-white/30 bg-transparent px-[22px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white/90 transition-colors hover:border-white/60",
+  heroLoadingSheen:
+    "pointer-events-none absolute inset-0 z-[1] animate-[skel-pulse_1.4s_ease-in-out_infinite] bg-[linear-gradient(100deg,transparent_0%,rgba(255,255,255,0.045)_45%,transparent_78%)]",
 
   // Discovery page
   discPage: "pb-[72px]",
@@ -143,22 +145,6 @@ export const media = {
   discShuffleBtn:
     "ml-auto flex cursor-pointer items-center gap-2 rounded-[11px] border border-hair bg-surface px-4 py-2 [font-family:Syne,var(--font)] text-cell font-bold tracking-2 text-ink transition-colors hover:border-accent hover:text-accent",
   discSection: "mb-8",
-  discHero:
-    "relative mb-8 min-h-[390px] overflow-hidden rounded-[18px] border border-hair bg-groove max-narrow:min-h-[430px]",
-  discHeroBg: "absolute inset-0",
-  discHeroImg: "size-full object-cover opacity-75",
-  discHeroShade:
-    "absolute inset-0 bg-[linear-gradient(to_right,rgba(7,7,10,0.96)_0%,rgba(7,7,10,0.74)_44%,rgba(7,7,10,0.1)_76%,transparent_100%),linear-gradient(to_top,rgba(0,0,0,0.74)_0%,transparent_38%)]",
-  discHeroBody:
-    "relative z-[1] flex min-h-[390px] max-w-[650px] flex-col justify-end px-10 pb-9 pt-20 max-narrow:min-h-[430px] max-narrow:px-5",
-  discHeroKicker:
-    "mb-2 font-mono text-2xs font-bold uppercase tracking-5 text-accent",
-  discHeroTitle:
-    "[font-family:Oswald,var(--font)] text-[64px] font-bold uppercase leading-[0.92] text-white max-narrow:text-[46px]",
-  discHeroOverview:
-    "mt-4 line-clamp-3 max-w-[560px] text-body leading-relaxed text-white/72",
-  discHeroMeta: "mt-4 flex flex-wrap items-center gap-2 font-mono text-xs text-white/65",
-  discHeroActions: "mt-6 flex flex-wrap items-center gap-3",
   discSecHead: "mb-3 flex items-center gap-3",
   discSecLabel:
     "[font-family:Oswald,var(--font)] text-xl font-bold uppercase tracking-3 text-ink",

@@ -17,7 +17,7 @@ import {
 import {useToast} from "../../components/ui/Toast.tsx";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
-import * as React from "react";
+import {MediaHero} from "./shared/MediaHero.tsx";
 
 interface MediaLibraryTabProps {
     library: LibraryItem[];
@@ -241,7 +241,7 @@ export function MediaLibraryTab({
 }
 
 
-const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail}) => {
+function LibraryHero({heroItem, resume, openDetail}: LibraryHeroProps) {
     const [heroDetail, setHeroDetail] = useState<HeroDetail>(null);
 
     useEffect(() => {
@@ -266,56 +266,29 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
     const runtime = heroDetail?.runtime ?? null;
 
     return (
-        <div className={ms.libHero} style={{cursor: "pointer"}} onClick={() => openDetail(heroItem)}>
-            <div className={ms.libHeroBg} style={{background: "#09090d"}}>
-                <img
-                    src={jellyfinBackdropUrl(heroItem.id)}
-                    alt=""
-                    style={{position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center", opacity: 0.55}}
-                    onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
-                />
-            </div>
-            <div className={ms.libHeroGlow} style={{background: "radial-gradient(ellipse at 74% 50%, rgba(255,255,255,0.02) 0%, transparent 58%)"}}/>
-            <div className={ms.libHeroGrain}/>
-            <div className={ms.libHeroVignette}/>
-            <div className={ms.libHeroBody}>
-                {/* Eyebrow */}
-                <div className={ms.libEyebrow} style={{animation: "heroSlide 0.55s 0.08s cubic-bezier(.22,.61,.36,1) both"}}>
-                    <span className="size-1.5 shrink-0 rounded-full bg-accent"/>
-                    {isResuming ? "ПРОДОЛЖИТЬ ПРОСМОТР" : "В БИБЛИОТЕКЕ"}
-                </div>
-
-                {/* Title */}
-                <h1 className={ms.libHeroTitle} style={{animation: "heroSlide 0.65s 0.16s cubic-bezier(.22,.61,.36,1) both"}}>{heroItem.name}</h1>
-
-                {/* Meta row */}
-                <div className={ms.heroMetaRow} style={{animation: "heroSlide 0.55s 0.28s cubic-bezier(.22,.61,.36,1) both"}}>
-                    {heroItem.year && <span>{heroItem.year}</span>}
-                    {runtime && (
-                        <>
-                            <span className={ms.heroMetaSep}>·</span>
-                            <span>{fmtRuntime(runtime)}</span>
-                        </>
-                    )}
-                    {rating && (
-                        <>
-                            <span className={ms.heroMetaSep}>·</span>
-                            <span className="flex items-center gap-1">
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="#ffd700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                {rating.toFixed(1)}
-                            </span>
-                        </>
-                    )}
-                    {genres.slice(0, 3).map((g) => (
-                        <span key={g} className={ms.heroGenreTag}>{g}</span>
-                    ))}
-                </div>
-
-                {/* Description */}
-                {overview && <p className={ms.heroDesc} style={{animation: "heroSlide 0.55s 0.38s cubic-bezier(.22,.61,.36,1) both"}}>{overview}</p>}
-
-                {/* Actions */}
-                <div className={ms.libActions} style={{animation: "heroSlide 0.55s 0.46s cubic-bezier(.22,.61,.36,1) both"}}>
+        <MediaHero
+            title={heroItem.name}
+            eyebrow={isResuming ? "ПРОДОЛЖИТЬ ПРОСМОТР" : "В БИБЛИОТЕКЕ"}
+            backgroundSrc={jellyfinBackdropUrl(heroItem.id)}
+            overview={overview}
+            metaItems={[
+                heroItem.year ? heroItem.year : null,
+                runtime ? fmtRuntime(runtime) : null,
+                rating ? (
+                    <span className="flex items-center gap-1">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="#ffd700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        {rating.toFixed(1)}
+                    </span>
+                ) : null,
+            ]}
+            badges={genres}
+            progress={isResuming && resumeItem ? {
+                valuePct: resumeItem.positionPct,
+                label: `${Math.round(resumeItem.positionPct)}% просмотрено`,
+            } : null}
+            onOpen={() => openDetail(heroItem)}
+            actions={
+                <>
                     <button
                         className={ms.playButton}
                         onClick={(e) => { e.stopPropagation(); openDetail(heroItem, true); }}
@@ -330,22 +303,13 @@ const LibraryHero: React.FC<LibraryHeroProps> = ({heroItem, resume, openDetail})
                         onClick={(e) => { e.stopPropagation(); openDetail(heroItem); }}
                     >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-                            <path d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"/>
+                            <circle cx="12" cy="12" r="9"/>
+                            <path d="M12 8h.01M11 12h1v4h1"/>
                         </svg>
-                        В очередь
+                        Подробнее
                     </button>
-                </div>
-
-                {/* Progress bar (resume only) */}
-                {isResuming && resumeItem && (
-                    <div className={ms.progRow} style={{animation: "heroSlide 0.55s 0.54s cubic-bezier(.22,.61,.36,1) both"}}>
-                        <div className={ms.progTrack}>
-                            <div className={ms.progFill} style={{width: resumeItem.positionPct + "%"}}/>
-                        </div>
-                        <span className={ms.progLabel}>{Math.round(resumeItem.positionPct)}% просмотрено</span>
-                    </div>
-                )}
-            </div>
-        </div>
+                </>
+            }
+        />
     );
-};
+}

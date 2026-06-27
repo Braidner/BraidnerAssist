@@ -13,6 +13,7 @@ import {
 } from "@/lib/api.ts";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
+import {MediaHero} from "./shared/MediaHero.tsx";
 
 interface MediaDiscoverTabProps {
     library: LibraryItem[];
@@ -156,35 +157,28 @@ function DiscoverHero({
     });
 
     return (
-        <section className={ms.discHero}>
-            <div className={ms.discHeroBg}>
-                {hero.poster ? (
-                    <img
-                        className={ms.discHeroImg}
-                        src={posterUrl(hero.poster)}
-                        alt=""
-                        onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
-                    />
-                ) : null}
-                <div className={ms.discHeroShade}/>
-            </div>
-            <div className={ms.discHeroBody}>
-                <div className={ms.discHeroKicker}>СЛУЧАЙНЫЙ ФИЛЬМ С ВЫСОКИМ РЕЙТИНГОМ</div>
-                <h2 className={ms.discHeroTitle}>{hero.title}</h2>
-                <div className={ms.discHeroMeta}>
-                    <span>фильм</span>
-                    {hero.year ? <><span>·</span><span>{hero.year}</span></> : null}
-                    {hero.rating != null ? (
-                        <>
-                            <span>·</span>
-                            <span style={{color: "#ffd978"}}>★ {hero.rating.toFixed(1)}</span>
-                        </>
-                    ) : null}
-                    <span>·</span>
-                    <span>не в библиотеке</span>
-                </div>
-                {hero.overview ? <p className={ms.discHeroOverview}>{hero.overview}</p> : null}
-                <div className={ms.discHeroActions}>
+        <MediaHero
+            title={hero.title}
+            eyebrow="СЛУЧАЙНЫЙ ФИЛЬМ С ВЫСОКИМ РЕЙТИНГОМ"
+            backgroundSrc={hero.poster ? posterUrl(hero.poster) : null}
+            overview={hero.overview}
+            loading={loading}
+            onOpen={openHero}
+            metaItems={[
+                "фильм",
+                hero.year ? hero.year : null,
+                hero.rating != null ? (
+                    <span style={{color: "#ffd978"}}>★ {hero.rating.toFixed(1)}</span>
+                ) : null,
+                "не в библиотеке",
+            ]}
+            badges={[
+                hero.rating != null ? `Рейтинг ${hero.rating.toFixed(1)}+` : "Высокий рейтинг",
+                "Radarr Discover",
+                "Не в библиотеке",
+            ]}
+            actions={
+                <>
                     <button
                         className={ms.playButton}
                         disabled={busy === key}
@@ -205,9 +199,9 @@ function DiscoverHero({
                     >
                         <ShuffleIcon size={15}/> {loading ? "Ищем…" : "Другой фильм"}
                     </button>
-                </div>
-            </div>
-        </section>
+                </>
+            }
+        />
     );
 }
 

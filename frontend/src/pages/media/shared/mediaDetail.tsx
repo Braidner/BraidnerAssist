@@ -190,11 +190,14 @@ export function DetailHero({
     videoRef,
     vidPlaying,
     setVidPlaying,
+    vidMuted,
+    setVidMuted,
     vidDuration,
     setVidDuration,
     vidTime,
     setVidTime,
     togglePlay,
+    toggleMute,
     seekTo,
     seekBy,
   } = useVideoPlayer(player?.url ?? null);
@@ -306,6 +309,7 @@ export function DetailHero({
           style={{ opacity: player ? 1 : 0, transition: "opacity 1.2s ease" }}
           onPlay={() => setVidPlaying(true)}
           onPause={() => setVidPlaying(false)}
+          onVolumeChange={(e) => setVidMuted(e.currentTarget.muted)}
           onDurationChange={(e) => setVidDuration(e.currentTarget.duration)}
           onTimeUpdate={(e) => setVidTime(e.currentTarget.currentTime)}
           onEnded={playNextItem}
@@ -474,6 +478,28 @@ export function DetailHero({
                 Далее: {nextItem.title}
               </span>
             )}
+            <button
+              className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
+              onClick={() => {
+                toggleMute();
+                revealControls();
+              }}
+              title={vidMuted ? "Включить звук" : "Выключить звук"}
+            >
+              {vidMuted ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                  <path d="m19 9-6 6" />
+                  <path d="m13 9 6 6" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                  <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                  <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+                </svg>
+              )}
+            </button>
             <button
               className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
               onClick={toggleFullscreen}

@@ -3,7 +3,7 @@
 // плеер + игра на устройство, поиск раздач и ручной импорт застрявшей раздачи.
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   ReleasePicker,
   ImportDrawer,
@@ -59,6 +59,7 @@ export function MediaMoviePage({
   const { id = "" } = useParams();
   const nav = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const [d, setD] = useState<MoviePageDetail | null | "loading">("loading");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -92,24 +93,24 @@ export function MediaMoviePage({
     const url = await getMediaPlayUrl(id);
     setBusy(false);
     if (url && d && d !== "loading") setPlayer({ url, title: d.title });
+    else toast.error("Не удалось запустить воспроизведение");
   };
 
   useEffect(() => {
     const state = location.state as AutoplayLocationState;
-    if (source !== "library" || d === "loading" || !d || !state?.autoplay) return;
+    const shouldAutoplay =
+      state?.autoplay || searchParams.get("autoplay") === "1";
+    if (source !== "library" || d === "loading" || !d || !shouldAutoplay) return;
     if (!d.hasFile) return;
 
-    const autoplayId = state.autoplayItemId ?? id;
+    const autoplayId = searchParams.get("play") ?? state?.autoplayItemId ?? id;
     const key = `${source}:${id}:${autoplayId}`;
     if (autoplayConsumedRef.current === key) return;
     autoplayConsumedRef.current = key;
 
-    const timer = setTimeout(() => {
-      void play();
-    }, 260);
-    return () => clearTimeout(timer);
+    void play();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, id, location.state, source]);
+  }, [d, id, location.state, searchParams, source]);
 
   if (d === "loading")
     return (

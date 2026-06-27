@@ -156,7 +156,10 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     `/api/v3/episode?includeEpisodeFile=true`); фильм — статус файла (качество/размер или «отсутствует»). Если
     тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: cinematic hero-player:
     клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), без дополнительного затемнения после
-    старта. Постер/описание/title-meta и нижняя панель (play/pause, seek, stop, fullscreen) являются единым
+    старта. Из медиабиблиотеки кнопка «Смотреть» и ряд «Продолжить просмотр» открывают detail-route с query
+    `?autoplay=1&play=<jellyfinId>&title=...`; старый модальный плеер для resume удалён. Если браузер блокирует
+    autoplay со звуком, HLS стартует muted, а в player chrome есть кнопка включения звука. Постер/описание/title-meta
+    и нижняя панель (play/pause, seek, mute, stop, fullscreen) являются единым
     player chrome: после idle они синхронно уезжают вниз/исчезают и возвращаются на mouse/touch. Fullscreen
     вызывается через `requestFullscreen` на hero-контейнере. Также есть `ReleasePicker`
     на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
@@ -234,7 +237,8 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     (`POST /media/monitor` → `arrSetMonitored`, GET→patch→PUT) и **bulk-поиск** «⬇ Найти сезон / недостающие»
     (`POST /media/season/search` → `arrTriggerSearch`: Sonarr SeasonSearch/MissingEpisodeSearch, Radarr
     MoviesSearch). `id` = внешний tvdbId/tmdbId (резолв через `arrFindByExternalId`). **Discovery**:
-    «Продолжить просмотр» (`GET /media/continue` → Jellyfin `Items/Resume`, прогресс-плитки) и единый
+    «Продолжить просмотр» (`GET /media/continue` → Jellyfin `Items/Resume`, прогресс-плитки; для эпизодов
+    подтягивается `seriesId`, клик ведёт на `/media/series/:seriesId?autoplay=1&play=<episodeId>`) и единый
     поиск в Cmd-K (`GET /media/unified?q=` → библиотека+`arrLookup`+Prowlarr: открыть detail / добавить /
     скачать). **UX**: тост-система (`components/Toast.tsx`, `ToastProvider` в `main.tsx`, `useToast()`) на
     все действия; сетка с оверлеями (просмотрено✓/N непросмотренных, Jellyfin `UserData`), фильтр тип/
@@ -343,6 +347,10 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   на mouse/touch, затемнение после старта просмотра убрано. Общие `DetailTopBar`/`DetailBody`/
   `DetailStatusBadges`/`SimilarRail`; дублирующая JSX-разметка убрана из
   `MediaMoviePage`/`MediaSeriesPage`, старый `InlinePlayer` удалён. ✅ ГОТОВО
+- **Media library autoplay handoff** (2026-06-28): «Смотреть» и «Продолжить просмотр» из `/media`
+  переходят на detail-route с `?autoplay=1&play=<jellyfinId>` и запускают cinematic hero-player;
+  resume-эпизоды получают `seriesId` из Jellyfin, старый modal-player для resume удалён, autoplay
+  fallback стартует muted с кнопкой звука. ✅ ГОТОВО
 - **Refactor — self-contained widgets + TabsContext** (fa19b5d → 20e7658): `App.tsx` split на
   domain-файлы (`TabsContext`, `OverviewPage`, `MediaRoutes`); затем полный рефакторинг — каждый виджет
   самостоятельно делает fetch/polling, `App.tsx` стал lean (~120 строк, только auth+routing+UI chrome).

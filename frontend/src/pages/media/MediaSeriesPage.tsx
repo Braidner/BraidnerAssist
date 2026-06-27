@@ -4,7 +4,7 @@
 // на сезон, bulk-поиск недостающих и ручной импорт застрявшей раздачи.
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   ReleasePicker,
   ImportDrawer,
@@ -77,6 +77,7 @@ export function MediaSeriesPage({
   const { id = "" } = useParams();
   const nav = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const [d, setD] = useState<SeriesPageDetail | null | "loading">("loading");
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -112,13 +113,18 @@ export function MediaSeriesPage({
     if (url) {
       setPlayer({ url, title });
       setActiveEpisodeId(jellyfinId);
+    } else {
+      toast.error("Не удалось запустить воспроизведение");
     }
   };
 
   useEffect(() => {
     const state = location.state as AutoplayLocationState;
-    if (source !== "library" || d === "loading" || !d || !state?.autoplay) return;
+    const shouldAutoplay =
+      state?.autoplay || searchParams.get("autoplay") === "1";
+    if (source !== "library" || d === "loading" || !d || !shouldAutoplay) return;
 
+    const requestedId = searchParams.get("play") ?? state?.autoplayItemId;
     const playable = d.seasons
       .flatMap((season) =>
         season.episodes
@@ -137,8 +143,8 @@ export function MediaSeriesPage({
           a.episodeNumber - b.episodeNumber,
       );
     const target =
-      (state.autoplayItemId
-        ? playable.find((ep) => ep.jellyfinId === state.autoplayItemId)
+      (requestedId
+        ? playable.find((ep) => ep.jellyfinId === requestedId)
         : null) ??
       playable.find((ep) => !ep.played) ??
       playable[0];
@@ -148,12 +154,9 @@ export function MediaSeriesPage({
     if (autoplayConsumedRef.current === key) return;
     autoplayConsumedRef.current = key;
 
-    const timer = setTimeout(() => {
-      void play(target.jellyfinId, state.autoplayTitle ?? target.title);
-    }, 260);
-    return () => clearTimeout(timer);
+    void play(target.jellyfinId, searchParams.get("title") ?? state?.autoplayTitle ?? target.title);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d, id, location.state, source]);
+  }, [d, id, location.state, searchParams, source]);
 
   if (d === "loading")
     return (

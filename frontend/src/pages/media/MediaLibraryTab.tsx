@@ -71,9 +71,12 @@ export function MediaLibraryTab({
     const toast = useToast();
 
     const openDetail = (it: LibraryItem, autoplay = false) =>
-        nav(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`, {
-            state: autoplay ? {autoplay: true} : undefined,
-        });
+        nav(
+            `/media/${it.type === "Series" ? "series" : "movie"}/${it.id}${
+                autoplay ? `?autoplay=1&play=${encodeURIComponent(it.id)}` : ""
+            }`,
+            { state: autoplay ? {autoplay: true, autoplayItemId: it.id} : undefined },
+        );
 
     // Pick hero once when library loads; re-pick if library changes significantly
     const heroRef = useRef<LibraryItem | null>(null);

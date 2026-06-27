@@ -56,6 +56,16 @@ export function fmtEta(eta?: number | null): string {
   return `${m}м`;
 }
 
+async function playVideo(video: HTMLVideoElement) {
+  try {
+    video.muted = false;
+    await video.play();
+  } catch {
+    video.muted = true;
+    await video.play().catch(() => {});
+  }
+}
+
 // ── Встроенный плеер: HLS (Jellyfin, hls.js) либо прямой файл (TorrServer) ──
 // direct=true → <video src> с Range-стримом (TorrServer), без hls.js. Для
 // несовместимых контейнеров (mkv/avi) показываем «копировать ссылку / .m3u».
@@ -82,7 +92,7 @@ export function Player({
     if (direct) {
       // TorrServer отдаёт файл напрямую (Range/seek) — токен не нужен (роут вне jwtAuth).
       video.src = url;
-      void video.play().catch(() => {});
+      void playVideo(video);
     } else if (Hls.isSupported()) {
       hls = new Hls({
         // Прикрепляем JWT к каждому сегментному запросу — роут под jwtAuth.
@@ -95,12 +105,12 @@ export function Player({
       hls.attachMedia(video);
       hls.on(
         Hls.Events.MANIFEST_PARSED,
-        () => void video.play().catch(() => {}),
+        () => void playVideo(video),
       );
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // Safari: нативный HLS (кука/токен через тот же origin).
       video.src = url;
-      void video.play().catch(() => {});
+      void playVideo(video);
     }
 
     return () => {
@@ -176,6 +186,7 @@ export function Player({
 export function useVideoPlayer(url: string | null, direct = false) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [vidPlaying, setVidPlaying] = useState(false);
+  const [vidMuted, setVidMuted] = useState(false);
   const [vidDuration, setVidDuration] = useState(0);
   const [vidTime, setVidTime] = useState(0);
 
@@ -186,7 +197,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
     let hls: Hls | null = null;
     if (direct) {
       video.src = url;
-      void video.play().catch(() => {});
+      void playVideo(video);
     } else if (Hls.isSupported()) {
       hls = new Hls({
         xhrSetup: (xhr) => {
@@ -196,10 +207,10 @@ export function useVideoPlayer(url: string | null, direct = false) {
       });
       hls.loadSource(url);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => void video.play().catch(() => {}));
+      hls.on(Hls.Events.MANIFEST_PARSED, () => void playVideo(video));
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
-      void video.play().catch(() => {});
+      void playVideo(video);
     }
     return () => { hls?.destroy(); };
   }, [url, direct]);
@@ -223,7 +234,14 @@ export function useVideoPlayer(url: string | null, direct = false) {
     v.currentTime = Math.max(0, Math.min(maxTime, v.currentTime + deltaSeconds));
   };
 
-  return { videoRef, vidPlaying, setVidPlaying, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, seekTo, seekBy };
+  const toggleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setVidMuted(v.muted);
+  };
+
+  return { videoRef, vidPlaying, setVidPlaying, vidMuted, setVidMuted, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, toggleMute, seekTo, seekBy };
 }
 
 // ── Интерактивный выбор раздачи (Sonarr/Radarr /release) ──────────────

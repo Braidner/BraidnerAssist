@@ -327,6 +327,24 @@
 
 ---
 
+## Batch v6.5 — media library autoplay handoff (2026-06-28)
+
+- [x] «Смотреть» из hero медиабиблиотеки теперь открывает detail-route с явным
+      `?autoplay=1&play=<jellyfinId>`; detail-страница сама запускает cinematic `DetailHero`.
+- [x] «Продолжить просмотр» больше не открывает старый modal-player на `/media`: фильм ведёт на
+      `/media/movie/:id?autoplay=1&play=:id`, эпизод — на `/media/series/:seriesId?autoplay=1&play=:episodeId`.
+- [x] Backend `GET /media/continue` расширен `seriesId` для resume-эпизодов; если `Items/Resume`
+      не отдаёт `SeriesId`, backend дочитывает карточку эпизода в Jellyfin.
+- [x] `MediaMoviePage`/`MediaSeriesPage` читают autoplay из query (state оставлен как дополнительный путь),
+      запускают нужный movie/episode id и показывают toast при неудачном `GET /media/play/:id`.
+- [x] `useVideoPlayer` получил autoplay fallback: если браузер блокирует `video.play()` со звуком,
+      HLS стартует muted; `DetailHero` показывает mute/unmute кнопку в player chrome.
+- [x] Проверено: `cd frontend && npm run build`, `cd backend && npm run build`; browser smoke на
+      `http://localhost:3000/media`: клик по `Wellington Paranormal — Demon Girl` → URL с `autoplay=1`,
+      hero показывает `▶ ВОСПРОИЗВОДИТСЯ`, `video.paused=false`, `currentTime` растёт.
+
+---
+
 ## REST API (план)
 
 ```

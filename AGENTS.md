@@ -130,7 +130,10 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     `/api/v3/episode?includeEpisodeFile=true`); фильм — статус файла (качество/размер или «отсутствует»). Если
     тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: cinematic hero-player:
     клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), без дополнительного затемнения после
-    старта. Постер/описание/title-meta и нижняя панель (play/pause, seek, stop, fullscreen) являются единым
+    старта. Из медиабиблиотеки кнопка «Смотреть» и ряд «Продолжить просмотр» открывают detail-route с query
+    `?autoplay=1&play=<jellyfinId>&title=...`; старый модальный плеер для resume удалён. Если браузер блокирует
+    autoplay со звуком, HLS стартует muted, а в player chrome есть кнопка включения звука. Постер/описание/title-meta
+    и нижняя панель (play/pause, seek, mute, stop, fullscreen) являются единым
     player chrome: после idle они синхронно уезжают вниз/исчезают и возвращаются на mouse/touch. Fullscreen
     вызывается через `requestFullscreen` на hero-контейнере. Горячие клавиши активны только при запущенном
     hero-плеере и не перехватывают поля ввода: пробел play/pause, ←/→ перемотка на 15 сек, Esc stop.
@@ -281,6 +284,10 @@ qBittorrent. Сервисы публикуются на хосте; backend-ко
 - **Cinematic player controls + series watch queue** (2026-06-28): пробел play/pause,
   стрелки ←/→ перематывают на 15 сек с feedback; для сериалов добавлены prev/next, autoplay
   следующей доступной серии и кнопка «Смотреть/Продолжить с SxEy». ✅ ГОТОВО
+- **Media library autoplay handoff** (2026-06-28): «Смотреть» и «Продолжить просмотр» из `/media`
+  переходят на detail-route с `?autoplay=1&play=<jellyfinId>` и запускают cinematic hero-player;
+  resume-эпизоды получают `seriesId` из Jellyfin, старый modal-player для resume удалён, autoplay
+  fallback стартует muted с кнопкой звука. ✅ ГОТОВО
 - **UI chrome pass — red glow + responsive menu** (2026-06-27): глобальный красный accent/glow,
   full-width TopBar с logo-burger без hover-эффекта; desktop Sidebar оставлен как rail-меню
   (иконки → расширение по burger), mobile Sidebar открывается fullscreen. ✅ ГОТОВО

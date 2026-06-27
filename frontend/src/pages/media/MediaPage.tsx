@@ -509,13 +509,13 @@ export function MediaPage({
 
   const playResume = async (it: ResumeItem) => {
     if (it.kind === "movie") {
-      nav(`/media/movie/${it.id}`, {
+      nav(`/media/movie/${it.id}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
         state: { autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
       });
       return;
     }
     if (it.seriesId) {
-      nav(`/media/series/${it.seriesId}`, {
+      nav(`/media/series/${it.seriesId}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
         state: { autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
       });
       return;

@@ -41,6 +41,7 @@ export interface LibraryItem {
   name: string;
   type: "Movie" | "Series";
   year: number | null;
+  tmdbId: number | null; // movie only — внешний id для сверки discovery с библиотекой
   tvdbId: number | null; // series only — маппится на внутренний id Sonarr для поиска релизов
   childCount: number | null; // series only — число сезонов
   played: boolean; // фильм просмотрен / сериал досмотрен полностью
@@ -217,6 +218,7 @@ export async function getLibrary(): Promise<LibraryItem[]> {
       name: it.Name ?? "—",
       type,
       year: it.ProductionYear ?? null,
+      tmdbId: type === "Movie" ? Number(it.ProviderIds?.Tmdb) || null : null,
       tvdbId: type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null,
       childCount: type === "Series" ? it.ChildCount ?? null : null,
       played: Boolean(it.UserData?.Played),
@@ -1461,6 +1463,7 @@ export interface Recommendation {
   year: number | null;
   overview: string;
   poster: string | null;
+  rating: number | null;
 }
 
 interface ArrImportListRecord {
@@ -1470,8 +1473,18 @@ interface ArrImportListRecord {
   tvdbId?: number;
   overview?: string;
   images?: ArrImage[];
+  ratings?: {
+    value?: number;
+    tmdb?: { value?: number };
+    imdb?: { value?: number };
+  };
   isExisting?: boolean;
   isExcluded?: boolean;
+}
+
+function arrRating(it: ArrImportListRecord): number | null {
+  const value = it.ratings?.value ?? it.ratings?.tmdb?.value ?? it.ratings?.imdb?.value;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 async function arrImportList(kind: "movie" | "series"): Promise<Recommendation[]> {
@@ -1493,6 +1506,7 @@ async function arrImportList(kind: "movie" | "series"): Promise<Recommendation[]
       year: it.year ?? null,
       overview: it.overview ?? "",
       poster: arrPoster(it.images),
+      rating: arrRating(it),
     }))
     .filter((r) => r.id > 0);
 }
@@ -1516,6 +1530,27 @@ export async function getRecommendations(): Promise<Recommendation[]> {
     return true;
   });
   return deduped.slice(0, 40);
+}
+
+// Случайный high-rated фильм для discovery hero. Источник тот же, что у подборок:
+// Radarr import-list уже отфильтрован от существующих/исключённых тайтлов.
+export async function getDiscoveryHeroMovie(): Promise<Recommendation | null> {
+  if (!config.media.radarr.configured) return null;
+  const [movies, library] = await Promise.all([
+    arrImportList("movie"),
+    getLibrary().catch(() => [] as LibraryItem[]),
+  ]);
+  const libraryMovieIds = new Set(
+    library
+      .filter((item) => item.type === "Movie" && item.tmdbId)
+      .map((item) => item.tmdbId),
+  );
+  const candidates = movies.filter((movie) => !libraryMovieIds.has(movie.id));
+  if (candidates.length === 0) return null;
+  const sorted = [...candidates].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const highRated = sorted.filter((m) => (m.rating ?? 0) >= 7).slice(0, 20);
+  const pool = highRated.length > 0 ? highRated : sorted.slice(0, Math.min(20, sorted.length));
+  return pool[Math.floor(Math.random() * pool.length)] ?? null;
 }
 
 // ── Расписание / monitor / поиск сезона (удобный пайплайн сериалов) ─────────

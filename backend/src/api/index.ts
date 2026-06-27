@@ -25,6 +25,7 @@ import {
   jellyfinSessions,
   jellyfinPlayTo,
   getRecommendations,
+  getDiscoveryHeroMovie,
   qbAdd,
   qbAction,
   prowlarrSearch,
@@ -530,6 +531,20 @@ apiRouter.get("/media/recommendations", async (_req, res) => {
   }
   try {
     res.json(await getRecommendations());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Случайный высокорейтинговый фильм для discovery hero (не из библиотеки).
+apiRouter.get("/media/discovery/hero", async (_req, res) => {
+  if (!config.media.radarr.configured) {
+    return res.status(503).json({ configured: false });
+  }
+  try {
+    const hero = await getDiscoveryHeroMovie();
+    if (!hero) return res.status(404).json({ error: "No discovery movie found" });
+    res.json(hero);
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

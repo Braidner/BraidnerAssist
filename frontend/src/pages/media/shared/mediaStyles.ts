@@ -143,6 +143,22 @@ export const media = {
   discShuffleBtn:
     "ml-auto flex cursor-pointer items-center gap-2 rounded-[11px] border border-hair bg-surface px-4 py-2 [font-family:Syne,var(--font)] text-cell font-bold tracking-2 text-ink transition-colors hover:border-accent hover:text-accent",
   discSection: "mb-8",
+  discHero:
+    "relative mb-8 min-h-[390px] overflow-hidden rounded-[18px] border border-hair bg-groove max-narrow:min-h-[430px]",
+  discHeroBg: "absolute inset-0",
+  discHeroImg: "size-full object-cover opacity-75",
+  discHeroShade:
+    "absolute inset-0 bg-[linear-gradient(to_right,rgba(7,7,10,0.96)_0%,rgba(7,7,10,0.74)_44%,rgba(7,7,10,0.1)_76%,transparent_100%),linear-gradient(to_top,rgba(0,0,0,0.74)_0%,transparent_38%)]",
+  discHeroBody:
+    "relative z-[1] flex min-h-[390px] max-w-[650px] flex-col justify-end px-10 pb-9 pt-20 max-narrow:min-h-[430px] max-narrow:px-5",
+  discHeroKicker:
+    "mb-2 font-mono text-2xs font-bold uppercase tracking-5 text-accent",
+  discHeroTitle:
+    "[font-family:Oswald,var(--font)] text-[64px] font-bold uppercase leading-[0.92] text-white max-narrow:text-[46px]",
+  discHeroOverview:
+    "mt-4 line-clamp-3 max-w-[560px] text-body leading-relaxed text-white/72",
+  discHeroMeta: "mt-4 flex flex-wrap items-center gap-2 font-mono text-xs text-white/65",
+  discHeroActions: "mt-6 flex flex-wrap items-center gap-3",
   discSecHead: "mb-3 flex items-center gap-3",
   discSecLabel:
     "[font-family:Oswald,var(--font)] text-xl font-bold uppercase tracking-3 text-ink",

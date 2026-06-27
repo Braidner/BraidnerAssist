@@ -803,6 +803,7 @@ export interface LibraryItem {
   name: string;
   type: "Movie" | "Series";
   year: number | null;
+  tmdbId: number | null;
   tvdbId: number | null;
   childCount: number | null;
   played: boolean;
@@ -1451,6 +1452,7 @@ export interface Recommendation {
   year: number | null;
   overview: string;
   poster: string | null;
+  rating: number | null;
 }
 
 export async function getRecommendations(): Promise<Recommendation[]> {
@@ -1460,6 +1462,16 @@ export async function getRecommendations(): Promise<Recommendation[]> {
     return (await res.json()) as Recommendation[];
   } catch {
     return [];
+  }
+}
+
+export async function getDiscoveryHeroMovie(): Promise<Recommendation | null> {
+  try {
+    const res = await apiFetch("/api/media/discovery/hero");
+    if (!res.ok) return null;
+    return (await res.json()) as Recommendation;
+  } catch {
+    return null;
   }
 }
 

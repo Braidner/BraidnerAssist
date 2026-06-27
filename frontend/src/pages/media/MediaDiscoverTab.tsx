@@ -24,8 +24,11 @@ interface MediaDiscoverTabProps {
     trending: TmdbItem[];
     dsearching: boolean;
     recs: Recommendation[];
+    discoveryHero: Recommendation | null;
+    heroLoading: boolean;
     calendar: CalendarItem[];
     busy: string | null;
+    onRefreshHero: () => void;
     onAddRec: (rec: Recommendation) => void;
     onOpenDiscover: (it: ArrLookupItem) => void;
     onOpenTmdb: (it: TmdbItem) => void;
@@ -135,6 +138,89 @@ function DiscSection({label, count, children}: DiscSectionProps) {
     );
 }
 
+function DiscoverHero({
+    hero,
+    loading,
+    busy,
+    onRefresh,
+    onAdd,
+    onOpen,
+}: {
+    hero: Recommendation | null;
+    loading: boolean;
+    busy: string | null;
+    onRefresh: () => void;
+    onAdd: (rec: Recommendation) => void;
+    onOpen: (it: ArrLookupItem) => void;
+}) {
+    if (!hero) return null;
+    const key = "rec" + hero.kind + hero.id;
+    const openHero = () => onOpen({
+        kind: hero.kind,
+        id: hero.id,
+        title: hero.title,
+        year: hero.year,
+        overview: hero.overview,
+        poster: hero.poster,
+        added: false,
+    });
+
+    return (
+        <section className={ms.discHero} onClick={openHero}>
+            <div className={ms.discHeroBg}>
+                {hero.poster ? (
+                    <img
+                        className={ms.discHeroImg}
+                        src={posterUrl(hero.poster)}
+                        alt=""
+                        onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
+                    />
+                ) : null}
+                <div className={ms.discHeroShade}/>
+            </div>
+            <div className={ms.discHeroBody}>
+                <div className={ms.discHeroKicker}>СЛУЧАЙНЫЙ ФИЛЬМ С ВЫСОКИМ РЕЙТИНГОМ</div>
+                <h2 className={ms.discHeroTitle}>{hero.title}</h2>
+                <div className={ms.discHeroMeta}>
+                    <span>фильм</span>
+                    {hero.year ? <><span>·</span><span>{hero.year}</span></> : null}
+                    {hero.rating != null ? (
+                        <>
+                            <span>·</span>
+                            <span style={{color: "#ffd978"}}>★ {hero.rating.toFixed(1)}</span>
+                        </>
+                    ) : null}
+                    <span>·</span>
+                    <span>не в библиотеке</span>
+                </div>
+                {hero.overview ? <p className={ms.discHeroOverview}>{hero.overview}</p> : null}
+                <div className={ms.discHeroActions}>
+                    <button
+                        className={ms.playButton}
+                        disabled={busy === key}
+                        onClick={(e) => { e.stopPropagation(); onAdd(hero); }}
+                    >
+                        {busy === key ? "Добавляем…" : "Добавить"}
+                    </button>
+                    <button
+                        className={ms.heroGhostBtn}
+                        onClick={(e) => { e.stopPropagation(); openHero(); }}
+                    >
+                        Подробнее
+                    </button>
+                    <button
+                        className={ms.heroGhostBtn}
+                        disabled={loading}
+                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+                    >
+                        <ShuffleIcon size={15}/> {loading ? "Ищем…" : "Другой фильм"}
+                    </button>
+                </div>
+            </div>
+        </section>
+    );
+}
+
 /* ─── Search results grid (reused from old discover) ─── */
 function SearchGrid({
     dq, tmdb, dsearching, dres, tmRes, busy,
@@ -200,8 +286,11 @@ export function MediaDiscoverTab({
     trending,
     dsearching,
     recs,
+    discoveryHero,
+    heroLoading,
     calendar: _calendar,
     busy,
+    onRefreshHero,
     onAddRec,
     onOpenDiscover,
     onOpenTmdb,
@@ -212,12 +301,6 @@ export function MediaDiscoverTab({
     const trendingByRating = [...trending].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     const seriesItems = library.filter((i) => i.type === "Series");
     const movieItems = library.filter((i) => i.type === "Movie");
-
-    const handleShuffle = () => {
-        if (library.length === 0) return;
-        const it = library[Math.floor(Math.random() * library.length)];
-        nav(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`);
-    };
 
     const handleSearchToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -247,11 +330,20 @@ export function MediaDiscoverTab({
                             <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
                         </svg>
                     </button>
-                    <button className={ms.discShuffleBtn} onClick={handleShuffle}>
-                        <ShuffleIcon size={15}/> Случайный
+                    <button className={ms.discShuffleBtn} onClick={onRefreshHero} disabled={heroLoading}>
+                        <ShuffleIcon size={15}/> {heroLoading ? "Ищем…" : "Случайный"}
                     </button>
                 </div>
             </div>
+
+            <DiscoverHero
+                hero={discoveryHero}
+                loading={heroLoading}
+                busy={busy}
+                onRefresh={onRefreshHero}
+                onAdd={onAddRec}
+                onOpen={onOpenDiscover}
+            />
 
             {/* Expandable search */}
             {searchOpen && (

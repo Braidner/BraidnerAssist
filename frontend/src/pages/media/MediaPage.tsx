@@ -15,6 +15,7 @@ import {
   searchReleases,
   posterUrl,
   getRecommendations,
+  getDiscoveryHeroMovie,
   discoverSearch,
   tmdbSearch,
   tmdbTrending,
@@ -447,8 +448,20 @@ export function MediaPage({
 
   // Recommendations
   const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [discoveryHero, setDiscoveryHero] = useState<Recommendation | null>(null);
+  const [heroLoading, setHeroLoading] = useState(false);
+  const refreshDiscoveryHero = async () => {
+    if (!media.configured) return;
+    setHeroLoading(true);
+    const next = await getDiscoveryHeroMovie();
+    setDiscoveryHero(next);
+    setHeroLoading(false);
+  };
   useEffect(() => {
-    if (media.configured) getRecommendations().then(setRecs);
+    if (media.configured) {
+      getRecommendations().then(setRecs);
+      refreshDiscoveryHero();
+    }
   }, [media.configured]);
 
   // Discovery search state (TMDB or *arr)
@@ -589,6 +602,9 @@ export function MediaPage({
       setRecs((prev) =>
         prev.filter((r) => !(r.kind === rec.kind && r.id === rec.id)),
       );
+      setDiscoveryHero((prev) =>
+        prev && prev.kind === rec.kind && prev.id === rec.id ? null : prev,
+      );
       onMediaUpdate();
     } else toast.error("Не удалось добавить");
   };
@@ -700,8 +716,11 @@ export function MediaPage({
           trending={trending}
           dsearching={dsearching}
           recs={recs}
+          discoveryHero={discoveryHero}
+          heroLoading={heroLoading}
           calendar={calendar}
           busy={busy}
+          onRefreshHero={refreshDiscoveryHero}
           onAddRec={onAddRec}
           onOpenDiscover={openDiscover}
           onOpenTmdb={openTmdb}

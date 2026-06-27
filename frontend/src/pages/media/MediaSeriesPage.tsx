@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  Player,
+  InlinePlayer,
   ReleasePicker,
   ImportDrawer,
   ProgressBar,
@@ -128,7 +128,6 @@ export function MediaSeriesPage({
   const tvdbId = det.tvdbId;
 
   const accent = titleAccent(det.title);
-  const accentGradient = `radial-gradient(ellipse at 60% 40%, ${accent}88 0%, ${accent}22 50%, #050508 100%)`;
 
   const patchSeasonMon = (sn: number, val: boolean) =>
     setD((p) =>
@@ -206,13 +205,6 @@ export function MediaSeriesPage({
 
   return (
     <div className={ms.page}>
-      {player && (
-        <Player
-          url={player.url}
-          title={player.title}
-          onClose={() => setPlayer(null)}
-        />
-      )}
       {importItem && (
         <ImportDrawer
           item={importItem}
@@ -259,9 +251,16 @@ export function MediaSeriesPage({
         </button>
       </div>
 
-      {/* hero */}
+      {/* hero — inline player OR backdrop */}
+      {player ? (
+        <InlinePlayer
+          url={player.url}
+          title={player.title}
+          onClose={() => setPlayer(null)}
+        />
+      ) : (
       <div className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px]" style={{animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both"}}>
-        <div className="absolute inset-0" style={{ background: accentGradient }}>
+        <div className="absolute inset-0" style={{ background: "#09090d" }}>
           <img
             src={jellyfinBackdropUrl(det.jellyfinId)}
             alt=""
@@ -278,12 +277,6 @@ export function MediaSeriesPage({
             }}
           />
         </div>
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse at 55% 40%, ${accent}50 0%, transparent 65%)`,
-          }}
-        />
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -340,7 +333,7 @@ export function MediaSeriesPage({
                 style={{
                   position: "absolute",
                   inset: 0,
-                  background: accentGradient,
+                  background: "#09090d",
                 }}
               />
               <img
@@ -361,6 +354,7 @@ export function MediaSeriesPage({
           </div>
         </div>
       </div>
+      )}
 
       {/* body */}
       <div className="px-[52px] pt-[38px] pb-20 max-w-[860px] max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]" style={{animation: "detIn 0.38s 0.12s cubic-bezier(.22,.61,.36,1) both"}}>

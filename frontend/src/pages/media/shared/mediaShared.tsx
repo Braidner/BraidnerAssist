@@ -2,7 +2,7 @@
 // детальными страницами фильма/сериала: HLS-плеер, release picker, ручной
 // импорт застрявших раздач, форматтеры размеров/скорости/ETA.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import {
   searchReleaseOptions,
@@ -12,11 +12,11 @@ import {
   type DownloadItem,
   type ReleaseOption,
   type ManualImportFile,
-} from "../../../lib/api.ts";
-import { getToken } from "../../../lib/auth.ts";
-import { useToast } from "../../../components/ui/Toast.tsx";
-import { cn } from "../../../lib/cn.ts";
-import { ui } from "../../../lib/ui.ts";
+} from "@/lib/api.ts";
+import { getToken } from "@/lib/auth.ts";
+import { useToast } from "@/components/ui/Toast.tsx";
+import { cn } from "@/lib/utils.ts";
+import { ui } from "@/lib/ui.ts";
 import { media } from "./mediaStyles.ts";
 
 export function ProgressBar({ pct }: { pct: number }) {
@@ -167,6 +167,216 @@ export function Player({
             открой в VLC/Kodi/приложении TorrServe на ТВ.
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Inline cinematic player — fills the hero section in-place ──────────
+export function InlinePlayer({
+  url,
+  title,
+  onClose,
+  direct = false,
+}: {
+  url: string;
+  title: string;
+  onClose: () => void;
+  direct?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [playing, setPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+
+  // HLS / direct setup — identical to Player
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    let hls: Hls | null = null;
+    if (direct) {
+      video.src = url;
+      void video.play().catch(() => {});
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        xhrSetup: (xhr) => {
+          const token = getToken();
+          if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        },
+      });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => void video.play().catch(() => {}));
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = url;
+      void video.play().catch(() => {});
+    }
+    return () => { hls?.destroy(); };
+  }, [url, direct]);
+
+  // Esc to close
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      if (videoRef.current && !videoRef.current.paused) setControlsVisible(false);
+    }, 3000);
+  }, []);
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) { void v.play(); } else { v.pause(); }
+  };
+
+  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const v = videoRef.current;
+    if (!v || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    v.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+  };
+
+  const fullscreen = () => {
+    const c = containerRef.current;
+    if (!c) return;
+    if (document.fullscreenElement) { void document.exitFullscreen(); }
+    else { void c.requestFullscreen(); }
+  };
+
+  const fmt = (s: number) => {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    return h > 0
+      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+      : `${m}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative h-[56vh] min-h-[360px] overflow-hidden bg-black max-mob:h-[50vh] max-mob:min-h-[300px]"
+      style={{ animation: "fadeIn 0.35s ease both", cursor: controlsVisible ? "default" : "none" }}
+      onMouseMove={showControls}
+      onTouchStart={showControls}
+    >
+      <video
+        ref={videoRef}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
+        onPlay={() => setPlaying(true)}
+        onPause={() => { setPlaying(false); setControlsVisible(true); }}
+        onDurationChange={(e) => setDuration(e.currentTarget.duration)}
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onClick={togglePlay}
+      />
+
+      {/* controls overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ opacity: controlsVisible ? 1 : 0, transition: "opacity 0.3s ease" }}
+      >
+        {/* top bar */}
+        <div
+          className="absolute inset-x-0 top-0 flex items-center justify-between px-6 pt-5 pb-10"
+          style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, transparent 100%)", pointerEvents: "auto" }}
+        >
+          <span
+            className="truncate max-w-[60%] text-white/80"
+            style={{ fontFamily: "Oswald, var(--font)", fontSize: 17, fontWeight: 600, letterSpacing: "0.03em" }}
+          >
+            {title}
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              pointerEvents: "auto",
+              border: "none",
+              background: "rgba(255,255,255,0.12)",
+              backdropFilter: "blur(8px)",
+              color: "#fff",
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              cursor: "pointer",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.24)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* bottom bar */}
+        <div
+          className="absolute inset-x-0 bottom-0 flex flex-col gap-3 px-6 pb-5 pt-10"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, transparent 100%)", pointerEvents: "auto" }}
+        >
+          {/* scrubber */}
+          <div
+            className="relative h-[3px] rounded-full overflow-hidden cursor-pointer"
+            style={{ background: "rgba(255,255,255,0.2)" }}
+            onClick={seek}
+          >
+            <div
+              className="absolute left-0 top-0 h-full rounded-full"
+              style={{ width: `${pct}%`, background: "var(--accent)", transition: "width 0.25s linear" }}
+            />
+          </div>
+
+          {/* controls row */}
+          <div className="flex items-center gap-4">
+            {/* play/pause */}
+            <button
+              onClick={togglePlay}
+              style={{ border: "none", background: "none", color: "#fff", cursor: "pointer", padding: 0, display: "grid", placeItems: "center" }}
+            >
+              {playing ? (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+                </svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5,3 19,12 5,21"/>
+                </svg>
+              )}
+            </button>
+
+            {/* time */}
+            <span className="font-mono text-xs text-white/60 select-none tabular-nums">
+              {fmt(currentTime)}{duration > 0 && <> / {fmt(duration)}</>}
+            </span>
+
+            <div style={{ flex: 1 }}/>
+
+            {/* fullscreen */}
+            <button
+              onClick={fullscreen}
+              style={{ border: "none", background: "none", color: "rgba(255,255,255,0.6)", cursor: "pointer", padding: 0, display: "grid", placeItems: "center" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

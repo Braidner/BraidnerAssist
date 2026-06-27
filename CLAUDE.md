@@ -155,9 +155,10 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     показывает ВСЕ эпизоды (вкл. отсутствующие) с датой выхода, «скачано/нет», качеством и размером (Sonarr
     `/api/v3/episode?includeEpisodeFile=true`); фильм — статус файла (качество/размер или «отсутствует»). Если
     тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: cinematic hero-player:
-    клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), title/meta/genres/poster остаются
-    поверх как player chrome, нижняя панель (play/pause, seek, stop, fullscreen) и инфо-слой auto-hide
-    синхронно уезжают вниз после idle и возвращаются на mouse/touch. Также есть `ReleasePicker`
+    клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), без дополнительного затемнения после
+    старта. Постер/описание/title-meta и нижняя панель (play/pause, seek, stop, fullscreen) являются единым
+    player chrome: после idle они синхронно уезжают вниз/исчезают и возвращаются на mouse/touch. Fullscreen
+    вызывается через `requestFullscreen` на hero-контейнере. Также есть `ReleasePicker`
     на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
     ручного импорта застрявшей раздачи (`ImportDrawer`, если в очереди есть `importPending`-раздача этого тайтла).
     Старый `SeriesDrawer` удалён; общие detail-компоненты (`DetailTopBar`/`DetailHero`/`DetailBody`/
@@ -266,8 +267,9 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
 Текущий визуальный стандарт фронтенда — **неоморфизм** (портирован из Claude Design
 бандла). Источник токенов и компонентных классов — `frontend/src/styles.css`.
 
-- **Токены** (`:root`): `--depth` (0.8), `--radius` (19px), `--accent` (`#34d399`),
-  шрифты `--font` Inconsolata (моно/числа) + `--font-ui` Outfit (UI).
+- **Токены** (`:root`): `--radius` (10px для shadcn), `--card-radius` (19px),
+  `--accent` (`#e53333`) + `--accent-glow-sm|glow|glow-lg`; шрифты
+  `--font`/`--mono`/`--font-ui` — Syne.
 - **Темы** — палитра под `.mc[data-theme="dark"|"light"]` (dark по умолчанию).
   Тема ставится на обёртку `.mc` (не на `:root`); переключатель в `theme.ts`.
 - **Примитивы теней**: `.neu` (выпуклый), `.neu-in` (вдавленный), `.neu-sm` (мелкий).
@@ -288,7 +290,12 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   - `HomeAssistantPanel` — hass automations (30с поллинг)
   - `CommandPalette` — docker+adguard (30с) + `useTasksCtx()` для `onAddTask`
   - `HermesPage`, `SystemPage`, `MediaRoutes` — каждая страница своя (polling внутри)
-  - `App.tsx` (~120 строк): только auth, clock, backend health, version, UI-флаги (sidebar/settings/logs)
+  - `App.tsx` (~120 строк): только auth, backend health, version, routing и UI-флаги
+    (sidebar/settings/logs); часы живут внутри `TopBar`
+- **Navigation chrome**: `TopBar` закреплён сверху на всю ширину экрана; логотип перенесён
+  в TopBar и работает как burger без hover-эффекта. `Sidebar` без лого: на desktop по умолчанию
+  узкая колонка иконок (`76px`), по burger расширяется до подписей; на mobile полностью скрыт
+  и открывается fullscreen-меню с body-lock.
 - **StatStrip**: одна горизонтальная полоса мини-тайлов с прокруткой — погода (широкий) +
   один объединённый Proxmox-тайл (CPU/RAM/DISK гейджи в ряд, диск/RAM в ГБ) + по тайлу на
   каждую VM/LXC (cpu/ram/статус) + по тайлу на каждый сервис. Панель «Статус системы»
@@ -331,14 +338,19 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
 - **Batch v6.1 — фикс воспроизведения** (151ba1c): nginx `/api/` резал большие HLS-плейлисты из-за
   upgrade-заголовков → убраны, `Connection ""`+`proxy_buffering off`. См. раздел «Деплой». ✅ ГОТОВО
 - **Media detail cinematic refactor** (2026-06-27): detail pages фильмов/сериалов переведены
-  на общий cinematic `DetailHero` (HLS в hero-фоне, fullscreen, auto-hide chrome), общий
-  `DetailTopBar`/`DetailBody`/`DetailStatusBadges`/`SimilarRail`; дублирующая JSX-разметка
-  убрана из `MediaMoviePage`/`MediaSeriesPage`, старый `InlinePlayer` удалён. ✅ ГОТОВО
+  на общий cinematic `DetailHero`: HLS играет прямо в hero-фоне, fullscreen через hero,
+  auto-hide chrome; poster/описание/meta и controls уходят вместе после idle, возвращаются
+  на mouse/touch, затемнение после старта просмотра убрано. Общие `DetailTopBar`/`DetailBody`/
+  `DetailStatusBadges`/`SimilarRail`; дублирующая JSX-разметка убрана из
+  `MediaMoviePage`/`MediaSeriesPage`, старый `InlinePlayer` удалён. ✅ ГОТОВО
 - **Refactor — self-contained widgets + TabsContext** (fa19b5d → 20e7658): `App.tsx` split на
   domain-файлы (`TabsContext`, `OverviewPage`, `MediaRoutes`); затем полный рефакторинг — каждый виджет
   самостоятельно делает fetch/polling, `App.tsx` стал lean (~120 строк, только auth+routing+UI chrome).
   `TasksContext` (`lib/tasksContext.tsx`) — единственный shared context (tasks/selectedTask/handlers).
   `OverviewPage` стала prop-free (20 строк). ✅ ГОТОВО
+- **UI chrome pass — red glow + responsive menu** (2026-06-27): глобальный красный accent/glow,
+  full-width TopBar с logo-burger без hover-эффекта; desktop Sidebar оставлен как rail-меню
+  (иконки → расширение по burger), mobile Sidebar открывается fullscreen. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); аппаратный транскод для тяжёлых
   4K/HEVC 10-bit (софт-транскод 4K→h264 грузит CPU VM, может тормозить).
 

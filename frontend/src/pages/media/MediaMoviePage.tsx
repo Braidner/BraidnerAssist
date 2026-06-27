@@ -188,7 +188,7 @@ export function MediaMoviePage({
 
       <DetailBody className="pt-5">
         {det.overview && (
-          <p className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
+          <p className="max-w-[860px] font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
             {det.overview}
           </p>
         )}

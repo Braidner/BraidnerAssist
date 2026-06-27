@@ -44,19 +44,19 @@
 ## Редизайн UI — Неоморфизм  ✅ ГОТОВО
 
 - [x] Дизайн-система портирована из Claude Design бандла в `frontend/src/styles.css`
-      (токены `--depth/--radius/--accent`, темы `.mc[data-theme]`, примитивы
-      `.neu/.neu-in/.neu-sm`, шрифты Outfit + Inconsolata)
+      (токены `--radius/--card-radius/--accent`, темы `.mc[data-theme]`, примитивы
+      `.neu/.neu-in/.neu-sm`, шрифты Syne)
 - [x] Компоненты: `Card`, `Ring`, `icons` + `panels/` (TopBar, StatStrip, Tasks,
       Habits, SystemStatus, Notes, HermesLog, Placeholder); удалён старый `Widget.tsx`
 - [x] Раскладка C (three columns): полоса мини-статов + 3 колонки
 - [x] Гибрид панелей: 5 панелей дизайна + плейсхолдеры Погода/HA/Календарь
 - [x] Данные: Tasks + HermesLog — реальные (бэкенд), остальное — мок/плейсхолдеры
-- [x] Тема dark/light, дефолт dark, акцент `#34d399`
+- [x] Тема dark/light, дефолт dark, текущий акцент `#e53333` + red glow tokens
 - [x] Проверено: `npm run build` ok; dev-сервер + браузер (обе темы, тоггл задач
       шлёт PUT и персистит, реальный лог Hermes, плейсхолдеры рендерятся)
 
-> Tweaks-панель (слайдеры глубины/радиуса/выбор акцента) — вне скоупа, значения
-> зафиксированы на «приземлённых» в дизайне (depth .8, radius 19, accent #34d399).
+> Tweaks-панель (слайдеры радиуса/выбор акцента) — вне скоупа; текущий стандарт:
+> card radius 19px, shadcn radius 10px, accent #e53333.
 
 ## Фаза 2 — Основные интеграции  ✅ ГОТОВО
 
@@ -276,10 +276,12 @@
 ## Batch v6.2 — cinematic detail hero + React refactor (2026-06-27)
 
 - [x] Detail pages получили cinematic hero-player: клик «Смотреть» плавно запускает HLS-видео
-      внутри hero-фона, без модального overlay; title/meta/genres/poster остаются поверх как player chrome.
+      внутри hero-фона, без модального overlay и без дополнительного затемнения после старта.
 - [x] Player chrome: play/pause, progress/seek, stop, fullscreen (`requestFullscreen` на hero),
       auto-hide через idle ~2.8с; нижняя панель и инфо-слой синхронно уезжают вниз и исчезают,
       возвращаются на mouse/touch.
+- [x] Постер, описание, title/meta/genres и controls объединены в один chrome-слой: при idle
+      уходят вместе с панелью управления, без рассинхрона между описанием/постером и controls.
 - [x] Визуальный cleanup: убран per-title цветной backdrop/glow, оставлен чистый темный hero с легким
       vignette; при старте просмотра нет дополнительного затемнения поверх видео.
 - [x] React refactor detail pages: общий reusable слой вынесен в
@@ -291,6 +293,23 @@
       seasons/episodes). Старый мертвый `InlinePlayer` удален из `mediaShared.tsx`.
 - [x] Проверено: `cd frontend && npx tsc --noEmit`, `cd frontend && npm run build`; browser smoke:
       movie detail → «Смотреть» → video state/fullscreen/auto-hide; series detail рендерится.
+
+---
+
+## Batch v6.3 — red glow + responsive navigation chrome (2026-06-27)
+
+- [x] Глобальный UI accent переведён на красный `--accent: #e53333`; добавлены
+      `--accent-glow-sm`, `--accent-glow`, `--accent-glow-lg`.
+- [x] Accent-кнопки (`ui.button.accent`, shadcn `Button` default) получили единый red glow,
+      согласованный с кнопкой «Смотреть» в медиабиблиотеке.
+- [x] `TopBar` вынесен на всю ширину экрана; логотип перенесён в TopBar и работает как burger.
+- [x] Hover-эффект на logo-burger убран: нет `hover:*`/`group-hover:*` классов на кнопке и иконке.
+- [x] `Sidebar` без лого: desktop default — rail `76px` с одними иконками; по burger расширяется
+      до `260px` и показывает подписи; overlay/body-lock на desktop не включаются.
+- [x] Mobile: меню скрыто за экраном; по burger открывается fullscreen (`100vw/100vh`) с overlay
+      и body-lock, закрывается по фону/крестику/повторному burger.
+- [x] Проверено: `cd frontend && npm run build`, `git diff --check`; browser smoke на
+      `localhost:3000`: desktop closed/open, mobile hidden/fullscreen, logo hover-class audit.
 
 ---
 

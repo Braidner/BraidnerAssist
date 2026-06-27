@@ -80,8 +80,8 @@ export function TopBar({
 						<span className="block truncate text-body font-bold leading-none tracking-1 text-ink">
 							Mission Control
 						</span>
-						<span className="mt-1 block font-mono text-tiny uppercase tracking-4 text-muted">
-							braidner
+						<span className="mt-1 block font-mono text-tiny tracking-4 text-muted">
+							by Braidner
 						</span>
 					</span>
 				</button>

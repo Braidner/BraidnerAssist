@@ -142,6 +142,34 @@ export function MediaSeriesPage({
         a.episodeNumber - b.episodeNumber,
     )
     .map(({ jellyfinId, title }) => ({ jellyfinId, title }));
+  const playableEpisodes = det.seasons
+    .flatMap((season) =>
+      season.episodes
+        .filter((ep) => ep.jellyfinId)
+        .map((ep) => ({
+          jellyfinId: ep.jellyfinId as string,
+          title: `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
+          label: `S${ep.seasonNumber}E${ep.episodeNumber}`,
+          seasonNumber: ep.seasonNumber,
+          episodeNumber: ep.episodeNumber ?? 0,
+          played: ep.played,
+        })),
+    )
+    .sort(
+      (a, b) =>
+        a.seasonNumber - b.seasonNumber ||
+        a.episodeNumber - b.episodeNumber,
+    );
+  const firstUnplayedEpisode = playableEpisodes.find((ep) => !ep.played);
+  const watchTarget = firstUnplayedEpisode ?? playableEpisodes[0] ?? null;
+  const hasStartedWatching = playableEpisodes.some((ep) => ep.played);
+  const watchLabel = watchTarget
+    ? firstUnplayedEpisode
+      ? hasStartedWatching
+        ? `Продолжить с ${watchTarget.label}`
+        : `Смотреть с ${watchTarget.label}`
+      : "Смотреть с начала"
+    : "Смотреть";
   const activeIndex = activeEpisodeId
     ? episodeQueue.findIndex((item) => item.jellyfinId === activeEpisodeId)
     : -1;
@@ -278,7 +306,25 @@ export function MediaSeriesPage({
         />
 
         {/* Actions */}
-        <div className="flex gap-3 mb-7">
+        <div className="flex flex-wrap gap-3 mb-7">
+          {watchTarget && (
+            <button
+              className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+              disabled={busy === watchTarget.jellyfinId}
+              title={watchTarget.title}
+              onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <polygon points="6,3 21,12 6,21" />
+              </svg>
+              {busy === watchTarget.jellyfinId ? "…" : watchLabel}
+            </button>
+          )}
           {!det.inArr && tvdbId != null && (
             <button
               className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"

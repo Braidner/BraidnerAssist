@@ -313,6 +313,20 @@
 
 ---
 
+## Batch v6.4 — cinematic player controls + series watch queue (2026-06-28)
+
+- [x] `useVideoPlayer` расширен относительной перемоткой `seekBy(deltaSeconds)` с clamp по краям видео.
+- [x] `DetailHero` получил keyboard controls только при активном hero-плеере: пробел play/pause,
+      ←/→ перемотка на 15 сек с transient feedback `-15s`/`+15s`, Esc stop; поля ввода не перехватываются.
+- [x] Для сериалов `MediaSeriesPage` строит frontend-очередь из доступных эпизодов с `jellyfinId`:
+      prev/next кнопки в player chrome, текст `Далее: ...`, автозапуск следующей доступной серии по `ended`.
+- [x] На странице сериала добавлена основная кнопка просмотра: `Смотреть с SxEy`, `Продолжить с SxEy`
+      или `Смотреть с начала` по played-статусу Jellyfin; запускает тот же cinematic player.
+- [x] Проверено: `cd frontend && npm run build`; Vite chunk-size warning остаётся стандартным и не связан
+      с изменениями плеера.
+
+---
+
 ## REST API (план)
 
 ```

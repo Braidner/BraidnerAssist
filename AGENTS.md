@@ -132,7 +132,12 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), без дополнительного затемнения после
     старта. Постер/описание/title-meta и нижняя панель (play/pause, seek, stop, fullscreen) являются единым
     player chrome: после idle они синхронно уезжают вниз/исчезают и возвращаются на mouse/touch. Fullscreen
-    вызывается через `requestFullscreen` на hero-контейнере. Также есть `ReleasePicker`
+    вызывается через `requestFullscreen` на hero-контейнере. Горячие клавиши активны только при запущенном
+    hero-плеере и не перехватывают поля ввода: пробел play/pause, ←/→ перемотка на 15 сек, Esc stop.
+    Для сериалов `MediaSeriesPage` строит frontend-очередь из доступных Jellyfin-эпизодов (`jellyfinId`),
+    показывает prev/next в player chrome, автозапускает следующую доступную серию по `ended`, а основная
+    кнопка «Смотреть» выбирает первый непосмотренный эпизод (`Смотреть с SxEy`/`Продолжить с SxEy`) или
+    первую доступную серию, если всё просмотрено. Также есть `ReleasePicker`
     на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
     ручного импорта застрявшей раздачи (`ImportDrawer`, если в очереди есть `importPending`-раздача этого тайтла).
     Старый `SeriesDrawer` удалён; общие detail-компоненты (`DetailTopBar`/`DetailHero`/`DetailBody`/
@@ -273,6 +278,9 @@ qBittorrent. Сервисы публикуются на хосте; backend-ко
   на mouse/touch, затемнение после старта просмотра убрано. Общие `DetailTopBar`/`DetailBody`/
   `DetailStatusBadges`/`SimilarRail`; дублирующая JSX-разметка убрана из
   `MediaMoviePage`/`MediaSeriesPage`, старый `InlinePlayer` удалён. ✅ ГОТОВО
+- **Cinematic player controls + series watch queue** (2026-06-28): пробел play/pause,
+  стрелки ←/→ перематывают на 15 сек с feedback; для сериалов добавлены prev/next, autoplay
+  следующей доступной серии и кнопка «Смотреть/Продолжить с SxEy». ✅ ГОТОВО
 - **UI chrome pass — red glow + responsive menu** (2026-06-27): глобальный красный accent/glow,
   full-width TopBar с logo-burger без hover-эффекта; desktop Sidebar оставлен как rail-меню
   (иконки → расширение по burger), mobile Sidebar открывается fullscreen. ✅ ГОТОВО

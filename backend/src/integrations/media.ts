@@ -454,6 +454,7 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
   const jf = await jellyfinItem(jellyfinId);
   const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
   const radarr = tmdbId ? await arrFindByExternalId("movie", tmdbId) : null;
+  const hasJellyfinMovie = jf?.Type === "Movie";
   return {
     jellyfinId,
     title: String(radarr?.title ?? jf?.Name ?? "—"),
@@ -469,7 +470,7 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
     tmdbId,
     inArr: Boolean(radarr),
     monitored: Boolean(radarr?.monitored),
-    hasFile: Boolean(radarr?.hasFile),
+    hasFile: Boolean(radarr?.hasFile) || hasJellyfinMovie,
     quality: radarr?.movieFile?.quality?.quality?.name ?? null,
     size: radarr?.movieFile?.size ?? null,
   };

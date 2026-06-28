@@ -107,8 +107,13 @@ export function MediaMoviePage({
   }, [id, source]);
 
   const play = async () => {
+    const playId = d && d !== "loading" ? d.jellyfinId : "";
+    if (!playId) {
+      toast.error("Файл ещё не появился в Jellyfin");
+      return;
+    }
     setBusy(true);
-    const url = await getMediaPlayUrl(id);
+    const url = await getMediaPlayUrl(playId);
     setBusy(false);
     if (url && d && d !== "loading") setPlayer({ url, title: d.title });
     else toast.error("Не удалось запустить воспроизведение");
@@ -275,7 +280,7 @@ export function MediaMoviePage({
 
         {/* Actions */}
         <div className="flex gap-3 mb-7">
-          {det.hasFile && (
+          {det.hasFile && det.jellyfinId && (
             <button
               className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
               disabled={busy}
@@ -292,7 +297,7 @@ export function MediaMoviePage({
               {busy ? "…" : "Смотреть"}
             </button>
           )}
-          {det.hasFile && devices.length > 0 && (
+          {det.hasFile && det.jellyfinId && devices.length > 0 && (
             <div className="relative">
               <button
                 className={ms.button.iconSm}

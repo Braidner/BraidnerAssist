@@ -224,6 +224,18 @@ async function tmdbLibraryTitle(type: "Movie" | "Series", tmdbId: number | null)
   return title;
 }
 
+async function localizedMediaTitle(
+  kind: "movie" | "series",
+  ids: { tmdbId?: number | null; tvdbId?: number | null },
+): Promise<string | null> {
+  const monitor = ids.tmdbId
+    ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind, tmdbId: ids.tmdbId } } }).catch(() => null)
+    : ids.tvdbId
+      ? await prisma.mediaMonitor.findFirst({ where: { kind, tvdbId: ids.tvdbId } }).catch(() => null)
+      : null;
+  return monitor?.title ?? await tmdbLibraryTitle(kind === "movie" ? "Movie" : "Series", ids.tmdbId ?? null);
+}
+
 // Каталог библиотеки: все фильмы + все сериалы (сериал — одна плитка, эпизоды
 // видны в drill-down). Movies и Series тащим отдельными запросами через allSettled.
 export async function getLibrary(): Promise<LibraryItem[]> {
@@ -425,6 +437,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
   const jf = jfItemR.status === "fulfilled" ? jfItemR.value : null;
   const jfDetail = jfEpisodesR.status === "fulfilled" ? jfEpisodesR.value : null;
   const tvdbId = Number(jf?.ProviderIds?.Tvdb) || jfDetail?.tvdbId || null;
+  const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
 
   // карта Jellyfin-эпизодов по S{n}E{n} → { id, played }
   const jfMap = new Map<string, { id: string; played: boolean }>();
@@ -435,6 +448,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
   }
 
   const sonarr = tvdbId ? await arrFindByExternalId("series", tvdbId) : null;
+  const localizedTitle = await localizedMediaTitle("series", { tmdbId, tvdbId });
   let seasons: DetailSeason[] = [];
 
   if (sonarr) {
@@ -462,7 +476,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
 
   return {
     jellyfinId,
-    title: String(sonarr?.title ?? jf?.Name ?? jfDetail?.name ?? "—"),
+    title: String(localizedTitle ?? sonarr?.title ?? jf?.Name ?? jfDetail?.name ?? "—"),
     year: sonarr?.year ?? jf?.ProductionYear ?? null,
     overview: sonarr?.overview ?? jf?.Overview ?? null,
     genres: sonarr?.genres ?? jf?.Genres ?? [],
@@ -485,10 +499,11 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
   const jf = await jellyfinItem(jellyfinId);
   const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
   const radarr = tmdbId ? await arrFindByExternalId("movie", tmdbId) : null;
+  const localizedTitle = await localizedMediaTitle("movie", { tmdbId });
   const hasJellyfinMovie = jf?.Type === "Movie";
   return {
     jellyfinId,
-    title: String(radarr?.title ?? jf?.Name ?? "—"),
+    title: String(localizedTitle ?? radarr?.title ?? jf?.Name ?? "—"),
     year: radarr?.year ?? jf?.ProductionYear ?? null,
     overview: radarr?.overview ?? jf?.Overview ?? null,
     genres: radarr?.genres ?? jf?.Genres ?? [],

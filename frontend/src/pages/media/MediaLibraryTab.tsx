@@ -86,7 +86,7 @@ export function MediaLibraryTab({
     const heroItem = heroRef.current;
 
     return (
-        <div className={ms.libPage}>
+        <div id="libraryContainer" className={ms.libPage}>
             <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail}/>
 
             {/* Continue watching row */}

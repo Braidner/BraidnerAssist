@@ -28,7 +28,6 @@ export function MediaHero({
   badges = [],
   actions,
   progress,
-  onOpen,
   loading = false,
 }: MediaHeroProps) {
   const filteredMeta = metaItems.filter(Boolean);
@@ -36,8 +35,6 @@ export function MediaHero({
   return (
     <div
       className={ms.libHero}
-      style={{ cursor: onOpen ? "pointer" : "default" }}
-      onClick={onOpen}
       aria-busy={loading}
     >
       <div

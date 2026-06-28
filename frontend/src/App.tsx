@@ -107,7 +107,6 @@ export function App() {
               theme={theme}
               onToggleTheme={toggle}
               onLogout={onLogout}
-              onSettings={() => setShowSettings(true)}
               onMenu={() => setSbOpen((open) => !open)}
               versionData={versionData}
             />
@@ -120,7 +119,7 @@ export function App() {
               onSettings={() => setShowSettings(true)}
             />
 
-            <div className={ui.main}>
+            <div id={"router-container"} className={ui.main}>
               <Routes>
                 <Route path="/" element={<OverviewPage />} />
                 <Route path="/hermes" element={<HermesPage />} />

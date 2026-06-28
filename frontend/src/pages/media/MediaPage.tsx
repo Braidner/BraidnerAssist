@@ -685,7 +685,7 @@ export function MediaPage({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className={ms.page}>
+    <div id="media-page" className={ms.page}>
       <AddTorrentDrawer
         open={addOpen}
         onClose={() => setAddOpen(false)}

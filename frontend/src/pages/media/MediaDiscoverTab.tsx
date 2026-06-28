@@ -37,16 +37,6 @@ interface MediaDiscoverTabProps {
     onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void;
 }
 
-/* ─── Compass SVG ─── */
-function CompassIcon({size = 26}: {size?: number}) {
-    return (
-        <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
-            <path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-    );
-}
-
 /* ─── Shuffle SVG ─── */
 function ShuffleIcon({size = 15}: {size?: number}) {
     return (
@@ -305,40 +295,13 @@ export function MediaDiscoverTab({
     onRefresh, onOpenDiscover, onOpenTmdb, onAddTmdb, onPreference,
 }: MediaDiscoverTabProps) {
     const nav = useNavigate();
-    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchOpen] = useState(true);
 
     const seriesItems = library.filter((i) => i.type === "Series");
     const movieItems = library.filter((i) => i.type === "Movie");
 
-    const handleSearchToggle = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSearchOpen((v) => !v);
-        if (searchOpen) setDq("");
-    };
-
     return (
         <div className={ms.discPage}>
-            {/* Header */}
-            <div className={ms.discHeader}>
-                <div className={ms.discHeaderIcon}>
-                    <CompassIcon size={26}/>
-                </div>
-                <div>
-                    <div className={ms.discHeaderTitle}>ДИСКАВЕРИ</div>
-                    <div className={ms.discHeaderSub}>{library.length} тайтлов в библиотеке</div>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                    <button className={cn(ms.discShuffleBtn, "ml-0 px-3")} onClick={handleSearchToggle} title="Поиск">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
-                        </svg>
-                    </button>
-                    <button className={ms.discShuffleBtn} onClick={onRefresh} disabled={homeLoading}>
-                        <ShuffleIcon size={15}/> {homeLoading ? "Обновляем…" : "Обновить"}
-                    </button>
-                </div>
-            </div>
-
             <DiscoverHero hero={home.hero} loading={homeLoading} onRefresh={onRefresh} onOpen={onOpenTmdb}
                 onAddTmdb={onAddTmdb} onPreference={onPreference}/>
 

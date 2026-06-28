@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import {LogOut, Moon, Settings, Sun} from "lucide-react";
+import {LogOut, Moon, Sun} from "lucide-react";
 import type {Theme} from "@/theme.ts";
 import type {VersionData} from "@/lib/api.ts";
 import {useTabsState} from "../../lib/tabsContext.tsx";
@@ -16,7 +16,6 @@ interface TopBarProps {
 	theme: Theme;
 	onToggleTheme: () => void;
 	onLogout: () => void;
-	onSettings: () => void;
 	onMenu: () => void;
 	versionData: VersionData | null;
 }
@@ -43,7 +42,6 @@ export function TopBar({
 	                       theme,
 	                       onToggleTheme,
 	                       onLogout,
-	                       onSettings,
 	                       onMenu,
 	                       versionData,
                        }: TopBarProps) {
@@ -65,7 +63,7 @@ export function TopBar({
 
 	return (
 		<header className="sticky top-0 z-40 w-full border-b border-hair bg-page/92 backdrop-blur-xl">
-			<div className="flex min-h-12 w-full items-center justify-between gap-4 px-4 max-[480px]:px-3">
+			<div className="flex h-12 w-full items-center justify-between gap-4 px-4 max-[480px]:px-3">
 				<button
 					type="button"
 					className="flex min-w-0 flex-none cursor-pointer items-center gap-3 rounded-xl border border-transparent py-1.5 pr-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/70"
@@ -86,11 +84,24 @@ export function TopBar({
 					</span>
 				</button>
 
-				<div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+				<div className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
 					<Tabs value={activeTab + ""}>
 						<TabsList variant="line" className="gap-5 px-3 sm:gap-8 sm:px-6">
 							{(tabs ?? []).map((tab, i) => (
-								<TabsTrigger key={i} value={i + ""} className="px-6 pb-4 text-[13px] font-bold tracking-[0.04em]" onClick={() => onTabChange?.(i)}>{tab}</TabsTrigger>
+								<TabsTrigger
+									key={i}
+									value={i + ""}
+									className={[
+										"h-full px-6 pb-0",
+										"text-[13px] font-bold tracking-[0.04em]",
+
+										"after:!bottom-[-8px]",
+										"after:!h-[2px]",
+									].join(" ")}
+									onClick={() => onTabChange?.(i)}
+								>
+									{tab}
+								</TabsTrigger>
 							))}
 						</TabsList>
 					</Tabs>
@@ -122,14 +133,6 @@ export function TopBar({
 						title={backendLabel}
 					/>
 					<div className="h-6 w-px bg-hair"/>
-					<Button
-						variant="ghost"
-						size="icon"
-						title="Настройки"
-						onClick={onSettings}
-					>
-						<Settings/>
-					</Button>
 					<Button
 						variant="ghost"
 						size="icon"

@@ -48,6 +48,7 @@ import { useToast } from "../../components/ui/Toast.tsx";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 type AutoplayLocationState = {
+  from?: string;
   autoplay?: boolean;
   autoplayItemId?: string;
   autoplayTitle?: string;
@@ -97,6 +98,8 @@ export function MediaSeriesPage({
   const [pickReload, setPickReload] = useState(0);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const autoplayConsumedRef = useRef<string | null>(null);
+  const locationState = location.state as AutoplayLocationState;
+  const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
 
   // discover-карточка резолвится по tvdbId (id = tvdbId), library — по Jellyfin-id.
   const fetchDetail = () =>
@@ -359,7 +362,7 @@ export function MediaSeriesPage({
         genres={det.genres}
         previousItem={previousItem}
         nextItem={nextItem}
-        onBack={() => nav("/media")}
+        onBack={() => nav(backTarget, { replace: true })}
         onQueueClick={() => setShowAllPicker((v) => !v)}
         onPlayQueueItem={(item) => play(item.jellyfinId, item.title)}
         onClosePlayer={() => {

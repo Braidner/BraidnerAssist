@@ -2,7 +2,7 @@
 // сетка тайтлов из TMDB Discover с фильтрами по году и сортировке + бесконечный скролл.
 
 import {useEffect, useRef, useState, useCallback} from "react";
-import {useParams, useNavigate, useSearchParams} from "react-router-dom";
+import {useLocation, useParams, useNavigate, useSearchParams} from "react-router-dom";
 import {
     getDiscoverGenre,
     getDiscoverGenres,
@@ -39,6 +39,7 @@ export function MediaGenrePage({media}: {media: MediaData}) {
     const kind: "movie" | "series" = kindParam === "series" ? "series" : "movie";
     const gid = Number(genreId);
     const nav = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const sorts = kind === "series" ? SERIES_SORTS : MOVIE_SORTS;
     const urlSort = searchParams.get("sort") ?? "popularity.desc";
@@ -116,8 +117,9 @@ export function MediaGenrePage({media}: {media: MediaData}) {
     }, [loading, done]);
 
     const open = (it: TmdbItem) => {
-        if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
-        else tmdbResolveTvdb(it.tmdbId).then((tvdb) => tvdb && nav(`/media/discover/series/${tvdb}`));
+        const from = `${location.pathname}${location.search}`;
+        if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`, {state: {from}});
+        else tmdbResolveTvdb(it.tmdbId).then((tvdb) => tvdb && nav(`/media/discover/series/${tvdb}`, {state: {from}}));
     };
 
     const setFilter = (key: "sort" | "year", value: string) => {
@@ -133,7 +135,7 @@ export function MediaGenrePage({media}: {media: MediaData}) {
 
     return (
         <div className={ms.page}>
-            <DetailTopBar title={genreName} onBack={() => nav("/media")} onQueueClick={() => nav("/media")}/>
+            <DetailTopBar title={genreName} onBack={() => nav("/media/discover")} onQueueClick={() => nav("/media/system")}/>
             <div className="px-8 pb-16 pt-6 max-mob:px-4">
                 <div className="mb-6 flex items-center gap-3">
                     <h1 className={ms.discHeaderTitle}>{genreName}</h1>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
   getVersion,
@@ -74,10 +74,6 @@ export function App() {
     setAuthed(false);
   };
 
-  // ── Detail page check (hides TopBar) ─────────────────────────────
-  const location = useLocation();
-  const isDetailPage = /\/media\/(series|movie)\//.test(location.pathname);
-
   // ── Render ────────────────────────────────────────────────────────
   if (!authed) {
     return (
@@ -100,17 +96,15 @@ export function App() {
           <CommandPalette />
           <Drawer />
 
-          {!isDetailPage && (
-            <TopBar
-              backend={backend}
-              menuOpen={sbOpen}
-              theme={theme}
-              onToggleTheme={toggle}
-              onLogout={onLogout}
-              onMenu={() => setSbOpen((open) => !open)}
-              versionData={versionData}
-            />
-          )}
+          <TopBar
+            backend={backend}
+            menuOpen={sbOpen}
+            theme={theme}
+            onToggleTheme={toggle}
+            onLogout={onLogout}
+            onMenu={() => setSbOpen((open) => !open)}
+            versionData={versionData}
+          />
 
           <div className={ui.content}>
             <Sidebar

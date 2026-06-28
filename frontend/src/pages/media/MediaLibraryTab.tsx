@@ -1,7 +1,7 @@
 // Library tab for MediaPage: hero, continue-watching row, poster grid, filters.
 
 import {useEffect, useRef, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {useLocation, useNavigate} from "react-router-dom";
 import {
     refreshJellyfin,
     getMediaLibrary,
@@ -68,14 +68,20 @@ export function MediaLibraryTab({
                                     busy: _busy,
                                 }: MediaLibraryTabProps) {
     const nav = useNavigate();
+    const location = useLocation();
     const toast = useToast();
+    const from = `${location.pathname}${location.search}`;
 
     const openDetail = (it: LibraryItem, autoplay = false) =>
         nav(
             `/media/${it.type === "Series" ? "series" : "movie"}/${it.id}${
                 autoplay ? `?autoplay=1&play=${encodeURIComponent(it.id)}` : ""
             }`,
-            { state: autoplay ? {autoplay: true, autoplayItemId: it.id} : undefined },
+            {
+                state: autoplay
+                    ? {from, autoplay: true, autoplayItemId: it.id}
+                    : {from},
+            },
         );
 
     // Pick hero once when library loads; re-pick if library changes significantly

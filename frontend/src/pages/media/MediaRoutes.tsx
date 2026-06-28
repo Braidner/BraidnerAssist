@@ -39,6 +39,26 @@ export function MediaRoutes() {
         element={<MediaPage media={media} onMediaUpdate={onMediaUpdate} />}
       />
       <Route
+        path="/discover"
+        element={
+          <MediaPage
+            media={media}
+            onMediaUpdate={onMediaUpdate}
+            tab="discover"
+          />
+        }
+      />
+      <Route
+        path="/system"
+        element={
+          <MediaPage
+            media={media}
+            onMediaUpdate={onMediaUpdate}
+            tab="system"
+          />
+        }
+      />
+      <Route
         path="/series/:id"
         element={
           <MediaSeriesPage media={media} onMediaUpdate={onMediaUpdate} />

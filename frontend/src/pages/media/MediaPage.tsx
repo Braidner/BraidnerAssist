@@ -2,7 +2,7 @@
 // Tab components: MediaLibraryTab, MediaDiscoverTab, MediaSystemTab.
 
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useRegisterTabs } from "../../lib/tabsContext.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import {
@@ -390,24 +390,38 @@ function AddTorrentDrawer({
 }
 
 type MediaTab = "library" | "discover" | "system";
+const TAB_KEYS: MediaTab[] = ["library", "discover", "system"];
+const TAB_ROUTES: Record<MediaTab, string> = {
+  library: "/media",
+  discover: "/media/discover",
+  system: "/media/system",
+};
 
 export function MediaPage({
   media,
   onMediaUpdate,
+  tab = "library",
 }: {
   media: MediaData;
   onMediaUpdate: () => void;
+  tab?: MediaTab;
 }) {
   const nav = useNavigate();
+  const location = useLocation();
   const toast = useToast();
-  const [params] = useSearchParams();
-  const tab = (params.get("tab") as MediaTab) || "library";
+  const from = `${location.pathname}${location.search}`;
 
-  const TAB_KEYS: MediaTab[] = ["library", "discover", "system"];
+  useEffect(() => {
+    const legacyTab = new URLSearchParams(location.search).get("tab") as MediaTab | null;
+    if (legacyTab && TAB_ROUTES[legacyTab]) {
+      nav(TAB_ROUTES[legacyTab], { replace: true });
+    }
+  }, [location.search, nav]);
+
   useRegisterTabs(
     ["Библиотека", "Дискавери", "Система"],
     Math.max(0, TAB_KEYS.indexOf(tab)),
-    (i: number) => nav(`/media${i > 0 ? `?tab=${TAB_KEYS[i]}` : ""}`),
+    (i: number) => nav(TAB_ROUTES[TAB_KEYS[i]]),
   );
 
   // ── Shared state ──────────────────────────────────────────────────────────
@@ -651,17 +665,18 @@ export function MediaPage({
   const openDiscover = (it: ArrLookupItem) =>
     nav(
       `/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`,
+      { state: { from } },
     );
 
   const openTmdb = async (it: TmdbItem) => {
     if (it.kind === "movie") {
-      nav(`/media/discover/movie/${it.tmdbId}`);
+      nav(`/media/discover/movie/${it.tmdbId}`, { state: { from } });
       return;
     }
     setBusy("tmdb" + it.tmdbId);
     const tvdb = await tmdbResolveTvdb(it.tmdbId);
     setBusy(null);
-    if (tvdb) nav(`/media/discover/series/${tvdb}`);
+    if (tvdb) nav(`/media/discover/series/${tvdb}`, { state: { from } });
     else
       toast.error("Не удалось определить tvdbId сериала через TMDB");
   };

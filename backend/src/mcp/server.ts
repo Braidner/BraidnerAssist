@@ -11,6 +11,9 @@ import { getMedia, qbAdd, arrLookup, arrAdd, arrReleaseSearch, arrReleaseGrab, m
 import { torrserverAdd, pickVideoFile, isBrowserPlayable } from "../integrations/torrserver.js";
 import { getAdguard } from "../integrations/adguard.js";
 import { config } from "../config.js";
+import { getDiscoverHome } from "../integrations/discover.js";
+import { tmdbSearch } from "../integrations/tmdb.js";
+import { upsertMediaPreference } from "../integrations/mediaPreferences.js";
 
 function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -28,7 +31,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: to get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). If a download finishes but never appears in the library — a multi-season pack or mis-parsed release stuck in the queue (get_media_status marks it importPending) — resolve it with list_import_candidates({type, downloadId}) then import_release({type, downloadId, fileIds?}) (omit fileIds to auto-import one best file per episode); this force-imports past the "not in grabbed release" rejection. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library) — for a quick one-off watch. get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: Discovery uses TMDB only. get_discovery_home/search_discovery are read-only; add_media_preference/hide_discovery_title update the dashboard's local SQLite preferences (watchlist/hidden/liked/disliked) and NEVER add/delete media in Jellyfin/Radarr/Sonarr. To get a movie or show into the library, prefer add_movie({ query }) / add_series({ query }) — these add the title to Radarr/Sonarr, which grab a release, import it and trigger a Jellyfin scan automatically (the proper pipeline). add_torrent({ magnet }) is the manual fallback (raw magnet/.torrent into qBittorrent — lands in the shared folder, needs a manual scan). To pick a SPECIFIC release (a particular dubbing/озвучка or quality) instead of letting Radarr/Sonarr auto-pick, use search_releases({ type, query, season? }) to list torrents with quality/languages/seeders/rejections, then grab_release({ type, guid, indexerId }) to force-grab the chosen one (works even for releases the arr would reject, e.g. multi-season packs). If a download finishes but never appears in the library — a multi-season pack or mis-parsed release stuck in the queue (get_media_status marks it importPending) — resolve it with list_import_candidates({type, downloadId}) then import_release({type, downloadId, fileIds?}) (omit fileIds to auto-import one best file per episode); this force-imports past the "not in grabbed release" rejection. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library) — for a quick one-off watch. get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -347,6 +350,66 @@ export function createMcpServer() {
     async () => {
       const items = await getRecommendations();
       return ok(items);
+    },
+  );
+
+  server.tool(
+    "get_discovery_home",
+    "Get TMDB-powered discovery home: hero, genre chips, rails and local watchlist rail. Read-only and graceful when TMDB is not configured.",
+    async () => {
+      const data = await getDiscoverHome();
+      return ok(data);
+    },
+  );
+
+  server.tool(
+    "search_discovery",
+    "Search TMDB discovery titles without adding them to Radarr/Sonarr. Use add_movie/add_series for actual library additions.",
+    { query: z.string().describe("Movie or series title") },
+    async ({ query }) => {
+      const data = await tmdbSearch(query);
+      return ok(data);
+    },
+  );
+
+  server.tool(
+    "add_media_preference",
+    "Save a local discovery preference (watchlist/liked/disliked/hidden). This only affects Mission Control recommendations; it does not add or delete media.",
+    {
+      kind: z.enum(["movie", "series"]),
+      tmdbId: z.number(),
+      status: z.enum(["watchlist", "hidden", "liked", "disliked"]),
+      title: z.string(),
+      poster: z.string().nullable().optional(),
+      backdrop: z.string().nullable().optional(),
+      year: z.number().nullable().optional(),
+      overview: z.string().nullable().optional(),
+      rating: z.number().nullable().optional(),
+      tvdbId: z.number().nullable().optional(),
+    },
+    async (input) => {
+      const pref = await upsertMediaPreference(input);
+      return ok(pref);
+    },
+  );
+
+  server.tool(
+    "hide_discovery_title",
+    "Hide a TMDB discovery title from future rails. This is local preference state only; it never removes Jellyfin/Radarr/Sonarr content.",
+    {
+      kind: z.enum(["movie", "series"]),
+      tmdbId: z.number(),
+      title: z.string(),
+      poster: z.string().nullable().optional(),
+      backdrop: z.string().nullable().optional(),
+      year: z.number().nullable().optional(),
+      overview: z.string().nullable().optional(),
+      rating: z.number().nullable().optional(),
+      tvdbId: z.number().nullable().optional(),
+    },
+    async (input) => {
+      const pref = await upsertMediaPreference({ ...input, status: "hidden" });
+      return ok(pref);
     },
   );
 

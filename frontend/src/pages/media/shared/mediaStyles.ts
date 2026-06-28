@@ -155,4 +155,9 @@ export const media = {
 
   // Search toggle in discover
   discSearchBar: "mb-6 flex items-stretch gap-2",
+
+  // Genre chips (→ genre hub)
+  discChips: "mb-8 flex flex-wrap gap-2",
+  discChip:
+    "cursor-pointer rounded-full border border-hair bg-surface px-3.5 py-1.5 [font-family:Syne,var(--font)] text-cell font-bold tracking-2 text-muted transition-colors hover:border-accent hover:text-accent",
 };

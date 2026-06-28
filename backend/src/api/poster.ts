@@ -30,7 +30,14 @@ posterRouter.get("/", async (req, res) => {
       ) {
         return res.status(400).end("bad url");
       }
-      upstream = await fetch(tmdb, { signal: AbortSignal.timeout(15_000) });
+      // Опциональный размер: бэкдропы тащим широким кропом (w1280), постеры остаются мелкими.
+      // Переписываем сегмент /t/p/<size>/ у TMDB; whitelist чтобы не дёргать произвольный путь.
+      let target = tmdb;
+      const w = typeof req.query.w === "string" ? req.query.w : "";
+      if (w && /^(w342|w780|w1280|original)$/.test(w)) {
+        target = tmdb.replace(/(image\.tmdb\.org\/t\/p\/)(w\d+|original)\//, `$1${w}/`);
+      }
+      upstream = await fetch(target, { signal: AbortSignal.timeout(15_000) });
     } else if (jf) {
       if (!config.media.jellyfin.configured) return res.status(503).end();
       if (!/^[a-f0-9]{8,}$/i.test(jf)) return res.status(400).end("bad id");

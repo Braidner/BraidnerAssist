@@ -14,6 +14,8 @@ import {
   DetailStatusBadges,
   DetailTopBar,
   SimilarRail,
+  CardRail,
+  tmdbRailCards,
   StuckImportButtons,
   type DetailPlayer,
 } from "./shared/mediaDetail.tsx";
@@ -32,11 +34,16 @@ import {
   seasonSearch,
   setMonitored,
   getMediaLibrary,
+  getDiscoverSimilar,
+  getDiscoverCollection,
+  getTmdbDetail,
+  tmdbResolveTvdb,
   type MoviePageDetail,
   type DownloadItem,
   type MediaData,
   type PlayDevice,
   type LibraryItem,
+  type TmdbItem,
 } from "@/lib/api.ts";
 import { useToast } from "../../components/ui/Toast.tsx";
 
@@ -94,6 +101,31 @@ export function MediaMoviePage({
     setBusy(false);
     if (url && d && d !== "loading") setPlayer({ url, title: d.title });
     else toast.error("Не удалось запустить воспроизведение");
+  };
+
+  // TMDB-подборки: похожее + франшиза (коллекция). Заводятся как только знаем tmdbId.
+  const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
+  const [tmdbDetail, setTmdbDetail] = useState<TmdbItem | null>(null);
+  const [collection, setCollection] = useState<{ name: string; items: TmdbItem[] } | null>(null);
+  const detTmdbId = d && d !== "loading" ? d.tmdbId : null;
+  useEffect(() => {
+    if (!media.tmdb || detTmdbId == null) {
+      setTmdbSimilar([]);
+      setTmdbDetail(null);
+      setCollection(null);
+      return;
+    }
+    getDiscoverSimilar("movie", detTmdbId).then(setTmdbSimilar);
+    getTmdbDetail("movie", detTmdbId).then(setTmdbDetail);
+    getDiscoverCollection(detTmdbId).then(setCollection);
+  }, [media.tmdb, detTmdbId]);
+
+  const openTmdb = (it: TmdbItem) => {
+    if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
+    else tmdbResolveTvdb(it.tmdbId).then((tvdb) => {
+      if (tvdb) nav(`/media/discover/series/${tvdb}`);
+      else toast.error("Не удалось открыть сериал: TMDB не вернул tvdbId");
+    });
   };
 
   useEffect(() => {
@@ -229,6 +261,18 @@ export function MediaMoviePage({
             size: det.size,
           }}
         />
+
+        {tmdbDetail && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {tmdbDetail.runtime ? <span className={ms.badge}>{tmdbDetail.runtime} мин</span> : null}
+            {tmdbDetail.genres?.slice(0, 4).map((g) => <span key={g} className={ms.lang}>{g}</span>)}
+            {tmdbDetail.trailerUrl ? (
+              <a className={ms.button.sm} href={tmdbDetail.trailerUrl} target="_blank" rel="noreferrer">
+                Трейлер
+              </a>
+            ) : null}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 mb-7">
@@ -372,7 +416,20 @@ export function MediaMoviePage({
           )}
         </div>
 
-        <SimilarRail items={similarItems} />
+        {collection && collection.items.length > 1 && (
+          <CardRail
+            label={`КОЛЛЕКЦИЯ · ${collection.name}`}
+            cards={tmdbRailCards(
+              collection.items.filter((x) => x.tmdbId !== det.tmdbId),
+              openTmdb,
+            )}
+          />
+        )}
+        {tmdbSimilar.length > 0 ? (
+          <CardRail label="ПОХОЖИЕ" cards={tmdbRailCards(tmdbSimilar, openTmdb)} />
+        ) : (
+          <SimilarRail items={similarItems} />
+        )}
       </DetailBody>
     </div>
   );

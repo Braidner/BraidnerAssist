@@ -1,15 +1,18 @@
-// Discover tab for MediaPage: cinematic discovery layout with sections.
+// Discover tab for MediaPage: cinematic, rail-driven discovery (LAMPA/ZONA-style).
+// Данные приходят из getDiscoverRails() (TMDB hero + жанры + рейлы) + «потому что
+// вы смотрели». Hero использует широкий backdrop; жанровые чипы ведут в жанровый хаб.
 
 import {useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {
     posterUrl,
+    backdropUrl,
     jellyfinPosterUrl,
     type ArrLookupItem,
-    type Recommendation,
-    type CalendarItem,
     type TmdbItem,
     type LibraryItem,
+    type DiscoverHome,
+    type DiscoverRail,
 } from "@/lib/api.ts";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
@@ -22,17 +25,26 @@ interface MediaDiscoverTabProps {
     setDq: (v: string) => void;
     dres: ArrLookupItem[];
     tmRes: TmdbItem[];
-    trending: TmdbItem[];
     dsearching: boolean;
-    recs: Recommendation[];
-    discoveryHero: Recommendation | null;
-    heroLoading: boolean;
-    calendar: CalendarItem[];
+    home: DiscoverHome;
+    because: DiscoverRail[];
+    homeLoading: boolean;
     busy: string | null;
-    onRefreshHero: () => void;
-    onAddRec: (rec: Recommendation) => void;
+    onRefresh: () => void;
     onOpenDiscover: (it: ArrLookupItem) => void;
     onOpenTmdb: (it: TmdbItem) => void;
+    onAddTmdb: (it: TmdbItem) => void;
+    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void;
+}
+
+/* ─── Compass SVG ─── */
+function CompassIcon({size = 26}: {size?: number}) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+            <path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+    );
 }
 
 /* ─── Shuffle SVG ─── */
@@ -55,9 +67,10 @@ interface DiscPosterCardProps {
     rank?: number;
     onClick: () => void;
     addBtn?: {label: string; disabled?: boolean; onClick: (e: React.MouseEvent) => void};
+    actions?: {label: string; title?: string; onClick: (e: React.MouseEvent) => void}[];
 }
 
-function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, onClick, addBtn}: DiscPosterCardProps) {
+function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, onClick, addBtn, actions}: DiscPosterCardProps) {
     return (
         <div className={cn(ms.posterCard, "group")} onClick={onClick} style={{cursor: "pointer"}}>
             <div className={ms.posterArt}>
@@ -71,11 +84,8 @@ function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, on
                     />
                 ) : null}
                 <div style={{position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)", zIndex: 0}}/>
-                {/* Season badge */}
                 {seasonCount ? <span className={ms.posterBadge}>{seasonCount} сез.</span> : null}
-                {/* Rank badge */}
                 {rank != null ? <span className={ms.posterRankBadge}>{rank}</span> : null}
-                {/* Hover overlay */}
                 <div className={cn(ms.posterOverlay, "z-5")}>
                     <div className={ms.roundPlay}>
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
@@ -105,18 +115,21 @@ function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, on
                     {addBtn.disabled ? "…" : addBtn.label}
                 </button>
             )}
+            {actions?.length ? (
+                <div className="mt-1.5 grid grid-cols-2 gap-1">
+                    {actions.map((a) => (
+                        <button key={a.label} className={cn(ms.button.sm, "h-7 px-1 text-[10px]")} title={a.title ?? a.label} onClick={a.onClick}>
+                            {a.label}
+                        </button>
+                    ))}
+                </div>
+            ) : null}
         </div>
     );
 }
 
 /* ─── Section with horizontal poster track ─── */
-interface DiscSectionProps {
-    label: string;
-    count: number;
-    children: React.ReactNode;
-}
-
-function DiscSection({label, count, children}: DiscSectionProps) {
+function DiscSection({label, count, children}: {label: string; count: number; children: React.ReactNode}) {
     return (
         <div className={ms.discSection}>
             <div className={ms.discSecHead}>
@@ -129,75 +142,86 @@ function DiscSection({label, count, children}: DiscSectionProps) {
     );
 }
 
-function DiscoverHero({
-    hero,
-    loading,
-    busy,
-    onRefresh,
-    onAdd,
-    onOpen,
-}: {
-    hero: Recommendation | null;
-    loading: boolean;
-    busy: string | null;
-    onRefresh: () => void;
-    onAdd: (rec: Recommendation) => void;
-    onOpen: (it: ArrLookupItem) => void;
+/* ─── TMDB rail (reusable for home rails + because-you-watched) ─── */
+function TmdbRail({label, items, onOpenTmdb, onAddTmdb, onPreference, ranked}: {
+    label: string; items: TmdbItem[]; onOpenTmdb: (it: TmdbItem) => void; onAddTmdb: (it: TmdbItem) => void;
+    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void; ranked?: boolean;
+}) {
+    if (!items.length) return null;
+    return (
+        <DiscSection label={label} count={items.length}>
+            {items.map((it, i) => (
+                <DiscPosterCard
+                    key={it.kind + it.tmdbId}
+                    title={it.title}
+                    year={it.year}
+                    sub={it.kind === "movie" ? "фильм" : "сериал"}
+                    imgUrl={it.poster ? posterUrl(it.poster) : null}
+                    rating={it.rating}
+                    rank={ranked ? i + 1 : undefined}
+                    onClick={() => onOpenTmdb(it)}
+                    actions={[
+                        {label: "В список", onClick: (e) => { e.stopPropagation(); onPreference(it, "watchlist"); }},
+                        {label: "Добавить", onClick: (e) => { e.stopPropagation(); onAddTmdb(it); }},
+                        {label: "Скрыть", onClick: (e) => { e.stopPropagation(); onPreference(it, "hidden"); }},
+                        {label: "Не интересно", onClick: (e) => { e.stopPropagation(); onPreference(it, "disliked"); }},
+                    ]}
+                />
+            ))}
+        </DiscSection>
+    );
+}
+
+/* ─── Cinematic TMDB hero with wide backdrop ─── */
+function DiscoverHero({hero, loading, onRefresh, onOpen, onAddTmdb, onPreference}: {
+    hero: TmdbItem | null; loading: boolean; onRefresh: () => void; onOpen: (it: TmdbItem) => void;
+    onAddTmdb: (it: TmdbItem) => void;
+    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void;
 }) {
     if (!hero) return null;
-    const key = "rec" + hero.kind + hero.id;
-    const openHero = () => onOpen({
-        kind: hero.kind,
-        id: hero.id,
-        title: hero.title,
-        year: hero.year,
-        overview: hero.overview,
-        poster: hero.poster,
-        added: false,
-    });
-
+    const bg = backdropUrl(hero.backdrop) ?? posterUrl(hero.poster, "w780");
     return (
         <MediaHero
             title={hero.title}
-            eyebrow="СЛУЧАЙНЫЙ ФИЛЬМ С ВЫСОКИМ РЕЙТИНГОМ"
-            backgroundSrc={hero.poster ? posterUrl(hero.poster) : null}
+            eyebrow="В ТРЕНДЕ СЕЙЧАС"
+            backgroundSrc={bg ?? null}
             overview={hero.overview}
             loading={loading}
-            onOpen={openHero}
+            onOpen={() => onOpen(hero)}
             metaItems={[
-                "фильм",
+                hero.kind === "movie" ? "фильм" : "сериал",
                 hero.year ? hero.year : null,
                 hero.rating != null ? (
                     <span style={{color: "#ffd978"}}>★ {hero.rating.toFixed(1)}</span>
                 ) : null,
-                "не в библиотеке",
             ]}
-            badges={[
-                hero.rating != null ? `Рейтинг ${hero.rating.toFixed(1)}+` : "Высокий рейтинг",
-                "Radarr Discover",
-                "Не в библиотеке",
-            ]}
+            badges={["TMDB", hero.rating != null && hero.rating >= 7 ? "Высокий рейтинг" : "Популярное"]}
             actions={
                 <>
                     <button
                         className={ms.playButton}
-                        disabled={busy === key}
-                        onClick={(e) => { e.stopPropagation(); onAdd(hero); }}
+                        onClick={(e) => { e.stopPropagation(); onOpen(hero); }}
                     >
-                        {busy === key ? "Добавляем…" : "Добавить"}
+                        Подробнее
                     </button>
                     <button
                         className={ms.heroGhostBtn}
-                        onClick={(e) => { e.stopPropagation(); openHero(); }}
+                        onClick={(e) => { e.stopPropagation(); onAddTmdb(hero); }}
                     >
-                        Подробнее
+                        Добавить
+                    </button>
+                    <button
+                        className={ms.heroGhostBtn}
+                        onClick={(e) => { e.stopPropagation(); onPreference(hero, "watchlist"); }}
+                    >
+                        В список
                     </button>
                     <button
                         className={ms.heroGhostBtn}
                         disabled={loading}
                         onClick={(e) => { e.stopPropagation(); onRefresh(); }}
                     >
-                        <ShuffleIcon size={15}/> {loading ? "Ищем…" : "Другой фильм"}
+                        <ShuffleIcon size={15}/> {loading ? "Обновляем…" : "Другой"}
                     </button>
                 </>
             }
@@ -205,26 +229,41 @@ function DiscoverHero({
     );
 }
 
-/* ─── Search results grid (reused from old discover) ─── */
+/* ─── Genre chips → genre hub ─── */
+function GenreChips({genres, kind}: {genres: {id: number; name: string}[]; kind: "movie" | "series"}) {
+    const nav = useNavigate();
+    if (!genres.length) return null;
+    return (
+        <div className={ms.discChips}>
+            {genres.map((g) => (
+                <button
+                    key={g.id}
+                    className={ms.discChip}
+                    onClick={() => nav(`/media/discover/genre/${kind}/${g.id}`)}
+                >
+                    {g.name}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/* ─── Search results grid ─── */
 function SearchGrid({
-    dq, tmdb, dsearching, dres, tmRes, busy,
-    onOpenDiscover, onOpenTmdb,
+    dq, tmdb, dsearching, dres, tmRes, busy, onOpenDiscover, onOpenTmdb,
 }: Pick<MediaDiscoverTabProps, "dq"|"tmdb"|"dsearching"|"dres"|"tmRes"|"busy"|"onOpenDiscover"|"onOpenTmdb">) {
     if (!dq.trim()) return null;
-
-    const isSearching = dq.trim().length > 0;
-    const items = tmdb ? (isSearching ? tmRes : []) : (isSearching ? dres : []);
-    const loading = isSearching && dsearching && items.length === 0;
-
+    const items = tmdb ? tmRes : dres;
+    const loading = dsearching && items.length === 0;
     return (
         <div className="mb-6">
             {loading ? (
                 <div className={ms.grid}>
                     {Array.from({length: 6}).map((_, i) => <div key={i} className={ms.skeleton}/>)}
                 </div>
-            ) : isSearching && items.length === 0 ? (
+            ) : items.length === 0 ? (
                 <div className={cn(ms.empty, "mt-2.5")}>Ничего не найдено.</div>
-            ) : isSearching ? (
+            ) : (
                 <div className={ms.grid}>
                     {tmdb
                         ? tmRes.map((it) => (
@@ -255,47 +294,65 @@ function SearchGrid({
                         ))
                     }
                 </div>
-            ) : null}
+            )}
         </div>
     );
 }
 
 export function MediaDiscoverTab({
-    library,
-    tmdb,
-    dq,
-    setDq,
-    dres,
-    tmRes,
-    trending,
-    dsearching,
-    recs,
-    discoveryHero,
-    heroLoading,
-    calendar: _calendar,
-    busy,
-    onRefreshHero,
-    onAddRec,
-    onOpenDiscover,
-    onOpenTmdb,
+    library, tmdb, dq, setDq, dres, tmRes, dsearching,
+    home, because, homeLoading, busy,
+    onRefresh, onOpenDiscover, onOpenTmdb, onAddTmdb, onPreference,
 }: MediaDiscoverTabProps) {
     const nav = useNavigate();
-    const [searchOpen] = useState(true);
+    const [searchOpen, setSearchOpen] = useState(false);
 
-    const trendingByRating = [...trending].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
     const seriesItems = library.filter((i) => i.type === "Series");
     const movieItems = library.filter((i) => i.type === "Movie");
 
+    const handleSearchToggle = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSearchOpen((v) => !v);
+        if (searchOpen) setDq("");
+    };
+
     return (
         <div className={ms.discPage}>
-            <DiscoverHero
-                hero={discoveryHero}
-                loading={heroLoading}
-                busy={busy}
-                onRefresh={onRefreshHero}
-                onAdd={onAddRec}
-                onOpen={onOpenDiscover}
-            />
+            {/* Header */}
+            <div className={ms.discHeader}>
+                <div className={ms.discHeaderIcon}>
+                    <CompassIcon size={26}/>
+                </div>
+                <div>
+                    <div className={ms.discHeaderTitle}>ДИСКАВЕРИ</div>
+                    <div className={ms.discHeaderSub}>{library.length} тайтлов в библиотеке</div>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                    <button className={cn(ms.discShuffleBtn, "ml-0 px-3")} onClick={handleSearchToggle} title="Поиск">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                            <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                    </button>
+                    <button className={ms.discShuffleBtn} onClick={onRefresh} disabled={homeLoading}>
+                        <ShuffleIcon size={15}/> {homeLoading ? "Обновляем…" : "Обновить"}
+                    </button>
+                </div>
+            </div>
+
+            <DiscoverHero hero={home.hero} loading={homeLoading} onRefresh={onRefresh} onOpen={onOpenTmdb}
+                onAddTmdb={onAddTmdb} onPreference={onPreference}/>
+
+            {/* Genre chips → genre hub */}
+            {tmdb && (
+                <>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                        <button className={ms.discChip} onClick={() => nav(`/media/discover/genre/movie/28`)}>Фильмы</button>
+                        <button className={ms.discChip} onClick={() => nav(`/media/discover/genre/series/18`)}>Сериалы</button>
+                    </div>
+                    <GenreChips genres={home.genres.movie} kind="movie"/>
+                    <GenreChips genres={home.genres.series} kind="series"/>
+                </>
+            )}
 
             {/* Expandable search */}
             {searchOpen && (
@@ -307,97 +364,53 @@ export function MediaDiscoverTab({
                         value={dq}
                         onChange={(e) => setDq(e.target.value)}
                     />
-                    {dq && (
-                        <button className={ms.button.iconSm} title="Очистить" onClick={() => setDq("")}>✕</button>
-                    )}
+                    {dq && <button className={ms.button.iconSm} title="Очистить" onClick={() => setDq("")}>✕</button>}
                 </div>
             )}
-
-            {/* Search results (only when search is open and has query) */}
             {searchOpen && dq.trim() && (
                 <SearchGrid dq={dq} tmdb={tmdb} dsearching={dsearching} dres={dres} tmRes={tmRes}
                     busy={busy} onOpenDiscover={onOpenDiscover} onOpenTmdb={onOpenTmdb}/>
             )}
 
-            {/* Top Rating — TMDB trending sorted by rating */}
-            {trendingByRating.length > 0 && (
-                <DiscSection label="ТОП РЕЙТИНГ" count={trendingByRating.length}>
-                    {trendingByRating.map((it, i) => (
-                        <DiscPosterCard
-                            key={it.kind + it.tmdbId}
-                            title={it.title}
-                            year={it.year}
-                            sub={it.kind === "movie" ? "фильм" : "сериал"}
-                            imgUrl={it.poster ? posterUrl(it.poster) : null}
-                            rating={it.rating}
-                            rank={i + 1}
-                            onClick={() => onOpenTmdb(it)}
-                        />
-                    ))}
-                </DiscSection>
-            )}
+            {/* TMDB discovery rails (trending / top / fresh / genres) */}
+            {home.rails.map((rail) => (
+                <TmdbRail key={rail.key} label={rail.label.toUpperCase()} items={rail.items}
+                    onOpenTmdb={onOpenTmdb} onAddTmdb={onAddTmdb} onPreference={onPreference}
+                    ranked={rail.key === "top" || rail.key === "trending"}/>
+            ))}
 
-            {/* Series from library */}
+            {/* Because you watched (personalized) */}
+            {because.map((rail) => (
+                <TmdbRail key={rail.key} label={rail.label} items={rail.items} onOpenTmdb={onOpenTmdb}
+                    onAddTmdb={onAddTmdb} onPreference={onPreference}/>
+            ))}
+
+            {/* Library rails */}
             {seriesItems.length > 0 && (
-                <DiscSection label="СЕРИАЛЫ" count={seriesItems.length}>
+                <DiscSection label="СЕРИАЛЫ В БИБЛИОТЕКЕ" count={seriesItems.length}>
                     {seriesItems.map((it) => (
-                        <DiscPosterCard
-                            key={it.id}
-                            title={it.name}
-                            year={it.year}
-                            sub="сериал"
-                            imgUrl={jellyfinPosterUrl(it.id)}
-                            seasonCount={it.childCount}
-                            onClick={() => nav(`/media/series/${it.id}`)}
-                        />
+                        <DiscPosterCard key={it.id} title={it.name} year={it.year} sub="сериал"
+                            imgUrl={jellyfinPosterUrl(it.id)} seasonCount={it.childCount}
+                            onClick={() => nav(`/media/series/${it.id}`)}/>
                     ))}
                 </DiscSection>
             )}
-
-            {/* Movies from library */}
             {movieItems.length > 0 && (
-                <DiscSection label="ФИЛЬМЫ" count={movieItems.length}>
+                <DiscSection label="ФИЛЬМЫ В БИБЛИОТЕКЕ" count={movieItems.length}>
                     {movieItems.map((it) => (
-                        <DiscPosterCard
-                            key={it.id}
-                            title={it.name}
-                            year={it.year}
-                            sub="фильм"
+                        <DiscPosterCard key={it.id} title={it.name} year={it.year} sub="фильм"
                             imgUrl={jellyfinPosterUrl(it.id)}
-                            onClick={() => nav(`/media/movie/${it.id}`)}
-                        />
+                            onClick={() => nav(`/media/movie/${it.id}`)}/>
                     ))}
-                </DiscSection>
-            )}
-
-            {/* Recommendations (if no library content yet) */}
-            {recs.length > 0 && seriesItems.length === 0 && movieItems.length === 0 && (
-                <DiscSection label="РЕКОМЕНДАЦИИ" count={recs.length}>
-                    {recs.map((r) => {
-                        const key = "rec" + r.kind + r.id;
-                        return (
-                            <DiscPosterCard
-                                key={key}
-                                title={r.title}
-                                year={r.year}
-                                sub={r.kind === "movie" ? "фильм" : "сериал"}
-                                imgUrl={r.poster ? posterUrl(r.poster) : null}
-                                onClick={() => {}}
-                                addBtn={{
-                                    label: "+ Добавить",
-                                    disabled: busy === key,
-                                    onClick: (e) => { e.stopPropagation(); onAddRec(r); },
-                                }}
-                            />
-                        );
-                    })}
                 </DiscSection>
             )}
 
             {/* Empty state */}
-            {library.length === 0 && trending.length === 0 && recs.length === 0 && (
+            {!homeLoading && home.rails.length === 0 && library.length === 0 && (
                 <div className={cn(ms.empty, "mt-8 text-center")}>
-                    Библиотека пуста. Добавь первый тайтл через поиск.
+                    {tmdb
+                        ? "Пока пусто. Найди первый тайтл через поиск."
+                        : "TMDB не настроен — дискавери-подборки недоступны. Добавляй тайтлы через поиск."}
                 </div>
             )}
         </div>

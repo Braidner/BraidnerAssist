@@ -4,8 +4,10 @@ import { useNavigate } from "react-router-dom";
 import {
   jellyfinBackdropUrl,
   jellyfinPosterUrl,
+  posterUrl,
   type DownloadItem,
   type LibraryItem,
+  type TmdbItem,
 } from "@/lib/api.ts";
 import { cn } from "@/lib/cn.ts";
 import { media as ms } from "./mediaStyles.ts";
@@ -528,40 +530,73 @@ export function DetailHero({
   );
 }
 
-export function SimilarRail({
-  items,
-  onOpen,
-}: {
-  items: LibraryItem[];
-  onOpen?: (item: LibraryItem) => void;
-}) {
-  const nav = useNavigate();
-  if (items.length === 0) return null;
+// Нейтральная карточка рейла — обслуживает и Jellyfin-библиотеку, и TMDB-подборки.
+export interface RailCard {
+  key: string;
+  title: string;
+  sub: string;
+  year: number | null;
+  poster: string | undefined;
+  seasonCount?: number | null;
+  onClick: () => void;
+}
 
-  const openItem =
-    onOpen ??
-    ((item: LibraryItem) =>
-      nav(`/media/${item.type === "Series" ? "series" : "movie"}/${item.id}`));
+// Адаптер: LibraryItem → RailCard (Jellyfin-постеры, навигация в карточку библиотеки).
+export function libraryRailCards(
+  items: LibraryItem[],
+  onOpen: (item: LibraryItem) => void,
+): RailCard[] {
+  return items.map((item) => ({
+    key: item.id,
+    title: item.name,
+    sub: item.type === "Series" ? "сериал" : "фильм",
+    year: item.year,
+    poster: jellyfinPosterUrl(item.id),
+    seasonCount: item.childCount,
+    onClick: () => onOpen(item),
+  }));
+}
 
+// Адаптер: TmdbItem → RailCard (TMDB-постеры через прокси). onOpen ведёт в discover-карточку.
+export function tmdbRailCards(
+  items: TmdbItem[],
+  onOpen: (item: TmdbItem) => void,
+): RailCard[] {
+  return items.map((item) => ({
+    key: item.kind + item.tmdbId,
+    title: item.title,
+    sub: item.kind === "movie" ? "фильм" : "сериал",
+    year: item.year,
+    poster: posterUrl(item.poster),
+    onClick: () => onOpen(item),
+  }));
+}
+
+// Универсальный горизонтальный рейл (похожее / коллекция / любая подборка).
+export function CardRail({ label, cards }: { label: string; cards: RailCard[] }) {
+  if (cards.length === 0) return null;
   return (
     <div className="mt-8">
-      <div className="mb-4 font-ui text-label font-extrabold uppercase tracking-section text-muted">ПОХОЖИЕ</div>
+      <div className="mb-4 font-ui text-label font-extrabold uppercase tracking-section text-muted">{label}</div>
       <div className={cn(ms.hTrack, ms.posterRow)}>
-        {items.map((item) => (
-          <div key={item.id} className={cn(ms.posterCard, "group")} onClick={() => openItem(item)}>
+        {cards.map((c) => (
+          <div key={c.key} className={cn(ms.posterCard, "group")} onClick={c.onClick}>
             <div className={ms.posterArt}>
               <div className="absolute inset-0 z-0 bg-[#09090d]" />
-              <img
-                src={jellyfinPosterUrl(item.id)}
-                alt=""
-                className="absolute inset-0 z-[1] size-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
-              />
-              {item.childCount ? (
+              {c.poster ? (
+                <img
+                  src={c.poster}
+                  alt=""
+                  loading="lazy"
+                  className="absolute inset-0 z-[1] size-full object-cover"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : null}
+              {c.seasonCount ? (
                 <span className={ms.posterBadge} style={{ position: "relative", zIndex: 2 }}>
-                  {item.childCount} сез.
+                  {c.seasonCount} сез.
                 </span>
               ) : null}
               <div className={cn(ms.posterOverlay, "bg-[linear-gradient(to_top,rgba(0,0,0,0.72),transparent_58%)]")}>
@@ -573,10 +608,10 @@ export function SimilarRail({
               </div>
             </div>
             <div className={ms.posterInfo}>
-              <div className={ms.posterTitle}>{item.name}</div>
+              <div className={ms.posterTitle}>{c.title}</div>
               <div className={ms.posterSub}>
-                {item.type === "Series" ? "сериал" : "фильм"}
-                {item.year ? ` · ${item.year}` : ""}
+                {c.sub}
+                {c.year ? ` · ${c.year}` : ""}
               </div>
             </div>
           </div>
@@ -584,4 +619,22 @@ export function SimilarRail({
       </div>
     </div>
   );
+}
+
+// Совместимость со старыми call-site'ами (библиотека). Тонкая обёртка над CardRail.
+export function SimilarRail({
+  items,
+  onOpen,
+  label = "ПОХОЖИЕ",
+}: {
+  items: LibraryItem[];
+  onOpen?: (item: LibraryItem) => void;
+  label?: string;
+}) {
+  const nav = useNavigate();
+  const open =
+    onOpen ??
+    ((item: LibraryItem) =>
+      nav(`/media/${item.type === "Series" ? "series" : "movie"}/${item.id}`));
+  return <CardRail label={label} cards={libraryRailCards(items, open)} />;
 }

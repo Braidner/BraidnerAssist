@@ -55,7 +55,21 @@ import {
   listContentTorrents,
   type ContentType,
 } from "../integrations/torrentPick.js";
-import { tmdbSearch, tmdbTrending, tmdbPopular, tmdbTvToTvdb } from "../integrations/tmdb.js";
+import { tmdbSearch, tmdbTrending, tmdbPopular, tmdbTvToTvdb, tmdbDiscover, tmdbGenres } from "../integrations/tmdb.js";
+import {
+  getDiscoverHome,
+  getBecauseRails,
+  getSimilarRail,
+  getCollectionRail,
+  getTmdbDetail,
+} from "../integrations/discover.js";
+import {
+  hiddenMediaKeys,
+  listMediaPreferences,
+  removeMediaPreference,
+  upsertMediaPreference,
+  type MediaPreferenceStatus,
+} from "../integrations/mediaPreferences.js";
 import {
   listDir, makeDir, renameEntry, moveEntry, removeEntry, organizeTorrent,
 } from "../integrations/files.js";
@@ -593,6 +607,154 @@ apiRouter.get("/media/tmdb/resolve", async (req, res) => {
   if (!Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "tmdbId required" });
   try {
     res.json({ tvdbId: await tmdbTvToTvdb(tmdbId) });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// ── Discover (LAMPA/ZONA-style подборки на TMDB) ───────────────────────
+// Домашняя страница дискавери одним вызовом. Graceful: TMDB off → 200 {configured:false}.
+apiRouter.get("/media/discover/rails", async (_req, res) => {
+  try {
+    res.json(await getDiscoverHome());
+  } catch (e) {
+    // Никогда не валим виджет — отдаём пустую, но валидную форму.
+    res.json({ configured: false, hero: null, genres: { movie: [], series: [] }, rails: [], error: String(e) });
+  }
+});
+
+// Жанровый хаб (бесконечный скролл): /media/discover/genre/:kind/:genreId?year=&sort=&page=
+apiRouter.get("/media/discover/genre/:kind/:genreId", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const kind = req.params.kind === "series" ? "series" : "movie";
+  const genreId = Number(req.params.genreId);
+  if (!Number.isFinite(genreId) || genreId <= 0) return res.status(400).json({ error: "genreId required" });
+  try {
+    const hidden = await hiddenMediaKeys();
+    const items = await tmdbDiscover(kind, {
+      genreId,
+      year: req.query.year ? String(req.query.year) : undefined,
+      sort: req.query.sort ? String(req.query.sort) : undefined,
+      page: req.query.page ? Number(req.query.page) : 1,
+    });
+    res.json(items.filter((i) => !hidden.has(`${i.kind}:${i.tmdbId}`)));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Список жанров (ru) по типу — для чипов/фильтров.
+apiRouter.get("/media/discover/genres", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const kind = req.query.kind === "series" ? "series" : "movie";
+  try {
+    res.json(await tmdbGenres(kind));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// «Похожее» для детальной страницы. ?idType=tvdb для сериала с tvdbId (резолв в TMDB id).
+apiRouter.get("/media/discover/similar/:kind/:id", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const kind = req.params.kind === "series" ? "series" : "movie";
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
+  const idType = req.query.idType === "tvdb" ? "tvdb" : "tmdb";
+  try {
+    res.json(await getSimilarRail(kind, id, idType));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Lightweight TMDB metadata for discover/detail interactions (trailers, genres, runtime).
+apiRouter.get("/media/discover/tmdb-detail/:kind/:id", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const kind = req.params.kind === "series" ? "series" : "movie";
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
+  const idType = req.query.idType === "tvdb" ? "tvdb" : "tmdb";
+  try {
+    const detail = await getTmdbDetail(kind, id, idType);
+    if (!detail) return res.status(404).json({ error: "not found" });
+    res.json(detail);
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// «Потому что вы смотрели» — персональные рейлы (seed из Jellyfin watch history).
+apiRouter.get("/media/discover/because", async (_req, res) => {
+  try {
+    res.json(await getBecauseRails());
+  } catch (e) {
+    res.json([]); // персонализация необязательна — не валим
+  }
+});
+
+// Франшиза (коллекция) фильма по tmdbId. 204 если фильм не в коллекции.
+apiRouter.get("/media/discover/collection/:tmdbId", async (req, res) => {
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const tmdbId = Number(req.params.tmdbId);
+  if (!Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "tmdbId required" });
+  try {
+    const rail = await getCollectionRail(tmdbId);
+    if (!rail) return res.status(204).end();
+    res.json(rail);
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+// Local discovery preferences: watchlist / hidden / liked / disliked.
+const prefStatuses = new Set<MediaPreferenceStatus>(["watchlist", "hidden", "liked", "disliked"]);
+
+apiRouter.get("/media/preferences", async (req, res) => {
+  const status = typeof req.query.status === "string" && prefStatuses.has(req.query.status as MediaPreferenceStatus)
+    ? (req.query.status as MediaPreferenceStatus)
+    : undefined;
+  try {
+    res.json(await listMediaPreferences(status));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.post("/media/preferences", async (req, res) => {
+  const kind = req.body?.kind === "series" ? "series" : req.body?.kind === "movie" ? "movie" : null;
+  const tmdbId = Number(req.body?.tmdbId);
+  const status = String(req.body?.status ?? "");
+  const title = String(req.body?.title ?? "").trim();
+  if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0 || !prefStatuses.has(status as MediaPreferenceStatus) || !title) {
+    return res.status(400).json({ error: "kind, tmdbId, status and title required" });
+  }
+  try {
+    const pref = await upsertMediaPreference({
+      kind,
+      tmdbId,
+      status: status as MediaPreferenceStatus,
+      title,
+      tvdbId: req.body?.tvdbId == null ? null : Number(req.body.tvdbId) || null,
+      poster: req.body?.poster ?? null,
+      backdrop: req.body?.backdrop ?? null,
+      year: req.body?.year == null ? null : Number(req.body.year) || null,
+      overview: req.body?.overview ?? null,
+      rating: req.body?.rating == null ? null : Number(req.body.rating) || null,
+    });
+    res.status(201).json(pref);
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.delete("/media/preferences/:kind/:tmdbId", async (req, res) => {
+  const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
+  const tmdbId = Number(req.params.tmdbId);
+  if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
+  try {
+    await removeMediaPreference(kind, tmdbId);
+    res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

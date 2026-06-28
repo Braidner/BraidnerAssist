@@ -17,6 +17,8 @@ import {
   DetailStatusBadges,
   DetailTopBar,
   SimilarRail,
+  CardRail,
+  tmdbRailCards,
   StuckImportButtons,
   type DetailPlayer,
   type QueueItem,
@@ -34,10 +36,14 @@ import {
   seasonSearch,
   setMonitored,
   getMediaLibrary,
+  getDiscoverSimilar,
+  getTmdbDetail,
+  tmdbResolveTvdb,
   type SeriesPageDetail,
   type DownloadItem,
   type MediaData,
   type LibraryItem,
+  type TmdbItem,
 } from "@/lib/api.ts";
 import { useToast } from "../../components/ui/Toast.tsx";
 
@@ -116,6 +122,28 @@ export function MediaSeriesPage({
     } else {
       toast.error("Не удалось запустить воспроизведение");
     }
+  };
+
+  // TMDB-похожие для сериала. На входе tvdbId → бэкенд резолвит в TMDB tv id (idType=tvdb).
+  const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
+  const [tmdbDetail, setTmdbDetail] = useState<TmdbItem | null>(null);
+  const detTvdbId = d && d !== "loading" ? d.tvdbId : null;
+  useEffect(() => {
+    if (!media.tmdb || detTvdbId == null) {
+      setTmdbSimilar([]);
+      setTmdbDetail(null);
+      return;
+    }
+    getDiscoverSimilar("series", detTvdbId, "tvdb").then(setTmdbSimilar);
+    getTmdbDetail("series", detTvdbId, "tvdb").then(setTmdbDetail);
+  }, [media.tmdb, detTvdbId]);
+
+  const openTmdb = (it: TmdbItem) => {
+    if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
+    else tmdbResolveTvdb(it.tmdbId).then((tvdb) => {
+      if (tvdb) nav(`/media/discover/series/${tvdb}`);
+      else toast.error("Не удалось открыть сериал: TMDB не вернул tvdbId");
+    });
   };
 
   useEffect(() => {
@@ -354,6 +382,19 @@ export function MediaSeriesPage({
           arrName="Sonarr"
           provider={det.network}
         />
+
+        {tmdbDetail && (
+          <div className="mb-5 flex flex-wrap gap-2">
+            {tmdbDetail.episodeCount ? <span className={ms.badge}>{tmdbDetail.episodeCount} эп.</span> : null}
+            {tmdbDetail.runtime ? <span className={ms.badge}>{tmdbDetail.runtime} мин / эп.</span> : null}
+            {tmdbDetail.genres?.slice(0, 4).map((g) => <span key={g} className={ms.lang}>{g}</span>)}
+            {tmdbDetail.trailerUrl ? (
+              <a className={ms.button.sm} href={tmdbDetail.trailerUrl} target="_blank" rel="noreferrer">
+                Трейлер
+              </a>
+            ) : null}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex flex-wrap gap-3 mb-7">
@@ -697,7 +738,11 @@ export function MediaSeriesPage({
           </div>
         )}
 
-        <SimilarRail items={similarItems} />
+        {tmdbSimilar.length > 0 ? (
+          <CardRail label="ПОХОЖИЕ" cards={tmdbRailCards(tmdbSimilar, openTmdb)} />
+        ) : (
+          <SimilarRail items={similarItems} />
+        )}
       </DetailBody>
     </div>
   );

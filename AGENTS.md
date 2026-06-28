@@ -208,6 +208,38 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     `list_import_candidates`/`import_release` (разложить застрявший multi-season пак: ManualImport
     в обход реджекта; `import_release` без `fileIds` — авто-выбор по одному файлу на серию),
     `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/`get_recommendations` (Hermes).
+    **Дискавери-таб (LAMPA/ZONA-style подборки на TMDB)** — таб «Дискавери» (`MediaDiscoverTab.tsx`)
+    управляется одним вызовом `GET /media/discover/rails` (`getDiscoverHome` в `integrations/discover.ts`):
+    cinematic hero на широком `backdrop_path` (отдельно от мелкого `poster_path`), чипы жанров и
+    рейлы (в тренде / топ рейтинг / новинки года / популярные сериалы / курируемые жанры). **TMDB —
+    единственный источник дискавери**: новых провайдеров не добавляли, расширили `integrations/tmdb.ts`
+    (`tmdbDiscover` с фильтрами `with_genres`/год/`sort_by`/`vote_average.gte`, `tmdbGenres` кеш 24ч,
+    `tmdbSimilar` recommendations→similar, `tmdbHero`, `tmdbMovieCollection`, `tmdbFindByTvdb`). Русские
+    тайтлы/описания — `language=ru-RU` (фолбэк на `original_*` при пустом ru). **ID-дисциплина: TMDB tv id
+    ≠ Sonarr/Jellyfin tvdbId** — `tmdbFindByTvdb` (`/find?external_source=tvdb_id`) резолвит перед любым
+    `/tv/{id}`-вызовом. Жанровый хаб `/media/discover/genre/:kind/:genreId` (`MediaGenrePage.tsx`,
+    ZONA-style каталог: фильтры год/сортировка + бесконечный скролл через IntersectionObserver);
+    фильтры синхронизируются в URL (`year`/`sort`), загрузка stale-safe через request id, сортировки
+    раздельные для movie (`primary_release_date`/`revenue`) и series (`first_air_date`/`popularity`/
+    `vote_average`). На
+    детальных страницах — рейл «Похожие» (`/media/discover/similar/:kind/:id`, для сериала `idType=tvdb`)
+    и «Коллекция» франшизы у фильма (`/media/discover/collection/:tmdbId`). «Потому что вы смотрели»
+    (`/media/discover/because`) — персональные рейлы, seed **строго из Jellyfin `ProviderIds`** недавно
+    просмотренного (`getRecentlyWatchedSeeds`, `Filters=IsPlayed&SortBy=DatePlayed`), дедуп против
+    библиотеки (включая series `tmdbId` из Jellyfin ProviderIds) и hidden/disliked preferences.
+    **Локальные preferences** (`MediaPreference` в SQLite): `watchlist|hidden|liked|disliked`,
+    endpoints `GET/POST/DELETE /api/media/preferences`; это только состояние дашборда, не Jellyfin
+    favorites и не команды *arr. Discovery-карточки дают действия «В список»/«Добавить»/«Скрыть»,
+    Cmd-K показывает «Мой список». `/media/discover/rails` **graceful**: TMDB off → `200 {configured:false,…}` (виджет не
+    падает). Общий рейл-компонент — `CardRail` + адаптеры `libraryRailCards`/`tmdbRailCards` в
+    `shared/mediaDetail.tsx` (бывший `SimilarRail` обобщён под Jellyfin- и TMDB-постеры). Постер-прокси
+    `api/poster.ts` получил `&w=` (`w342|w780|w1280|original`) — бэкдропы тащатся широким кропом.
+    Фронт: `getDiscoverRails`/`getDiscoverGenre`/`getDiscoverSimilar`/`getDiscoverBecause`/
+    `getDiscoverCollection`/`getTmdbDetail`/preferences helpers + `backdropUrl()` в `lib/api.ts`.
+    Detail pages показывают трейлер/жанры/runtime/episodeCount из TMDB и graceful toast, если
+    TMDB→TVDB resolve не сработал. MCP: `get_discovery_home`/`search_discovery`/
+    `add_media_preference`/`hide_discovery_title`. (Старые `/media/recommendations` и
+    `/media/discovery/hero` оставлены для MCP/Hermes, дискавери-таб их больше не использует.)
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
     создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление
@@ -291,6 +323,13 @@ qBittorrent. Сервисы публикуются на хосте; backend-ко
 - **UI chrome pass — red glow + responsive menu** (2026-06-27): глобальный красный accent/glow,
   full-width TopBar с logo-burger без hover-эффекта; desktop Sidebar оставлен как rail-меню
   (иконки → расширение по burger), mobile Sidebar открывается fullscreen. ✅ ГОТОВО
+- **Discovery overhaul — LAMPA/ZONA-style подборки** (2026-06-28): дискавери-таб переведён на TMDB
+  Discover (один `GET /media/discover/rails` → hero на backdrop + чипы жанров + рейлы тренды/топ/
+  новинки/жанры), жанровый хаб `/media/discover/genre/:kind/:genreId` (`MediaGenrePage`, фильтры +
+  бесконечный скролл), рейлы «Похожие»/«Коллекция» на детальных, персональное «Потому что вы смотрели»
+  (seed из Jellyfin ProviderIds). Расширен `integrations/tmdb.ts` + новый `integrations/discover.ts`;
+  `SimilarRail` обобщён в `CardRail`; poster-прокси получил `&w=`. Русские тайтлы/описания (`ru-RU`),
+  graceful при TMDB off. Builds зелёные; полная проверка данных — после деплоя с `TMDB_API_KEY`. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); Sonarr/Radarr interactive search
   (авто-раскладка файлов в библиотеки Jellyfin) — кандидат на отдельную партию.
 

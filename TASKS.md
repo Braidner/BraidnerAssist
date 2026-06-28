@@ -88,16 +88,6 @@
 - [x] Удалены панели: Habits, Notes, WeatherPanel, Calendar — не используются
 - [x] Финальная раскладка: кол.1=Tasks, кол.2=SystemStatus+Health+HA, кол.3=HermesLog
 
-## Фаза 3 — UI/UX improvements  ✅ ГОТОВО
-
-- [x] Calendar — удалён полностью (пользователь не использует)
-- [x] Health integration — удалена (деferred); HealthDay миграция создана и откачена
-- [x] APP_TOKEN — статический bearer-токен для iOS Shortcuts / Hermes (не истекает)
-      добавлен в `jwtAuth.ts`, `config.ts`, `.env.example`
-- [x] StatStrip carousel — на ≤760px: scroll-snap, свайп, dots-индикаторы;
-      4й тайл переключён с шагов на HA automations count
-- [x] Version pill — при наличии апдейта показывает `v0.1.0 → v0.2.0` с amber glow
-
 ## Фаза 4 — Home Assistant  ✅ ГОТОВО
 
 - [x] `backend/src/integrations/homeassistant.ts` — `getAutomations()` (30с кеш),
@@ -342,6 +332,32 @@
 - [x] Проверено: `cd frontend && npm run build`, `cd backend && npm run build`; browser smoke на
       `http://localhost:3000/media`: клик по `Wellington Paranormal — Demon Girl` → URL с `autoplay=1`,
       hero показывает `▶ ВОСПРОИЗВОДИТСЯ`, `video.paused=false`, `currentTime` растёт.
+
+---
+
+## Batch v7 — Discovery hardening + smart media UX (2026-06-28)
+
+- [x] Review fixes: жанровый хаб получил kind-specific сортировки (movie: popularity/rating/release/cash,
+      series: popularity/rating/first-air), URL-фильтры `year`/`sort`, reset-кнопку и stale-safe загрузку
+      через request id; смена фильтров грузит page 1 без смешивания старых результатов.
+- [x] Discovery dedup: `LibraryItem.tmdbId` теперь заполняется и для сериалов из Jellyfin `ProviderIds.Tmdb`;
+      `because`/home rails фильтруются против библиотеки и локальных hidden/disliked preferences.
+- [x] SQLite preferences: добавлена Prisma-модель `MediaPreference` (`watchlist|hidden|liked|disliked`,
+      kind+tmdbId unique) + миграция `20260628082140_media_preferences`; REST
+      `GET/POST/DELETE /api/media/preferences`.
+- [x] Smart UI actions: TMDB-карточки/hero в Discovery получили быстрые действия «В список»,
+      «Добавить» (через существующий Radarr/Sonarr pipeline) и «Скрыть»; watchlist показывается
+      рейлом «Мой список» и в Cmd-K.
+- [x] Richer TMDB detail: `tmdbDetails`/`GET /media/discover/tmdb-detail/:kind/:id` добавляют
+      trailer YouTube, жанры, runtime/episodeCount; movie/series detail pages показывают эти метаданные
+      и дают graceful toast при неудачном TMDB→TVDB resolve.
+- [x] MCP для Hermes: `get_discovery_home`, `search_discovery`, `add_media_preference`,
+      `hide_discovery_title`; preferences — только локальная рекомендационная модель, не добавляют и
+      не удаляют media в Jellyfin/*arr.
+- [x] Доки: `AGENTS.md`/`CLAUDE.md` обновлены по Discovery preferences, sort/id rules, stale-scroll
+      constraints и новым MCP/REST interfaces.
+- [x] Проверено: `cd backend && DATABASE_URL=file:./dev.db npx prisma migrate dev --name media_preferences`,
+      `cd backend && npm run build`, `cd frontend && npm run build` (Vite chunk-size warning прежний).
 
 ---
 

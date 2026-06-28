@@ -41,7 +41,7 @@ export interface LibraryItem {
   name: string;
   type: "Movie" | "Series";
   year: number | null;
-  tmdbId: number | null; // movie only — внешний id для сверки discovery с библиотекой
+  tmdbId: number | null; // внешний id для сверки discovery с библиотекой
   tvdbId: number | null; // series only — маппится на внутренний id Sonarr для поиска релизов
   childCount: number | null; // series only — число сезонов
   played: boolean; // фильм просмотрен / сериал досмотрен полностью
@@ -218,7 +218,7 @@ export async function getLibrary(): Promise<LibraryItem[]> {
       name: it.Name ?? "—",
       type,
       year: it.ProductionYear ?? null,
-      tmdbId: type === "Movie" ? Number(it.ProviderIds?.Tmdb) || null : null,
+      tmdbId: Number(it.ProviderIds?.Tmdb) || null,
       tvdbId: type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null,
       childCount: type === "Series" ? it.ChildCount ?? null : null,
       played: Boolean(it.UserData?.Played),
@@ -1739,6 +1739,62 @@ export async function getContinueWatching(): Promise<ResumeItem[]> {
       seriesId: kind === "movie" ? null : await resolveResumeSeriesId(it),
     };
   }));
+}
+
+// Недавно просмотренные тайтлы (seed для «Потому что вы смотрели»). Привязка строго
+// по Jellyfin ProviderIds (Tmdb для фильмов, Tmdb/Tvdb для сериалов) — без угадывания
+// по названию. Эпизоды сворачиваются к сериалу. Возвращает до `limit` уникальных тайтлов.
+export interface WatchSeed {
+  kind: "movie" | "series";
+  title: string;
+  tmdbId: number | null;
+  tvdbId: number | null;
+}
+
+export async function getRecentlyWatchedSeeds(limit = 6): Promise<WatchSeed[]> {
+  if (!config.media.jellyfin.configured) return [];
+  const userId = await jellyfinUserId();
+  if (!userId) return [];
+  const url = new URL(`${config.media.jellyfin.url}/Users/${userId}/Items`);
+  url.searchParams.set("Limit", "40");
+  url.searchParams.set("Recursive", "true");
+  url.searchParams.set("IncludeItemTypes", "Movie,Episode");
+  url.searchParams.set("Filters", "IsPlayed");
+  url.searchParams.set("SortBy", "DatePlayed");
+  url.searchParams.set("SortOrder", "Descending");
+  url.searchParams.set("Fields", "ProviderIds,SeriesId,SeriesName,SeriesProviderIds");
+  const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
+  if (!res.ok) throw new Error(`Jellyfin played ${res.status}`);
+  const body = (await res.json()) as {
+    Items?: {
+      Id: string; Name?: string; Type?: string;
+      ProviderIds?: Record<string, string>;
+      SeriesId?: string; SeriesName?: string;
+      SeriesProviderIds?: Record<string, string>;
+    }[];
+  };
+  const seeds: WatchSeed[] = [];
+  const seen = new Set<string>();
+  for (const it of body.Items ?? []) {
+    if (it.Type === "Movie") {
+      const tmdbId = Number(it.ProviderIds?.Tmdb) || null;
+      if (!tmdbId) continue;
+      const key = `m${tmdbId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      seeds.push({ kind: "movie", title: it.Name ?? "—", tmdbId, tvdbId: null });
+    } else {
+      const tmdbId = Number(it.SeriesProviderIds?.Tmdb) || null;
+      const tvdbId = Number(it.SeriesProviderIds?.Tvdb) || null;
+      if (!tmdbId && !tvdbId) continue;
+      const key = `s${it.SeriesId ?? tmdbId ?? tvdbId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      seeds.push({ kind: "series", title: it.SeriesName ?? "—", tmdbId, tvdbId });
+    }
+    if (seeds.length >= limit) break;
+  }
+  return seeds;
 }
 
 export interface UnifiedSearch {

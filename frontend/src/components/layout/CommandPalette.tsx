@@ -22,9 +22,12 @@ import {
   addTorrent,
   getDocker,
   getAdguard,
+  getMediaPreferences,
+  tmdbResolveTvdb,
   type DockerData,
   type AdguardData,
   type UnifiedSearchResult,
+  type MediaPreference,
 } from "../../lib/api.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
 
@@ -70,6 +73,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [mediaRes, setMediaRes] = useState<UnifiedSearchResult>(EMPTY_MEDIA);
+  const [watchlist, setWatchlist] = useState<MediaPreference[]>([]);
 
   // Глобальный хоткей Cmd/Ctrl+K.
   useEffect(() => {
@@ -88,6 +92,7 @@ export function CommandPalette() {
     if (open) {
       setQuery("");
       setFeedback(null);
+      getMediaPreferences("watchlist").then(setWatchlist);
     }
   }, [open]);
 
@@ -193,6 +198,24 @@ export function CommandPalette() {
 
   // Медиа-результаты единого поиска: библиотека → detail, discover → добавить, релиз → скачать.
   const mediaActions: Action[] = [
+    ...watchlist
+      .filter((it) => !trimmed || it.title.toLowerCase().includes(lc))
+      .map((it) => ({
+        id: `watch:${it.kind}:${it.tmdbId}`,
+        label: `Мой список: ${it.title}${it.year ? ` (${it.year})` : ""}`,
+        hint: it.kind === "movie" ? "Фильм" : "Сериал",
+        run: async () => {
+          if (it.kind === "movie") {
+            navigate(`/media/discover/movie/${it.tmdbId}`);
+            close();
+            return;
+          }
+          const tvdb = it.tvdbId ?? (await tmdbResolveTvdb(it.tmdbId));
+          if (tvdb) navigate(`/media/discover/series/${tvdb}`);
+          else navigate("/media");
+          close();
+        },
+      })),
     ...mediaRes.inLibrary.map((it) => ({
       id: `lib:${it.id}`,
       label: `${it.type === "Series" ? "📺" : "🎬"} ${it.name}${it.year ? ` (${it.year})` : ""}`,

@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import { MediaPage } from "./MediaPage.tsx";
 import { MediaSeriesPage } from "./MediaSeriesPage.tsx";
 import { MediaMoviePage } from "./MediaMoviePage.tsx";
+import { MediaGenrePage } from "./MediaGenrePage.tsx";
 import { getMedia, type MediaData } from "../../lib/api.ts";
 
 const DEFAULT_MEDIA: MediaData = {
@@ -66,6 +67,10 @@ export function MediaRoutes() {
             source="discover"
           />
         }
+      />
+      <Route
+        path="/discover/genre/:kind/:genreId"
+        element={<MediaGenrePage media={media} />}
       />
     </Routes>
   );

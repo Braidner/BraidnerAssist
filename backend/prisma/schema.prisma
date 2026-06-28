@@ -107,6 +107,27 @@ model MediaTorrentFile {
   @@unique([torrentId, fileIndex])
 }
 
+// Локальные предпочтения discovery-каталога. Это состояние только дашборда:
+// не Jellyfin favorites и не команды Radarr/Sonarr.
+model MediaPreference {
+  id        String   @id @default(cuid())
+  kind      String   // movie | series
+  tmdbId    Int
+  tvdbId    Int?
+  status    String   // watchlist | hidden | liked | disliked
+  title     String
+  poster    String?
+  backdrop  String?
+  year      Int?
+  overview  String?
+  rating    Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, tmdbId])
+  @@index([status, updatedAt])
+}
+
 // Локальные события календаря (если нет CalDAV).
 model CalendarEvent {
   id          String   @id @default(cuid())

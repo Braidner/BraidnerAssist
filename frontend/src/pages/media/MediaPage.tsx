@@ -14,28 +14,27 @@ import {
   addTitle,
   searchReleases,
   posterUrl,
-  getRecommendations,
-  getDiscoveryHeroMovie,
+  getDiscoverRails,
+  getDiscoverBecause,
+  saveMediaPreference,
   discoverSearch,
   tmdbSearch,
-  tmdbTrending,
   tmdbResolveTvdb,
   torrserverAdd,
   torrserverList,
   torrserverRemove,
   torrserverStreamUrl,
-  getCalendar,
   getContinueWatching,
   type MediaData,
   type DownloadItem,
   type LibraryItem,
   type SearchResult,
   type ArrLookupItem,
-  type Recommendation,
   type TorrServerStream,
-  type CalendarItem,
   type ResumeItem,
   type TmdbItem,
+  type DiscoverHome,
+  type DiscoverRail,
 } from "@/lib/api.ts";
 import {
   ReleasePicker,
@@ -446,29 +445,32 @@ export function MediaPage({
         : a.name.localeCompare(b.name, "ru"),
     );
 
-  // Recommendations
-  const [recs, setRecs] = useState<Recommendation[]>([]);
-  const [discoveryHero, setDiscoveryHero] = useState<Recommendation | null>(null);
-  const [heroLoading, setHeroLoading] = useState(false);
-  const refreshDiscoveryHero = async () => {
+  // Discovery home (LAMPA/ZONA-style rails: hero + genres + rails + because-you-watched)
+  const [discoverHome, setDiscoverHome] = useState<DiscoverHome>({
+    configured: false,
+    hero: null,
+    genres: {movie: [], series: []},
+    rails: [],
+  });
+  const [because, setBecause] = useState<DiscoverRail[]>([]);
+  const [homeLoading, setHomeLoading] = useState(false);
+  const refreshDiscover = async () => {
     if (!media.configured) return;
-    setHeroLoading(true);
-    const next = await getDiscoveryHeroMovie();
-    setDiscoveryHero(next);
-    setHeroLoading(false);
+    setHomeLoading(true);
+    const home = await getDiscoverRails();
+    setDiscoverHome(home);
+    setHomeLoading(false);
+    if (home.configured) getDiscoverBecause().then(setBecause);
   };
   useEffect(() => {
-    if (media.configured) {
-      getRecommendations().then(setRecs);
-      refreshDiscoveryHero();
-    }
+    if (media.configured) refreshDiscover();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [media.configured]);
 
   // Discovery search state (TMDB or *arr)
   const [dq, setDq] = useState("");
   const [dres, setDres] = useState<ArrLookupItem[]>([]);
   const [tmRes, setTmRes] = useState<TmdbItem[]>([]);
-  const [trending, setTrending] = useState<TmdbItem[]>([]);
   const [dsearching, setDsearching] = useState(false);
   useEffect(() => {
     const q = dq.trim();
@@ -493,16 +495,6 @@ export function MediaPage({
     }, 350);
     return () => clearTimeout(t);
   }, [dq, media.tmdb]);
-
-  useEffect(() => {
-    if (media.tmdb) tmdbTrending().then(setTrending);
-  }, [media.tmdb]);
-
-  // Calendar
-  const [calendar, setCalendar] = useState<CalendarItem[]>([]);
-  useEffect(() => {
-    if (media.configured) getCalendar(14).then(setCalendar);
-  }, [media.configured]);
 
   // Continue watching
   const [resume, setResume] = useState<ResumeItem[]>([]);
@@ -592,22 +584,58 @@ export function MediaPage({
     return ok;
   };
 
-  const onAddRec = async (rec: Recommendation) => {
-    const key = "rec" + rec.kind + rec.id;
-    setBusy(key);
-    const okAdd = await addTitle(rec.kind, rec.id);
+  const onAddTmdb = async (it: TmdbItem) => {
+    if (it.kind === "movie") {
+      const item: ArrLookupItem = {
+        kind: "movie",
+        id: it.tmdbId,
+        title: it.title,
+        year: it.year,
+        overview: it.overview,
+        poster: it.poster,
+        added: false,
+      };
+      await onAddTitle(item, "tmdbadd" + it.tmdbId);
+      return;
+    }
+    setBusy("tmdbadd" + it.tmdbId);
+    const tvdb = await tmdbResolveTvdb(it.tmdbId);
     setBusy(null);
-    if (okAdd) {
-      toast.success(`«${rec.title}» добавлен в библиотеку`);
-      setRecs((prev) =>
-        prev.filter((r) => !(r.kind === rec.kind && r.id === rec.id)),
-      );
-      setDiscoveryHero((prev) =>
-        prev && prev.kind === rec.kind && prev.id === rec.id ? null : prev,
-      );
-      onMediaUpdate();
-    } else toast.error("Не удалось добавить");
+    if (!tvdb) {
+      toast.error("Не удалось определить tvdbId сериала — можно открыть карточку и выбрать релиз вручную");
+      return;
+    }
+    const item: ArrLookupItem = {
+      kind: "series",
+      id: tvdb,
+      title: it.title,
+      year: it.year,
+      overview: it.overview,
+      poster: it.poster,
+      added: false,
+    };
+    await onAddTitle(item, "tmdbadd" + it.tmdbId);
   };
+
+  const onPreference = async (
+    it: TmdbItem,
+    status: "watchlist" | "hidden" | "liked" | "disliked",
+  ) => {
+    setBusy("pref" + it.tmdbId + status);
+    const pref = await saveMediaPreference(it, status);
+    setBusy(null);
+    if (!pref) {
+      toast.error("Не удалось сохранить предпочтение");
+      return;
+    }
+    const label =
+      status === "watchlist" ? "добавлен в список" :
+      status === "hidden" ? "скрыт из рекомендаций" :
+      status === "liked" ? "отмечен как понравившийся" : "больше не будет рекомендоваться";
+    toast.success(`«${it.title}» ${label}`);
+    refreshDiscover();
+  };
+
 
   const onTorrent = async (
     hash: string,
@@ -713,17 +741,16 @@ export function MediaPage({
           setDq={setDq}
           dres={dres}
           tmRes={tmRes}
-          trending={trending}
           dsearching={dsearching}
-          recs={recs}
-          discoveryHero={discoveryHero}
-          heroLoading={heroLoading}
-          calendar={calendar}
+          home={discoverHome}
+          because={because}
+          homeLoading={homeLoading}
           busy={busy}
-          onRefreshHero={refreshDiscoveryHero}
-          onAddRec={onAddRec}
+          onRefresh={refreshDiscover}
           onOpenDiscover={openDiscover}
           onOpenTmdb={openTmdb}
+          onAddTmdb={onAddTmdb}
+          onPreference={onPreference}
         />
       )}
 

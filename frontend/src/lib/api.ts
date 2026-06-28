@@ -694,7 +694,51 @@ export interface TmdbItem {
   year: number | null;
   overview: string;
   poster: string | null;
+  backdrop: string | null;
+  genreIds: number[];
+  genres?: string[];
+  runtime?: number | null;
+  episodeCount?: number | null;
+  trailerKey?: string | null;
+  trailerUrl?: string | null;
   rating: number | null;
+}
+
+export type MediaPreferenceStatus = "watchlist" | "hidden" | "liked" | "disliked";
+
+export interface MediaPreference {
+  id: string;
+  kind: "movie" | "series";
+  tmdbId: number;
+  tvdbId: number | null;
+  status: MediaPreferenceStatus;
+  title: string;
+  poster: string | null;
+  backdrop: string | null;
+  year: number | null;
+  overview: string;
+  rating: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Genre {
+  id: number;
+  name: string;
+}
+
+export interface DiscoverRail {
+  key: string;
+  label: string;
+  kind: "movie" | "series" | "mixed";
+  items: TmdbItem[];
+}
+
+export interface DiscoverHome {
+  configured: boolean;
+  hero: TmdbItem | null;
+  genres: { movie: Genre[]; series: Genre[] };
+  rails: DiscoverRail[];
 }
 
 export async function tmdbSearch(q: string): Promise<TmdbItem[]> {
@@ -733,6 +777,161 @@ export async function tmdbResolveTvdb(tmdbId: number): Promise<number | null> {
     return body.tvdbId ?? null;
   } catch {
     return null;
+  }
+}
+
+// ── Discover (LAMPA/ZONA-style подборки) ───────────────────────────────
+export interface DiscoverGenreOpts {
+  year?: number | string;
+  sort?: string;
+  page?: number;
+}
+
+// Домашняя страница дискавери (hero + жанры + рейлы) одним вызовом.
+export async function getDiscoverRails(): Promise<DiscoverHome> {
+  const empty: DiscoverHome = {
+    configured: false,
+    hero: null,
+    genres: { movie: [], series: [] },
+    rails: [],
+  };
+  try {
+    const res = await apiFetch("/api/media/discover/rails");
+    if (!res.ok) return empty;
+    return (await res.json()) as DiscoverHome;
+  } catch {
+    return empty;
+  }
+}
+
+// Жанровый хаб: страница каталога (бесконечный скролл).
+export async function getDiscoverGenre(
+  kind: "movie" | "series",
+  genreId: number,
+  opts: DiscoverGenreOpts = {},
+): Promise<TmdbItem[]> {
+  try {
+    const qs = new URLSearchParams();
+    if (opts.year) qs.set("year", String(opts.year));
+    if (opts.sort) qs.set("sort", opts.sort);
+    if (opts.page) qs.set("page", String(opts.page));
+    const res = await apiFetch(`/api/media/discover/genre/${kind}/${genreId}?${qs}`);
+    if (!res.ok) return [];
+    return (await res.json()) as TmdbItem[];
+  } catch {
+    return [];
+  }
+}
+
+// Список жанров (ru) по типу — для чипов/фильтров жанрового хаба.
+export async function getDiscoverGenres(kind: "movie" | "series"): Promise<Genre[]> {
+  try {
+    const res = await apiFetch(`/api/media/discover/genres?kind=${kind}`);
+    if (!res.ok) return [];
+    return (await res.json()) as Genre[];
+  } catch {
+    return [];
+  }
+}
+
+// «Похожее» для детальной страницы. idType="tvdb" для сериала по tvdbId.
+export async function getDiscoverSimilar(
+  kind: "movie" | "series",
+  id: number,
+  idType: "tmdb" | "tvdb" = "tmdb",
+): Promise<TmdbItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/discover/similar/${kind}/${id}?idType=${idType}`);
+    if (!res.ok) return [];
+    return (await res.json()) as TmdbItem[];
+  } catch {
+    return [];
+  }
+}
+
+// «Потому что вы смотрели» — персональные рейлы.
+export async function getDiscoverBecause(): Promise<DiscoverRail[]> {
+  try {
+    const res = await apiFetch("/api/media/discover/because");
+    if (!res.ok) return [];
+    return (await res.json()) as DiscoverRail[];
+  } catch {
+    return [];
+  }
+}
+
+// Франшиза (коллекция) фильма по tmdbId. null если не в коллекции (204).
+export async function getDiscoverCollection(
+  tmdbId: number,
+): Promise<{name: string; items: TmdbItem[]} | null> {
+  try {
+    const res = await apiFetch(`/api/media/discover/collection/${tmdbId}`);
+    if (res.status === 204 || !res.ok) return null;
+    return (await res.json()) as {name: string; items: TmdbItem[]};
+  } catch {
+    return null;
+  }
+}
+
+export async function getTmdbDetail(
+  kind: "movie" | "series",
+  id: number,
+  idType: "tmdb" | "tvdb" = "tmdb",
+): Promise<TmdbItem | null> {
+  try {
+    const res = await apiFetch(`/api/media/discover/tmdb-detail/${kind}/${id}?idType=${idType}`);
+    if (!res.ok) return null;
+    return (await res.json()) as TmdbItem;
+  } catch {
+    return null;
+  }
+}
+
+export async function getMediaPreferences(status?: MediaPreferenceStatus): Promise<MediaPreference[]> {
+  try {
+    const res = await apiFetch(`/api/media/preferences${status ? `?status=${status}` : ""}`);
+    if (!res.ok) return [];
+    return (await res.json()) as MediaPreference[];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveMediaPreference(
+  item: TmdbItem,
+  status: MediaPreferenceStatus,
+  tvdbId?: number | null,
+): Promise<MediaPreference | null> {
+  try {
+    const res = await apiFetch("/api/media/preferences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: item.kind,
+        tmdbId: item.tmdbId,
+        tvdbId: tvdbId ?? null,
+        status,
+        title: item.title,
+        poster: item.poster,
+        backdrop: item.backdrop,
+        year: item.year,
+        overview: item.overview,
+        rating: item.rating,
+      }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as MediaPreference;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteMediaPreference(kind: "movie" | "series", tmdbId: number): Promise<boolean> {
+  try {
+    const res = await apiFetch(`/api/media/preferences/${kind}/${tmdbId}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -1151,9 +1350,19 @@ export async function executeImport(p: {
 // (TMDB резолвится в AAAA) → прямой <img> виснет по таймауту. Бэкенд ходит по IPv4.
 export function posterUrl(
   remote: string | null | undefined,
+  w?: "w342" | "w780" | "w1280" | "original",
 ): string | undefined {
   if (!remote) return undefined;
-  return `/api/poster?url=${encodeURIComponent(remote)}`;
+  return `/api/poster?url=${encodeURIComponent(remote)}${w ? `&w=${w}` : ""}`;
+}
+
+// Широкий бэкдроп (для hero-фона). Тащим w1280-кроп через прокси.
+export function backdropUrl(
+  remote: string | null | undefined,
+  w: "w780" | "w1280" | "original" = "w1280",
+): string | undefined {
+  if (!remote) return undefined;
+  return `/api/poster?url=${encodeURIComponent(remote)}&w=${w}`;
 }
 
 // Постер из Jellyfin по id элемента (токен инжектит бэкенд, не утекает в браузер).

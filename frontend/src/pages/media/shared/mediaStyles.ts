@@ -148,6 +148,8 @@ export const media = {
   discSecHead: "mb-3 flex items-center gap-3",
   discSecLabel:
     "[font-family:Oswald,var(--font)] text-xl font-bold uppercase tracking-3 text-ink",
+  discSecLink:
+    "cursor-pointer border-0 bg-transparent p-0 text-left transition-colors hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
   discSecLine: "h-px flex-1 bg-hair",
   discSecCount: "font-mono text-data text-muted",
   posterRankBadge:
@@ -156,8 +158,4 @@ export const media = {
   // Search toggle in discover
   discSearchBar: "mb-6 flex items-stretch gap-2",
 
-  // Genre chips (→ genre hub)
-  discChips: "mb-8 flex flex-wrap gap-2",
-  discChip:
-    "cursor-pointer rounded-full border border-hair bg-surface px-3.5 py-1.5 [font-family:Syne,var(--font)] text-cell font-bold tracking-2 text-muted transition-colors hover:border-accent hover:text-accent",
 };

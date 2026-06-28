@@ -348,6 +348,8 @@
 - [x] Smart UI actions: TMDB-карточки/hero в Discovery получили быстрые действия «В список»,
       «Добавить» (через существующий Radarr/Sonarr pipeline) и «Скрыть»; watchlist показывается
       рейлом «Мой список» и в Cmd-K.
+- [x] Discovery UI cleanup: отдельные жанровые чипы с главной вкладки убраны; переходы в
+      жанровый хаб перенесены на кликабельные названия жанровых подборок.
 - [x] Richer TMDB detail: `tmdbDetails`/`GET /media/discover/tmdb-detail/:kind/:id` добавляют
       trailer YouTube, жанры, runtime/episodeCount; movie/series detail pages показывают эти метаданные
       и дают graceful toast при неудачном TMDB→TVDB resolve.

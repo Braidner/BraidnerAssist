@@ -680,7 +680,7 @@ apiRouter.get("/media/discover/genre/:kind/:genreId", async (req, res) => {
   }
 });
 
-// Список жанров (ru) по типу — для чипов/фильтров.
+// Список жанров (ru) по типу — для жанрового хаба и фильтров.
 apiRouter.get("/media/discover/genres", async (req, res) => {
   if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const kind = req.query.kind === "series" ? "series" : "movie";

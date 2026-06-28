@@ -341,7 +341,7 @@ export function createMcpServer() {
 
   server.tool(
     "get_discovery_home",
-    "Get TMDB-powered discovery home: hero, genre chips, rails and local watchlist rail. Read-only and graceful when TMDB is not configured.",
+    "Get TMDB-powered discovery home: hero, rails, genres for the genre hub, and local watchlist rail. Read-only and graceful when TMDB is not configured.",
     async () => {
       const data = await getDiscoverHome();
       return ok(data);

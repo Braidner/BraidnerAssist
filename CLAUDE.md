@@ -267,8 +267,9 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     `add_torrent`, `get_media_status`, `list_devices`, `play_on_device`.
     **Дискавери-таб (LAMPA/ZONA-style подборки на TMDB)** — таб «Дискавери» (`MediaDiscoverTab.tsx`)
     управляется одним вызовом `GET /media/discover/rails` (`getDiscoverHome` в `integrations/discover.ts`):
-    cinematic hero на широком `backdrop_path` (отдельно от мелкого `poster_path`), чипы жанров и
-    рейлы (в тренде / топ рейтинг / новинки года / популярные сериалы / курируемые жанры). **TMDB —
+    cinematic hero на широком `backdrop_path` (отдельно от мелкого `poster_path`) и рейлы
+    (в тренде / топ рейтинг / новинки года / популярные сериалы / курируемые жанры); отдельные
+    жанровые чипы убраны, переход в жанровый хаб открывается кликом по названию жанровой подборки. **TMDB —
     единственный источник дискавери**: новых провайдеров не добавляли, расширили `integrations/tmdb.ts`
     (`tmdbDiscover` с фильтрами `with_genres`/год/`sort_by`/`vote_average.gte`, `tmdbGenres` кеш 24ч,
     `tmdbSimilar` recommendations→similar, `tmdbHero`, `tmdbMovieCollection`, `tmdbFindByTvdb`). Русские
@@ -406,8 +407,9 @@ native media pipeline внутри Mission Control. Сервисы публик�
   full-width TopBar с logo-burger без hover-эффекта; desktop Sidebar оставлен как rail-меню
   (иконки → расширение по burger), mobile Sidebar открывается fullscreen. ✅ ГОТОВО
 - **Discovery overhaul — LAMPA/ZONA-style подборки** (2026-06-28): дискавери-таб переведён на TMDB
-  Discover (один `GET /media/discover/rails` → hero на backdrop + чипы жанров + рейлы тренды/топ/
-  новинки/жанры), жанровый хаб `/media/discover/genre/:kind/:genreId` (`MediaGenrePage`, фильтры +
+  Discover (один `GET /media/discover/rails` → hero на backdrop + рейлы тренды/топ/
+  новинки/жанры; названия жанровых рейлов кликабельны и ведут в жанровый хаб), жанровый хаб
+  `/media/discover/genre/:kind/:genreId` (`MediaGenrePage`, фильтры +
   бесконечный скролл), рейлы «Похожие»/«Коллекция» на детальных, персональное «Потому что вы смотрели»
   (seed из Jellyfin ProviderIds). Расширен `integrations/tmdb.ts` + новый `integrations/discover.ts`;
   `SimilarRail` обобщён в `CardRail`; poster-прокси получил `&w=`. Русские тайтлы/описания (`ru-RU`),

@@ -1,6 +1,6 @@
 // Discover tab for MediaPage: cinematic, rail-driven discovery (LAMPA/ZONA-style).
-// Данные приходят из getDiscoverRails() (TMDB hero + жанры + рейлы) + «потому что
-// вы смотрели». Hero использует широкий backdrop; жанровые чипы ведут в жанровый хаб.
+// Данные приходят из getDiscoverRails() (TMDB hero + рейлы) + «потому что
+// вы смотрели». Hero использует широкий backdrop; заголовки жанровых рейлов ведут в жанровый хаб.
 
 import {useState} from "react";
 import {useNavigate} from "react-router-dom";
@@ -119,11 +119,22 @@ function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, on
 }
 
 /* ─── Section with horizontal poster track ─── */
-function DiscSection({label, count, children}: {label: string; count: number; children: React.ReactNode}) {
+function DiscSection({label, count, children, onLabelClick}: {
+    label: string;
+    count: number;
+    children: React.ReactNode;
+    onLabelClick?: () => void;
+}) {
     return (
         <div className={ms.discSection}>
             <div className={ms.discSecHead}>
-                <span className={ms.discSecLabel}>{label}</span>
+                {onLabelClick ? (
+                    <button className={cn(ms.discSecLabel, ms.discSecLink)} onClick={onLabelClick}>
+                        {label}
+                    </button>
+                ) : (
+                    <span className={ms.discSecLabel}>{label}</span>
+                )}
                 <div className={ms.discSecLine}/>
                 <span className={ms.discSecCount}>{count} тайтлов</span>
             </div>
@@ -133,13 +144,21 @@ function DiscSection({label, count, children}: {label: string; count: number; ch
 }
 
 /* ─── TMDB rail (reusable for home rails + because-you-watched) ─── */
-function TmdbRail({label, items, onOpenTmdb, onAddTmdb, onPreference, ranked}: {
-    label: string; items: TmdbItem[]; onOpenTmdb: (it: TmdbItem) => void; onAddTmdb: (it: TmdbItem) => void;
+function TmdbRail({rail, onOpenTmdb, onAddTmdb, onPreference, ranked}: {
+    rail: DiscoverRail; onOpenTmdb: (it: TmdbItem) => void; onAddTmdb: (it: TmdbItem) => void;
     onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void; ranked?: boolean;
 }) {
+    const nav = useNavigate();
+    const items = rail.items;
     if (!items.length) return null;
+    const genreId = rail.key.startsWith("g") ? Number(rail.key.slice(1)) : null;
+    const canOpenGenre = rail.kind !== "mixed" && genreId != null && Number.isFinite(genreId);
     return (
-        <DiscSection label={label} count={items.length}>
+        <DiscSection
+            label={rail.label.toUpperCase()}
+            count={items.length}
+            onLabelClick={canOpenGenre ? () => nav(`/media/discover/genre/${rail.kind}/${genreId}`) : undefined}
+        >
             {items.map((it, i) => (
                 <DiscPosterCard
                     key={it.kind + it.tmdbId}
@@ -219,25 +238,6 @@ function DiscoverHero({hero, loading, onRefresh, onOpen, onAddTmdb, onPreference
     );
 }
 
-/* ─── Genre chips → genre hub ─── */
-function GenreChips({genres, kind}: {genres: {id: number; name: string}[]; kind: "movie" | "series"}) {
-    const nav = useNavigate();
-    if (!genres.length) return null;
-    return (
-        <div className={ms.discChips}>
-            {genres.map((g) => (
-                <button
-                    key={g.id}
-                    className={ms.discChip}
-                    onClick={() => nav(`/media/discover/genre/${kind}/${g.id}`)}
-                >
-                    {g.name}
-                </button>
-            ))}
-        </div>
-    );
-}
-
 /* ─── Search results grid ─── */
 function SearchGrid({
     dq, tmdb, dsearching, dres, tmRes, busy, onOpenDiscover, onOpenTmdb,
@@ -305,18 +305,6 @@ export function MediaDiscoverTab({
             <DiscoverHero hero={home.hero} loading={homeLoading} onRefresh={onRefresh} onOpen={onOpenTmdb}
                 onAddTmdb={onAddTmdb} onPreference={onPreference}/>
 
-            {/* Genre chips → genre hub */}
-            {tmdb && (
-                <>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                        <button className={ms.discChip} onClick={() => nav(`/media/discover/genre/movie/28`)}>Фильмы</button>
-                        <button className={ms.discChip} onClick={() => nav(`/media/discover/genre/series/18`)}>Сериалы</button>
-                    </div>
-                    <GenreChips genres={home.genres.movie} kind="movie"/>
-                    <GenreChips genres={home.genres.series} kind="series"/>
-                </>
-            )}
-
             {/* Expandable search */}
             {searchOpen && (
                 <div className={ms.discSearchBar}>
@@ -337,14 +325,14 @@ export function MediaDiscoverTab({
 
             {/* TMDB discovery rails (trending / top / fresh / genres) */}
             {home.rails.map((rail) => (
-                <TmdbRail key={rail.key} label={rail.label.toUpperCase()} items={rail.items}
+                <TmdbRail key={rail.key} rail={rail}
                     onOpenTmdb={onOpenTmdb} onAddTmdb={onAddTmdb} onPreference={onPreference}
                     ranked={rail.key === "top" || rail.key === "trending"}/>
             ))}
 
             {/* Because you watched (personalized) */}
             {because.map((rail) => (
-                <TmdbRail key={rail.key} label={rail.label} items={rail.items} onOpenTmdb={onOpenTmdb}
+                <TmdbRail key={rail.key} rail={rail} onOpenTmdb={onOpenTmdb}
                     onAddTmdb={onAddTmdb} onPreference={onPreference}/>
             ))}
 

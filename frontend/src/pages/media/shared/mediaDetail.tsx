@@ -158,6 +158,7 @@ export function DetailHero({
   kindLabel,
   title,
   jellyfinId,
+  backdropSrc,
   posterSrc,
   player,
   year,
@@ -172,6 +173,7 @@ export function DetailHero({
   kindLabel: string;
   title: string;
   jellyfinId: string;
+  backdropSrc?: string;
   posterSrc?: string;
   player: DetailPlayer;
   year?: number | string | null;
@@ -204,6 +206,7 @@ export function DetailHero({
     seekBy,
   } = useVideoPlayer(player?.url ?? null);
   const displayTitle = player?.title ?? title;
+  const heroBackdropSrc = backdropSrc ?? (jellyfinId ? jellyfinBackdropUrl(jellyfinId) : undefined);
 
   const revealControls = useCallback(() => {
     setControlsVisible(true);
@@ -296,15 +299,17 @@ export function DetailHero({
       onTouchStart={player ? revealControls : undefined}
     >
       <div className="absolute inset-0 bg-black">
-        <img
-          src={jellyfinBackdropUrl(jellyfinId)}
-          alt=""
-          className="absolute inset-0 size-full object-cover object-top"
-          style={{ opacity: player ? 0 : 1, transition: "opacity 1.2s ease" }}
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-          }}
-        />
+        {heroBackdropSrc ? (
+          <img
+            src={heroBackdropSrc}
+            alt=""
+            className="absolute inset-0 size-full object-cover object-top"
+            style={{ opacity: player ? 0 : 1, transition: "opacity 1.2s ease" }}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : null}
         <video
           ref={videoRef}
           className="absolute inset-0 size-full object-cover"
@@ -381,14 +386,16 @@ export function DetailHero({
         >
           <div className="relative aspect-[2/3] w-[130px] overflow-hidden rounded-[11px] shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
             <div className="absolute inset-0 bg-[#09090d]" />
-            <img
-              src={posterSrc}
-              alt=""
-              className="absolute inset-0 size-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
-            />
+            {posterSrc ? (
+              <img
+                src={posterSrc}
+                alt=""
+                className="absolute inset-0 size-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : null}
           </div>
         </div>
       </div>

@@ -37,6 +37,7 @@ import {
   getDiscoverSimilar,
   getDiscoverCollection,
   tmdbResolveTvdb,
+  backdropUrl,
   type MoviePageDetail,
   type DownloadItem,
   type MediaData,
@@ -187,7 +188,13 @@ export function MediaMoviePage({
 
   const posterSrc = det.posterRemote
     ? posterUrl(det.posterRemote)
-    : jellyfinPosterUrl(det.jellyfinId);
+    : det.jellyfinId
+      ? jellyfinPosterUrl(det.jellyfinId)
+      : undefined;
+  const backdropSrc = det.backdropRemote
+    && !det.jellyfinId
+    ? backdropUrl(det.backdropRemote)
+    : undefined;
   const stuck = [
     ...new Map(
       media.downloads
@@ -230,6 +237,7 @@ export function MediaMoviePage({
         kindLabel="ФИЛЬМ"
         title={det.title}
         jellyfinId={det.jellyfinId}
+        backdropSrc={backdropSrc}
         posterSrc={posterSrc}
         player={player}
         year={det.year}

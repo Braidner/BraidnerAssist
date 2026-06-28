@@ -1156,6 +1156,7 @@ export interface SeriesPageDetail {
   runtime: number | null;
   rating: number | null;
   posterRemote: string | null;
+  backdropRemote: string | null;
   tvdbId: number | null;
   inArr: boolean;
   monitored: boolean;
@@ -1172,6 +1173,7 @@ export interface MoviePageDetail {
   runtime: number | null;
   rating: number | null;
   posterRemote: string | null;
+  backdropRemote: string | null;
   tmdbId: number | null;
   inArr: boolean;
   monitored: boolean;

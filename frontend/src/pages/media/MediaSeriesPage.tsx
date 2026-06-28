@@ -38,6 +38,7 @@ import {
   getMediaLibrary,
   getDiscoverSimilar,
   tmdbResolveTvdb,
+  backdropUrl,
   type SeriesPageDetail,
   type DownloadItem,
   type MediaData,
@@ -324,7 +325,13 @@ export function MediaSeriesPage({
 
   const posterSrc = det.posterRemote
     ? posterUrl(det.posterRemote)
-    : jellyfinPosterUrl(det.jellyfinId);
+    : det.jellyfinId
+      ? jellyfinPosterUrl(det.jellyfinId)
+      : undefined;
+  const backdropSrc = det.backdropRemote
+    && !det.jellyfinId
+    ? backdropUrl(det.backdropRemote)
+    : undefined;
 
   return (
     <div className={ms.page}>
@@ -350,6 +357,7 @@ export function MediaSeriesPage({
         kindLabel="СЕРИАЛ"
         title={det.title}
         jellyfinId={det.jellyfinId}
+        backdropSrc={backdropSrc}
         posterSrc={posterSrc}
         player={player}
         year={det.year}

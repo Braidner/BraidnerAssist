@@ -100,6 +100,7 @@ export interface SeriesPageDetail {
   runtime: number | null; // минуты
   rating: number | null;
   posterRemote: string | null;
+  backdropRemote: string | null;
   tvdbId: number | null;
   inArr: boolean;
   monitored: boolean;
@@ -116,6 +117,7 @@ export interface MoviePageDetail {
   runtime: number | null;
   rating: number | null;
   posterRemote: string | null;
+  backdropRemote: string | null;
   tmdbId: number | null;
   inArr: boolean;
   monitored: boolean;
@@ -437,6 +439,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
     runtime: sonarr?.runtime ?? ticksToMin(jf?.RunTimeTicks),
     rating: sonarr?.ratings?.value ?? jf?.CommunityRating ?? null,
     posterRemote: sonarr ? arrPoster(sonarr.images) : null,
+    backdropRemote: sonarr ? arrBackdrop(sonarr.images) : null,
     tvdbId,
     inArr: Boolean(sonarr),
     monitored: Boolean(sonarr?.monitored),
@@ -461,6 +464,7 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
     runtime: radarr?.runtime ?? ticksToMin(jf?.RunTimeTicks),
     rating: radarr?.ratings?.value ?? radarr?.ratings?.tmdb?.value ?? jf?.CommunityRating ?? null,
     posterRemote: radarr ? arrPoster(radarr.images) : null,
+    backdropRemote: radarr ? arrBackdrop(radarr.images) : null,
     tmdbId,
     inArr: Boolean(radarr),
     monitored: Boolean(radarr?.monitored),
@@ -500,6 +504,7 @@ export async function getSeriesDiscoverDetail(tvdbId: number): Promise<SeriesPag
     runtime: rec.runtime ?? null,
     rating: rec.ratings?.value ?? null,
     posterRemote: arrPoster(rec.images),
+    backdropRemote: arrBackdrop(rec.images),
     tvdbId,
     inArr: Boolean(sonarr),
     monitored: Boolean(sonarr?.monitored),
@@ -525,6 +530,7 @@ export async function getMovieDiscoverDetail(tmdbId: number): Promise<MoviePageD
     runtime: rec.runtime ?? null,
     rating: radarr?.ratings?.value ?? radarr?.ratings?.tmdb?.value ?? rec.ratings?.value ?? null,
     posterRemote: arrPoster(rec.images),
+    backdropRemote: arrBackdrop(rec.images),
     tmdbId,
     inArr: Boolean(radarr),
     monitored: Boolean(radarr?.monitored),
@@ -1084,6 +1090,11 @@ function arrCfg(kind: "movie" | "series") {
 
 function arrPoster(images?: ArrImage[]): string | null {
   const p = (images ?? []).find((i) => i.coverType === "poster");
+  return p?.remoteUrl ?? p?.url ?? null;
+}
+
+function arrBackdrop(images?: ArrImage[]): string | null {
+  const p = (images ?? []).find((i) => i.coverType === "fanart" || i.coverType === "background");
   return p?.remoteUrl ?? p?.url ?? null;
 }
 

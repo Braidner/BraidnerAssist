@@ -222,6 +222,9 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
   const source = cached?.item.url;
   if (!source) throw new Error("Release not in cache; run search_releases first");
   const item = cached.item;
+  const ensuredMonitor = item.tmdbId
+    ? await nativeAdd(kind, item.tmdbId, { monitored: true, searchMode: "manual" }).catch(() => null)
+    : null;
   let previewSource = source;
   if (!source.startsWith("magnet:")) {
     const resolved = await resolveTorrent(source).catch(() => null);
@@ -239,7 +242,9 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
       source: previewSource,
       category: "mc-native",
     });
-    const monitor = item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
+    const monitor = ensuredMonitor?.monitorId
+      ? await prisma.mediaMonitor.findUnique({ where: { id: ensuredMonitor.monitorId } })
+      : item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
     if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
     await prisma.mediaReleaseDecision.updateMany({ where: { kind: item.type, guid }, data: { selected: true } }).catch(() => {});
     return { ok: true, ...res };
@@ -260,7 +265,9 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
     wantedIndexes,
     category: "mc-native",
   });
-  const monitor = item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
+  const monitor = ensuredMonitor?.monitorId
+    ? await prisma.mediaMonitor.findUnique({ where: { id: ensuredMonitor.monitorId } })
+    : item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
   if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
   await prisma.mediaReleaseDecision.updateMany({ where: { kind: item.type, guid }, data: { selected: true } }).catch(() => {});
   return { ok: true, ...res };

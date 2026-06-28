@@ -324,7 +324,7 @@ export function MediaMoviePage({
               )}
             </div>
           )}
-          {!det.inArr && det.tmdbId != null && (
+          {!det.inArr && !det.hasFile && det.tmdbId != null && (
             <button
               className={ms.button.accentSm}
               disabled={act === "add"}

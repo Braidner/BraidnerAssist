@@ -3,6 +3,8 @@
 // через Promise.allSettled — падение одного не ломает остальные. Не настроено → "Not configured".
 
 import { config } from "../config.js";
+import { prisma } from "../db/client.js";
+import { tmdbDetails } from "./tmdb.js";
 import { request } from "undici";
 
 export interface NowPlaying {
@@ -207,11 +209,29 @@ interface JfItem {
   UserData?: { Played?: boolean; UnplayedItemCount?: number };
 }
 
+const tmdbTitleCache = new Map<string, { at: number; title: string }>();
+const TMDB_TITLE_TTL = 24 * 60 * 60_000;
+
+async function tmdbLibraryTitle(type: "Movie" | "Series", tmdbId: number | null): Promise<string | null> {
+  if (!tmdbId || !config.media.tmdb.configured) return null;
+  const kind = type === "Movie" ? "movie" : "series";
+  const key = `${kind}:${tmdbId}`;
+  const cached = tmdbTitleCache.get(key);
+  if (cached && Date.now() - cached.at < TMDB_TITLE_TTL) return cached.title;
+  const detail = await tmdbDetails(kind, tmdbId).catch(() => null);
+  const title = detail?.title?.trim() || null;
+  if (title) tmdbTitleCache.set(key, { at: Date.now(), title });
+  return title;
+}
+
 // Каталог библиотеки: все фильмы + все сериалы (сериал — одна плитка, эпизоды
 // видны в drill-down). Movies и Series тащим отдельными запросами через allSettled.
 export async function getLibrary(): Promise<LibraryItem[]> {
   if (!config.media.jellyfin.configured) return [];
   const userId = await jellyfinUserId();
+  const monitors = await prisma.mediaMonitor.findMany().catch(() => []);
+  const monitorByTmdb = new Map(monitors.map((m) => [`${m.kind}:${m.tmdbId}`, m.title]));
+  const monitorByTvdb = new Map(monitors.filter((m) => m.tvdbId).map((m) => [`series:${m.tvdbId}`, m.title]));
   const fetchItems = async (type: "Movie" | "Series"): Promise<LibraryItem[]> => {
     const url = new URL(`${config.media.jellyfin.url}/Items`);
     url.searchParams.set("Recursive", "true");
@@ -223,16 +243,27 @@ export async function getLibrary(): Promise<LibraryItem[]> {
     const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
     if (!res.ok) throw new Error(`Jellyfin /Items(${type}) responded ${res.status}`);
     const body = (await res.json()) as { Items?: JfItem[] };
-    return (body.Items ?? []).map((it) => ({
-      id: it.Id,
-      name: it.Name ?? "—",
-      type,
-      year: it.ProductionYear ?? null,
-      tmdbId: Number(it.ProviderIds?.Tmdb) || null,
-      tvdbId: type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null,
-      childCount: type === "Series" ? it.ChildCount ?? null : null,
-      played: Boolean(it.UserData?.Played),
-      unplayed: type === "Series" ? Number(it.UserData?.UnplayedItemCount ?? 0) : 0,
+    return Promise.all((body.Items ?? []).map(async (it) => {
+      const tmdbId = Number(it.ProviderIds?.Tmdb) || null;
+      const tvdbId = type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null;
+      const kind = type === "Movie" ? "movie" : "series";
+      const localizedName =
+        (tmdbId ? monitorByTmdb.get(`${kind}:${tmdbId}`) : null) ??
+        (tvdbId ? monitorByTvdb.get(`series:${tvdbId}`) : null) ??
+        await tmdbLibraryTitle(type, tmdbId) ??
+        it.Name ??
+        "—";
+      return {
+        id: it.Id,
+        name: localizedName,
+        type,
+        year: it.ProductionYear ?? null,
+        tmdbId,
+        tvdbId,
+        childCount: type === "Series" ? it.ChildCount ?? null : null,
+        played: Boolean(it.UserData?.Played),
+        unplayed: type === "Series" ? Number(it.UserData?.UnplayedItemCount ?? 0) : 0,
+      };
     }));
   };
   const [movies, series] = await Promise.allSettled([fetchItems("Movie"), fetchItems("Series")]);

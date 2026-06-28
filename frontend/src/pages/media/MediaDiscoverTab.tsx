@@ -127,7 +127,7 @@ function DiscSection({label, count, children, onLabelClick}: {
 }) {
     return (
         <div className={ms.discSection}>
-            <div className={ms.discSecHead}>
+            <div className={cn(ms.discSecHead, ms.railHeaderInset)}>
                 {onLabelClick ? (
                     <button className={cn(ms.discSecLabel, ms.discSecLink)} onClick={onLabelClick}>
                         {label}
@@ -138,7 +138,7 @@ function DiscSection({label, count, children, onLabelClick}: {
                 <div className={ms.discSecLine}/>
                 <span className={ms.discSecCount}>{count} тайтлов</span>
             </div>
-            <div className={cn(ms.hTrack, ms.posterRow)}>{children}</div>
+            <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>{children}</div>
         </div>
     );
 }

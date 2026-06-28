@@ -627,8 +627,8 @@ export function CardRail({ label, cards }: { label: string; cards: RailCard[] })
   if (cards.length === 0) return null;
   return (
     <div className="mt-8">
-      <div className="mb-4 font-ui text-label font-extrabold uppercase tracking-section text-muted">{label}</div>
-      <div className={cn(ms.hTrack, ms.posterRow)}>
+      <div className={cn("mb-4 font-ui text-label font-extrabold uppercase tracking-section text-muted", ms.railHeaderInset)}>{label}</div>
+      <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
         {cards.map((c) => (
           <div key={c.key} className={cn(ms.posterCard, "group")} onClick={c.onClick}>
             <div className={ms.posterArt}>

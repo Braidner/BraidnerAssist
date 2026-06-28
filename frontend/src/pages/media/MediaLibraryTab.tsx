@@ -98,11 +98,11 @@ export function MediaLibraryTab({
             {/* Continue watching row */}
             {resume.length > 0 && (
                 <div className={ms.section}>
-                    <div className={ms.sectionHead}>
+                    <div className={cn(ms.sectionHead, ms.railHeaderInset)}>
                         <span className={ms.sectionTitle}>ПРОДОЛЖИТЬ ПРОСМОТР</span>
                         <span className={ms.countBadge}>{resume.length}</span>
                     </div>
-                    <div className={ms.hTrack}>
+                    <div className={cn(ms.hTrack, ms.railInset)}>
                         {resume.map((it) => {
                             const COLORS = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
                             const accent = COLORS[it.title.charCodeAt(0) % COLORS.length];
@@ -145,7 +145,7 @@ export function MediaLibraryTab({
 
             {/* Library poster grid */}
             <div className={ms.section}>
-                <div className={ms.sectionHead}>
+                <div className={cn(ms.sectionHead, ms.railHeaderInset)}>
                     <span className={ms.sectionTitle}>БИБЛИОТЕКА</span>
                     <span className={ms.countBadge}>{shownLibrary.length}</span>
                     <button
@@ -166,7 +166,7 @@ export function MediaLibraryTab({
                     </button>
                 </div>
 
-                <div className={ms.filterTabs}>
+                <div className={cn(ms.filterTabs, ms.railHeaderInset)}>
                     {[
                         {label: "Все", val: "all" as const},
                         {label: "Сериалы", val: "Series" as const},
@@ -189,17 +189,17 @@ export function MediaLibraryTab({
                 </div>
 
                 {!libReady ? (
-                    <div className={cn(ms.hTrack, ms.posterRow)}>
+                    <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
                         {Array.from({length: 8}).map((_, i) => (
                             <div key={i} style={{flex: "0 0 auto", width: 160, aspectRatio: "2/3", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)"}}/>
                         ))}
                     </div>
                 ) : shownLibrary.length === 0 ? (
-                    <div style={{padding: "24px 0", color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
+                    <div className={ms.railHeaderInset} style={{paddingTop: 24, paddingBottom: 24, color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
                         {library.length === 0 ? "Библиотека пуста или ещё не отсканирована." : "Ничего не подходит под фильтр."}
                     </div>
                 ) : (
-                    <div className={cn(ms.hTrack, ms.posterRow)}>
+                    <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
                         {shownLibrary.map((it) => {
                             const isSeries = it.type === "Series";
                             return (

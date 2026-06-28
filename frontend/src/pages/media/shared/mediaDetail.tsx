@@ -167,6 +167,8 @@ export function DetailHero({
   genres,
   previousItem,
   nextItem,
+  onBack,
+  onQueueClick,
   onPlayQueueItem,
   onClosePlayer,
 }: {
@@ -182,6 +184,8 @@ export function DetailHero({
   genres?: string[];
   previousItem?: QueueItem | null;
   nextItem?: QueueItem | null;
+  onBack: () => void;
+  onQueueClick: () => void;
   onPlayQueueItem?: (item: QueueItem) => void;
   onClosePlayer: () => void;
 }) {
@@ -338,6 +342,45 @@ export function DetailHero({
             "linear-gradient(to right, rgba(9,9,13,0.72) 0%, rgba(9,9,13,0.32) 44%, rgba(9,9,13,0.06) 72%, transparent 100%), linear-gradient(to top, rgba(9,9,13,0.58) 0%, rgba(9,9,13,0.12) 28%, transparent 52%)",
         }}
       />
+
+      <div
+        className="absolute inset-x-0 top-0 z-[2] flex items-center justify-between gap-4 px-[52px] py-5 transition-all duration-500 ease-out max-mob:px-5 max-mob:py-4"
+        style={{
+          opacity: player && !controlsVisible ? 0 : 1,
+          pointerEvents: player && !controlsVisible ? "none" : "auto",
+          transform: player && !controlsVisible ? "translateY(-18px)" : "translateY(0)",
+        }}
+      >
+        <button
+          className="inline-flex h-11 flex-none cursor-pointer items-center gap-2 rounded-[9px] border border-white/10 bg-black/10 px-4 font-ui text-pill font-extrabold uppercase tracking-4 text-white/65 backdrop-blur-md transition-all hover:border-white/18 hover:bg-white/[0.07] hover:text-white"
+          onClick={onBack}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M19 12H5M12 19l-7-7 7-7"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>Назад</span>
+        </button>
+        <button
+          className="inline-flex h-11 flex-none cursor-pointer items-center gap-2 rounded-[9px] border border-white/12 bg-black/10 px-4 font-ui text-pill font-bold text-white/62 backdrop-blur-md transition-all hover:border-white/22 hover:bg-white/[0.08] hover:text-white"
+          onClick={onQueueClick}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 3h14a1 1 0 011 1v17l-8-4-8 4V4a1 1 0 011-1z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>В очередь</span>
+        </button>
+      </div>
 
       <div
         className="relative z-[1] flex h-full items-end gap-9 px-[52px] pb-11 transition-all duration-500 ease-out max-mob:gap-[18px] max-mob:px-5 max-mob:pb-8"

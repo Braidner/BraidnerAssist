@@ -12,7 +12,6 @@ import {
   DetailBody,
   DetailHero,
   DetailStatusBadges,
-  DetailTopBar,
   SimilarRail,
   CardRail,
   tmdbRailCards,
@@ -227,12 +226,6 @@ export function MediaMoviePage({
         />
       )}
 
-      <DetailTopBar
-        title={det.title}
-        onBack={() => nav("/media")}
-        onQueueClick={() => setShowPicker((v) => !v)}
-      />
-
       <DetailHero
         kindLabel="ФИЛЬМ"
         title={det.title}
@@ -244,6 +237,8 @@ export function MediaMoviePage({
         runtimeLabel={det.runtime ? `${det.runtime} мин` : null}
         rating={det.rating}
         genres={det.genres}
+        onBack={() => nav("/media")}
+        onQueueClick={() => setShowPicker((v) => !v)}
         onClosePlayer={() => setPlayer(null)}
       />
 

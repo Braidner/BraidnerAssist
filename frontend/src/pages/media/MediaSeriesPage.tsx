@@ -15,7 +15,6 @@ import {
   DetailBody,
   DetailHero,
   DetailStatusBadges,
-  DetailTopBar,
   SimilarRail,
   CardRail,
   tmdbRailCards,
@@ -347,12 +346,6 @@ export function MediaSeriesPage({
         />
       )}
 
-      <DetailTopBar
-        title={det.title}
-        onBack={() => nav("/media")}
-        onQueueClick={() => setShowAllPicker((v) => !v)}
-      />
-
       <DetailHero
         kindLabel="СЕРИАЛ"
         title={det.title}
@@ -366,6 +359,8 @@ export function MediaSeriesPage({
         genres={det.genres}
         previousItem={previousItem}
         nextItem={nextItem}
+        onBack={() => nav("/media")}
+        onQueueClick={() => setShowAllPicker((v) => !v)}
         onPlayQueueItem={(item) => play(item.jellyfinId, item.title)}
         onClosePlayer={() => {
           setPlayer(null);

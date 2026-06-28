@@ -1345,6 +1345,7 @@ export interface ReleaseOption {
   guid: string;
   indexerId?: number | string;
   title: string;
+  query?: string;
   quality?: string;
   languages?: string[];
   size: number;
@@ -1366,21 +1367,38 @@ export interface ReleaseOption {
   };
 }
 
+export interface MediaSearchResponse<T> {
+  items: T[];
+  error: string | null;
+  status: number | null;
+}
+
+async function readMediaSearchError(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: string; configured?: boolean };
+    if (body.configured === false) return "Jackett не настроен";
+    if (body.error) return body.error;
+  } catch {
+    /* ignore non-json errors */
+  }
+  return res.status >= 500 ? "Ошибка поиска" : `Ошибка поиска (${res.status})`;
+}
+
 export async function searchReleaseOptions(p: {
   type: "movie" | "series";
   id: number;
   seasonNumber?: number;
-}): Promise<ReleaseOption[]> {
+}): Promise<MediaSearchResponse<ReleaseOption>> {
   try {
     const res = await apiFetch("/api/media/release/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p),
     });
-    if (!res.ok) return [];
-    return (await res.json()) as ReleaseOption[];
+    if (!res.ok) return { items: [], error: await readMediaSearchError(res), status: res.status };
+    return { items: (await res.json()) as ReleaseOption[], error: null, status: res.status };
   } catch {
-    return [];
+    return { items: [], error: "Ошибка сети", status: null };
   }
 }
 
@@ -1484,15 +1502,16 @@ export interface SearchResult {
   seeders: number;
   indexer: string;
   url: string | null;
+  query?: string;
 }
 
-export async function searchReleases(q: string): Promise<SearchResult[]> {
+export async function searchReleases(q: string): Promise<MediaSearchResponse<SearchResult>> {
   try {
     const res = await apiFetch(`/api/media/search?q=${encodeURIComponent(q)}`);
-    if (!res.ok) return [];
-    return (await res.json()) as SearchResult[];
+    if (!res.ok) return { items: [], error: await readMediaSearchError(res), status: res.status };
+    return { items: (await res.json()) as SearchResult[], error: null, status: res.status };
   } catch {
-    return [];
+    return { items: [], error: "Ошибка сети", status: null };
   }
 }
 

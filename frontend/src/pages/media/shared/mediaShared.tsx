@@ -254,6 +254,7 @@ export function ReleasePicker({
   onGrabbed?: () => void;
 }) {
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -263,10 +264,13 @@ export function ReleasePicker({
   useEffect(() => {
     let alive = true;
     setReleases(null);
+    setError(null);
     setDone({});
     setSel(new Set());
     searchReleaseOptions(params).then((r) => {
-      if (alive) setReleases(r);
+      if (!alive) return;
+      setReleases(r.items);
+      setError(r.error);
     });
     return () => {
       alive = false;
@@ -321,6 +325,8 @@ export function ReleasePicker({
 
   if (releases === null)
     return <div className={cn(media.empty, "mt-2.5")}>Ищем раздачи…</div>;
+  if (error)
+    return <div className={cn(media.empty, "mt-2.5 text-bad")}>{error}</div>;
   if (releases.length === 0)
     return <div className={cn(media.empty, "mt-2.5")}>Раздачи не найдены.</div>;
 
@@ -369,6 +375,7 @@ export function ReleasePicker({
                 <span>{fmtSize(r.size)}</span>
                 <span className={media.okText}>{r.seeders ?? 0} seed</span>
                 <span>{r.indexer}</span>
+                {r.query && <span title="Поисковый запрос">q: {r.query}</span>}
                 {r.rejected && (
                   <span
                     className={media.reject}

@@ -134,6 +134,7 @@ export interface SearchResult {
   indexer: string;
   url: string | null; // magnet или .torrent — то, что отдаём в qBittorrent
   category?: string | null;
+  query?: string;
   score?: number;
   scoreReasons?: string[];
   warnings?: string[];

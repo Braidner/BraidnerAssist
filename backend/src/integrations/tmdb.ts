@@ -12,6 +12,7 @@ export interface TmdbItem {
   kind: "movie" | "series";
   tmdbId: number;
   title: string;
+  originalTitle: string | null;
   year: number | null;
   overview: string;
   poster: string | null;
@@ -80,10 +81,13 @@ function mapItem(r: any, forceKind?: "movie" | "tv"): TmdbItem | null {
     : [];
   const trailer = pickTrailer(r.videos);
   if (mt === "movie") {
+    const title = String(r.title || r.original_title || "—");
+    const originalTitle = r.original_title && r.original_title !== title ? String(r.original_title) : null;
     return {
       kind: "movie",
       tmdbId: Number(r.id),
-      title: String(r.title || r.original_title || "—"),
+      title,
+      originalTitle,
       year: yearOf(r.release_date),
       overview: String(r.overview ?? ""),
       poster: imgOf(r.poster_path),
@@ -98,10 +102,13 @@ function mapItem(r: any, forceKind?: "movie" | "tv"): TmdbItem | null {
     };
   }
   if (mt === "tv") {
+    const title = String(r.name || r.original_name || "—");
+    const originalTitle = r.original_name && r.original_name !== title ? String(r.original_name) : null;
     return {
       kind: "series",
       tmdbId: Number(r.id),
-      title: String(r.name || r.original_name || "—"),
+      title,
+      originalTitle,
       year: yearOf(r.first_air_date),
       overview: String(r.overview ?? ""),
       poster: imgOf(r.poster_path),

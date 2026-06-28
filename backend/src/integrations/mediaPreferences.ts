@@ -107,6 +107,7 @@ export async function watchlistItems(): Promise<TmdbItem[]> {
     kind: r.kind,
     tmdbId: r.tmdbId,
     title: r.title,
+    originalTitle: null,
     year: r.year,
     overview: r.overview,
     poster: r.poster,

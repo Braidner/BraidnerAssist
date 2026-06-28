@@ -68,6 +68,7 @@ export function TorrentFilePicker({
   const toast = useToast();
   const [q, setQ] = useState(title);
   const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<{
     source: string;
@@ -83,7 +84,10 @@ export function TorrentFilePicker({
     const term = q.trim();
     if (!term) return;
     setSearching(true);
-    setResults(await searchReleases(term));
+    setSearchError(null);
+    const res = await searchReleases(term);
+    setResults(res.items);
+    setSearchError(res.error);
     setSearching(false);
   };
 
@@ -168,7 +172,12 @@ export function TorrentFilePicker({
       </div>
 
       {/* список раздач */}
+      {searchError && !picked && (
+        <div className={cn(media.empty, "mt-2.5 text-bad")}>{searchError}</div>
+      )}
+
       {results &&
+        !searchError &&
         !picked &&
         (results.length === 0 ? (
           <div className={cn(media.empty, "mt-2.5")}>Раздачи не найдены.</div>
@@ -184,6 +193,7 @@ export function TorrentFilePicker({
                     {fmtSize(r.size)} ·{" "}
                     <span className={media.okText}>{r.seeders} seed</span> ·{" "}
                     {r.indexer}
+                    {r.query ? ` · q: ${r.query}` : ""}
                   </span>
                   <button
                     className={media.button.accentSm}

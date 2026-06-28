@@ -83,6 +83,7 @@ function AddTorrentDrawer({
   const [magnet, setMagnet] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -105,7 +106,10 @@ function AddTorrentDrawer({
     const q = query.trim();
     if (!q) return;
     setSearching(true);
-    setResults(await searchReleases(q));
+    setSearchError(null);
+    const res = await searchReleases(q);
+    setResults(res.items);
+    setSearchError(res.error);
     setSearching(false);
   };
 
@@ -338,7 +342,11 @@ function AddTorrentDrawer({
                 </button>
               </div>
 
-              {results.length > 0 && (
+              {searchError && (
+                <div className={cn(ms.empty, "mt-3.5 text-bad")}>{searchError}</div>
+              )}
+
+              {!searchError && results.length > 0 && (
                 <div className={ms.list}>
                   {results.map((r) => (
                     <div key={r.guid} className={ms.row}>
@@ -350,6 +358,7 @@ function AddTorrentDrawer({
                           {fmtSize(r.size)} ·{" "}
                           <span className={ms.okText}>{r.seeders} seed</span> ·{" "}
                           {r.indexer}
+                          {r.query ? ` · q: ${r.query}` : ""}
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {torrserver && (
@@ -378,7 +387,7 @@ function AddTorrentDrawer({
                   ))}
                 </div>
               )}
-              {!searching && query.trim() && results.length === 0 && (
+              {!searchError && !searching && query.trim() && results.length === 0 && (
                 <div className={cn(ms.empty, "mt-3.5")}>Ничего не найдено.</div>
               )}
             </>

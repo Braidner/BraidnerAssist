@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 import type { SearchResult } from "./media.js";
-import { getQualityProfile, scoreRelease } from "./releaseScore.js";
+import { getQualityProfile, scoreRelease, type ReleaseQualityProfile } from "./releaseScore.js";
 
 export interface JackettIndexerHealth {
   id: string;
@@ -93,22 +93,56 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
 
 export async function jackettSearch(
   query: string,
-  opts: { kind?: "movie" | "series" | "manual"; profileName?: string | null } = {},
+  opts: { kind?: "movie" | "series" | "manual"; profileName?: string | null; profile?: ReleaseQualityProfile } = {},
 ): Promise<SearchResult[]> {
   const cfg = config.media.jackett;
   if (!cfg.configured || !query.trim()) return [];
-  const profile = await getQualityProfile(opts.profileName);
-  const tokens = query.toLowerCase().split(/\s+/).filter((t) => t.length >= 4 && !/^\d+$/.test(t));
+  const profile = opts.profile ?? await getQualityProfile(opts.profileName);
   const batches = await Promise.allSettled(indexerIds().map((idx) => searchIndexer(idx, query, opts)));
+  if (batches.length > 0 && batches.every((b) => b.status === "rejected")) {
+    const first = batches[0];
+    throw new Error(first.status === "rejected" ? String(first.reason) : "Jackett search failed");
+  }
   const releases = batches.flatMap((b) => (b.status === "fulfilled" ? b.value : []));
   const dedup = new Map<string, SearchResult>();
   for (const r of releases) {
-    if (tokens.length && !tokens.every((t) => r.title.toLowerCase().includes(t))) continue;
     const key = (r.url ?? r.guid ?? r.title).toLowerCase();
-    if (!dedup.has(key)) dedup.set(key, r);
+    if (!dedup.has(key)) dedup.set(key, { ...r, query });
   }
   return [...dedup.values()]
     .map((r) => ({ ...r, ...scoreRelease({ ...r, query, kind: opts.kind === "manual" ? undefined : opts.kind, profile }) }))
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0))
+    .slice(0, 50);
+}
+
+export async function jackettSearchMany(
+  queries: string[],
+  opts: { kind?: "movie" | "series" | "manual"; profileName?: string | null; profile?: ReleaseQualityProfile } = {},
+): Promise<SearchResult[]> {
+  const seenQueries = new Set<string>();
+  const dedup = new Map<string, SearchResult>();
+  const uniqueQueries: string[] = [];
+  for (const query of queries.map((q) => q.trim()).filter(Boolean)) {
+    const queryKey = query.toLowerCase();
+    if (seenQueries.has(queryKey)) continue;
+    seenQueries.add(queryKey);
+    uniqueQueries.push(query);
+  }
+  const batches = await Promise.allSettled(uniqueQueries.map((query) => jackettSearch(query, opts)));
+  if (batches.length > 0 && batches.every((b) => b.status === "rejected")) {
+    const first = batches[0];
+    throw new Error(first.status === "rejected" ? String(first.reason) : "Jackett search failed");
+  }
+  for (const batch of batches) {
+    if (batch.status !== "fulfilled") continue;
+    const results = batch.value;
+    for (const r of results) {
+      const key = (r.url ?? r.guid ?? r.title).toLowerCase();
+      const prev = dedup.get(key);
+      if (!prev || (r.score ?? 0) > (prev.score ?? 0)) dedup.set(key, r);
+    }
+  }
+  return [...dedup.values()]
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0))
     .slice(0, 50);
 }

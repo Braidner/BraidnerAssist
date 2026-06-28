@@ -1,6 +1,6 @@
 import { prisma } from "../db/client.js";
 import { config } from "../config.js";
-import { jackettHealth, jackettSearch } from "./jackett.js";
+import { jackettHealth, jackettSearchMany } from "./jackett.js";
 import { listQualityProfiles, getQualityProfile, scoreRelease } from "./releaseScore.js";
 import { tmdbDetails, tmdbSearch, tmdbSeason, tmdbTvSeasons, tmdbTvToTvdb, tmdbFindByTvdb, type TmdbItem } from "./tmdb.js";
 import { previewTorrent, grabSelected } from "./torrentPick.js";
@@ -38,6 +38,22 @@ export interface NativeManualImportFile {
 
 const releaseCache = new Map<string, { at: number; item: SearchResult & { type: MediaKind; tmdbId?: number | null; tvdbId?: number | null; titleHint: string } }>();
 const CACHE_TTL = 10 * 60_000;
+
+function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: number): string[] {
+  const titles = [title, detail?.originalTitle]
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean);
+  const uniqueTitles = [...new Set(titles.map((v) => v.toLowerCase()))]
+    .map((key) => titles.find((v) => v.toLowerCase() === key)!)
+    .filter(Boolean);
+  const season = seasonNumber != null ? ` S${String(seasonNumber).padStart(2, "0")}` : "";
+  const queries: string[] = [];
+  for (const t of uniqueTitles) {
+    queries.push(`${t}${season}`);
+    if (detail?.year) queries.push(`${t} ${detail.year}${season}`);
+  }
+  return queries;
+}
 
 function cacheKey(type: MediaKind, guid: string, indexerId: number | string): string {
   return `${type}:${indexerId}:${guid}`;
@@ -168,13 +184,14 @@ export async function nativeReleaseSearch(kind: MediaKind, id: number, seasonNum
       tvdbId = id;
     }
   }
-  const detail = monitor ? null : await tmdbDetails(kind, tmdbId).catch(() => null);
+  const detail = await tmdbDetails(kind, tmdbId).catch(() => null);
   const title = monitor?.title ?? detail?.title ?? String(id);
-  const query = kind === "series" && seasonNumber != null ? `${title} S${String(seasonNumber).padStart(2, "0")}` : title;
+  const queries = releaseQueries(detail, title, kind === "series" ? seasonNumber : undefined);
+  const query = queries[0] ?? title;
   const profileName = monitor?.qualityProfileId
     ? (await prisma.mediaQualityProfile.findUnique({ where: { id: monitor.qualityProfileId } }))?.name
     : null;
-  const releases = await jackettSearch(query, { kind, profileName });
+  const releases = await jackettSearchMany(queries, { kind, profileName });
   for (const r of releases) {
     releaseCache.set(cacheKey(kind, r.guid, r.indexer), { at: Date.now(), item: { ...r, type: kind, tmdbId, tvdbId, titleHint: title } });
   }

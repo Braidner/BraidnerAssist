@@ -1377,7 +1377,7 @@ async function readMediaSearchError(res: Response): Promise<string> {
   try {
     const body = (await res.json()) as { error?: string; configured?: boolean };
     if (body.configured === false) return "Jackett не настроен";
-    if (body.error) return body.error;
+    if (body.error) return body.error.replace(/^Error:\s*/, "");
   } catch {
     /* ignore non-json errors */
   }
@@ -1406,16 +1406,17 @@ export async function grabRelease(p: {
   type: "movie" | "series";
   guid: string;
   indexerId: number | string;
-}): Promise<boolean> {
+}): Promise<{ ok: boolean; error: string | null }> {
   try {
     const res = await apiFetch("/api/media/release/grab", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p),
     });
-    return res.ok;
+    if (!res.ok) return { ok: false, error: await readMediaSearchError(res) };
+    return { ok: true, error: null };
   } catch {
-    return false;
+    return { ok: false, error: "Ошибка сети" };
   }
 }
 

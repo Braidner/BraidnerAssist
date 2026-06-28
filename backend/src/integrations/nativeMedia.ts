@@ -5,7 +5,7 @@ import { listQualityProfiles, getQualityProfile, scoreRelease } from "./releaseS
 import { tmdbDetails, tmdbSearch, tmdbSeason, tmdbTvSeasons, tmdbTvToTvdb, tmdbFindByTvdb, type TmdbItem } from "./tmdb.js";
 import { previewTorrent, grabSelected } from "./torrentPick.js";
 import { organizeTorrent } from "./files.js";
-import { qbittorrentDownloads, type SearchResult, type SeriesPageDetail, type MoviePageDetail, type DetailSeason } from "./media.js";
+import { qbittorrentDownloads, resolveTorrent, type SearchResult, type SeriesPageDetail, type MoviePageDetail, type DetailSeason } from "./media.js";
 
 type MediaKind = "movie" | "series";
 
@@ -222,7 +222,12 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
   const source = cached?.item.url;
   if (!source) throw new Error("Release not in cache; run search_releases first");
   const item = cached.item;
-  const preview = await previewTorrent(source);
+  let previewSource = source;
+  if (!source.startsWith("magnet:")) {
+    const resolved = await resolveTorrent(source).catch(() => null);
+    if (resolved?.magnet) previewSource = resolved.magnet;
+  }
+  const preview = await previewTorrent(previewSource);
   const videoFiles = preview.files.filter((f) => f.isVideo);
   const wantedIndexes = item.type === "movie"
     ? [videoFiles.slice().sort((a, b) => b.length - a.length)[0]?.fileIndex].filter((x): x is number => Number.isFinite(x))
@@ -233,7 +238,7 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
     tmdbId: item.tmdbId,
     tvdbId: item.tvdbId,
     title: item.titleHint,
-    source,
+    source: previewSource,
     infohash: preview.infohash,
     files: preview.files,
     wantedIndexes,

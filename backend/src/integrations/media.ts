@@ -769,7 +769,7 @@ export async function qbittorrentDownloads(): Promise<DownloadItem[]> {
 // который qBittorrent (в изолированной docker-сети) не видит. Поэтому .torrent тащит
 // бэкенд (он до Prowlarr достаёт), а в qBittorrent уже грузим байты файлом. Часть
 // индексеров редиректит на magnet — ловим это вручную (maxRedirections:0).
-async function resolveTorrent(
+export async function resolveTorrent(
   src: string,
   depth = 0,
 ): Promise<{ magnet?: string; bytes?: Buffer }> {

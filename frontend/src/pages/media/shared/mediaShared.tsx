@@ -279,24 +279,24 @@ export function ReleasePicker({
   }, [params.type, params.id, params.seasonNumber]);
 
   // Грабим один релиз; помечаем done. Возвращаем успех (для bulk-счётчика).
-  const grabOne = async (r: ReleaseOption): Promise<boolean> => {
-    const ok = await grabRelease({
+  const grabOne = async (r: ReleaseOption): Promise<{ ok: boolean; error: string | null }> => {
+    const res = await grabRelease({
       type: params.type,
       guid: r.guid,
       indexerId: r.indexerId ?? r.indexer,
     });
-    if (ok) setDone((p) => ({ ...p, [r.guid]: true }));
-    return ok;
+    if (res.ok) setDone((p) => ({ ...p, [r.guid]: true }));
+    return res;
   };
 
   const onGrab = async (r: ReleaseOption) => {
     setBusyGuid(r.guid);
-    const ok = await grabOne(r);
+    const res = await grabOne(r);
     setBusyGuid(null);
-    if (ok) {
+    if (res.ok) {
       toast.success("Раздача отправлена на загрузку");
       onGrabbed?.();
-    } else toast.error("Не удалось отправить раздачу");
+    } else toast.error(res.error ?? "Не удалось отправить раздачу");
   };
 
   const toggle = (guid: string) =>
@@ -312,7 +312,7 @@ export function ReleasePicker({
     let ok = 0,
       fail = 0;
     for (const r of releases.filter((x) => sel.has(x.guid) && !done[x.guid])) {
-      (await grabOne(r)) ? ok++ : fail++;
+      (await grabOne(r)).ok ? ok++ : fail++;
     }
     setBulkBusy(false);
     setSel(new Set());

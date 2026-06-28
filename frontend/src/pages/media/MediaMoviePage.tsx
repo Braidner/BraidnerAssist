@@ -36,7 +36,6 @@ import {
   getMediaLibrary,
   getDiscoverSimilar,
   getDiscoverCollection,
-  getTmdbDetail,
   tmdbResolveTvdb,
   type MoviePageDetail,
   type DownloadItem,
@@ -105,18 +104,15 @@ export function MediaMoviePage({
 
   // TMDB-подборки: похожее + франшиза (коллекция). Заводятся как только знаем tmdbId.
   const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
-  const [tmdbDetail, setTmdbDetail] = useState<TmdbItem | null>(null);
   const [collection, setCollection] = useState<{ name: string; items: TmdbItem[] } | null>(null);
   const detTmdbId = d && d !== "loading" ? d.tmdbId : null;
   useEffect(() => {
     if (!media.tmdb || detTmdbId == null) {
       setTmdbSimilar([]);
-      setTmdbDetail(null);
       setCollection(null);
       return;
     }
     getDiscoverSimilar("movie", detTmdbId).then(setTmdbSimilar);
-    getTmdbDetail("movie", detTmdbId).then(setTmdbDetail);
     getDiscoverCollection(detTmdbId).then(setCollection);
   }, [media.tmdb, detTmdbId]);
 
@@ -261,18 +257,6 @@ export function MediaMoviePage({
             size: det.size,
           }}
         />
-
-        {tmdbDetail && (
-          <div className="mb-5 flex flex-wrap gap-2">
-            {tmdbDetail.runtime ? <span className={ms.badge}>{tmdbDetail.runtime} мин</span> : null}
-            {tmdbDetail.genres?.slice(0, 4).map((g) => <span key={g} className={ms.lang}>{g}</span>)}
-            {tmdbDetail.trailerUrl ? (
-              <a className={ms.button.sm} href={tmdbDetail.trailerUrl} target="_blank" rel="noreferrer">
-                Трейлер
-              </a>
-            ) : null}
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex gap-3 mb-7">

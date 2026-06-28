@@ -37,7 +37,6 @@ import {
   setMonitored,
   getMediaLibrary,
   getDiscoverSimilar,
-  getTmdbDetail,
   tmdbResolveTvdb,
   type SeriesPageDetail,
   type DownloadItem,
@@ -126,16 +125,13 @@ export function MediaSeriesPage({
 
   // TMDB-похожие для сериала. На входе tvdbId → бэкенд резолвит в TMDB tv id (idType=tvdb).
   const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
-  const [tmdbDetail, setTmdbDetail] = useState<TmdbItem | null>(null);
   const detTvdbId = d && d !== "loading" ? d.tvdbId : null;
   useEffect(() => {
     if (!media.tmdb || detTvdbId == null) {
       setTmdbSimilar([]);
-      setTmdbDetail(null);
       return;
     }
     getDiscoverSimilar("series", detTvdbId, "tvdb").then(setTmdbSimilar);
-    getTmdbDetail("series", detTvdbId, "tvdb").then(setTmdbDetail);
   }, [media.tmdb, detTvdbId]);
 
   const openTmdb = (it: TmdbItem) => {
@@ -382,19 +378,6 @@ export function MediaSeriesPage({
           arrName="native monitor"
           provider={det.network}
         />
-
-        {tmdbDetail && (
-          <div className="mb-5 flex flex-wrap gap-2">
-            {tmdbDetail.episodeCount ? <span className={ms.badge}>{tmdbDetail.episodeCount} эп.</span> : null}
-            {tmdbDetail.runtime ? <span className={ms.badge}>{tmdbDetail.runtime} мин / эп.</span> : null}
-            {tmdbDetail.genres?.slice(0, 4).map((g) => <span key={g} className={ms.lang}>{g}</span>)}
-            {tmdbDetail.trailerUrl ? (
-              <a className={ms.button.sm} href={tmdbDetail.trailerUrl} target="_blank" rel="noreferrer">
-                Трейлер
-              </a>
-            ) : null}
-          </div>
-        )}
 
         {/* Actions */}
         <div className="flex flex-wrap gap-3 mb-7">

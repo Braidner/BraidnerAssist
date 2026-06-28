@@ -361,6 +361,50 @@
 
 ---
 
+## Batch v8 — Native media pipeline + Jackett cutover (2026-06-28, commit 5a30a4e)
+
+Цель: убрать Sonarr/Radarr/Prowlarr из production media pipeline. Mission Control теперь сам
+ведёт monitor/import state, ищет релизы через Jackett Torznab, скорит качество и раскладывает
+файлы в Jellyfin layout.
+
+- [x] Prisma: миграция `20260628140000_native_media_jackett` добавила `MediaQualityProfile`,
+      `MediaMonitor`, `MediaMonitorSeason`, `MediaMonitorEpisode`, `MediaReleaseDecision`,
+      `MediaImportEvent`, а также import-state поля в `MediaTorrent`/`MediaTorrentFile`.
+- [x] Backend config/env: `MEDIA_BACKEND=arr|native|dual`, `JACKETT_URL`, `JACKETT_API_KEY`,
+      `JACKETT_INDEXERS`, `POLL_JACKETT_HEALTH`, `POLL_MEDIA_IMPORTER`, `POLL_MEDIA_MONITOR`.
+      Реальный Jackett key хранится только в server `.env`, в репо только placeholder.
+- [x] Jackett: `integrations/jackett.ts` реализует Torznab search (`/api/v2.0/indexers/.../
+      results/torznab/api`), category intelligence для movie/series/manual, XML/RSS parsing,
+      per-indexer health, timeout/error isolation.
+- [x] Native release intelligence: `releaseParse.ts`/`releaseScore.ts` парсят resolution/source/
+      codec/HDR/languages/season hints/banned words, создают default profiles (`1080p balanced`,
+      `2160p HDR`, `small file`, `RU-first`, `original audio`) и объясняют score/warnings.
+- [x] Native orchestration: `integrations/nativeMedia.ts` заменяет lookup/add/release search/grab/
+      import candidates/import execute/monitor/calendar/repair. `POST /media/add` создаёт
+      `MediaMonitor`; `POST /media/release/search|grab` идёт Jackett → previewTorrent →
+      grabSelected → qB category `mc-native`.
+- [x] Native importer: `mediaImporter.ts` стартует из `index.ts`, поллит qB, обновляет progress/
+      completed/importStatus и вызывает `organizeTorrent`. `organizeTorrent` теперь пишет
+      per-file `importedPath`/`importError`, возвращает подробный отчёт и триггерит Jellyfin scan.
+- [x] REST: добавлены `GET /media/quality-profiles`, `/media/jackett/health`, `/media/repair`,
+      `/media/monitor`; `/media/search`, `/media/lookup`, `/media/add`, `/media/release/*`,
+      `/media/import/*`, `/media/calendar`, `/media/monitor` переключены на native при
+      `MEDIA_BACKEND!=arr`. Dead routes `/media/recommendations` и `/media/discovery/hero` удалены.
+- [x] MCP Hermes: media instructions переписаны на native+Jackett. Добавлены tools
+      `list_jackett_indexers`, `test_jackett_search`, `set_quality_profile`, `list_media_monitor`,
+      `search_missing_media`, `retry_media_import`, `explain_release_choice`; удалён
+      `get_recommendations`.
+- [x] Frontend: `ReleasePicker` показывает score, parsed quality/source/codec/HDR/languages,
+      warnings/reasons; `MediaSystemTab` получил Native pipeline/Repair Center summary с Jackett
+      health, stuck imports и missing episodes. Add drawer переименован на Jackett/native wording.
+- [x] Homelab: `homelab/docker-compose.yml` и `homelab/README.md` обновлены под целевой стек
+      Jellyfin + qBittorrent + Jackett + TorrServer, без Sonarr/Radarr/Prowlarr.
+- [x] Проверено: `cd backend && npx prisma generate`, `cd backend && npm run build`,
+      `cd frontend && npm run build`; grep подтвердил, что реальный Jackett API key не попал
+      в репозиторий.
+
+---
+
 ## REST API (план)
 
 ```

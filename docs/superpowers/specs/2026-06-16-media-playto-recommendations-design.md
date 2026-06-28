@@ -1,5 +1,11 @@
 # Дизайн: «Играть на устройство» + плашка подборок (медиа-модуль)
 
+> **Status:** partially superseded by Batch v8 (2026-06-28). Play-To через
+> Jellyfin остаётся актуальным, но recommendations/import-list часть через
+> Radarr/Sonarr удалена. Discovery/recommendations теперь идут через TMDB rails
+> и локальные `MediaPreference`; добавление в библиотеку — через native
+> `MediaMonitor`, Jackett Torznab и qBittorrent category `mc-native`.
+
 Дата: 2026-06-16
 Статус: на ревью
 

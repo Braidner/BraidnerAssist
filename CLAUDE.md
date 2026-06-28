@@ -139,8 +139,23 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     adguard.ts` (basic auth → `/control/stats`). `GET /api/adguard` отдаёт запросы/блокировки/%/
     латентность + топ заблокированных. Карточка на `/system` (Ring по % блокировок).
 11. **Медиа-стек** (opt-in, любой из источников) — `integrations/media.ts` агрегирует Jellyfin
-    `/Sessions` (что играет) + Sonarr/Radarr `/api/v3/queue` + qBittorrent `/api/v2/torrents/info`
-    (очередь) + Prowlarr `/api/v1/search` (поиск релизов) через `Promise.allSettled`.
+    `/Sessions` (что играет) + qBittorrent `/api/v2/torrents/info` + native media state.
+    **Актуальный pipeline (Batch v8, 2026-06-28)**: TMDB (метаданные/discovery/calendar)
+    → Jackett Torznab (`JACKETT_URL`/`JACKETT_API_KEY`/`JACKETT_INDEXERS`) → native
+    release parser/scoring (`releaseParse.ts`/`releaseScore.ts`) → qBittorrent category
+    `mc-native` → native importer (`mediaImporter.ts`, `organizeTorrent`) → `/media/movies|tv`
+    → Jellyfin scan/playback/watch-state. Sonarr/Radarr/Prowlarr больше не production path;
+    `arr*` код оставлен только как rollback/fallback при `MEDIA_BACKEND=arr`. Мёртвые
+    `/media/recommendations` и `/media/discovery/hero` удалены.
+    Native API: `GET /media/quality-profiles`, `GET /media/jackett/health`, `GET /media/repair`,
+    `GET /media/monitor`; `GET /media/search` ищет через Jackett; `POST /media/add`
+    создаёт `MediaMonitor`; `POST /media/release/search|grab` работает через Jackett+
+    preview/grab; `POST /media/import/candidates|execute` использует локальную SQLite-модель.
+    Hermes MCP: `add_movie`/`add_series`, `search_releases`/`grab_release`,
+    `list_import_candidates`/`import_release`, `list_jackett_indexers`, `test_jackett_search`,
+    `list_media_monitor`, `search_missing_media`, `retry_media_import`, `explain_release_choice`.
+    Ниже в этом разделе встречаются исторические описания Batch v3–v7 про Sonarr/Radarr/
+    Prowlarr; считать их legacy context, а не целевым текущим поведением.
     `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
     **Встроенный плеер**: библиотека Jellyfin (`GET /media/library`) → клик → HTML5 video
     с HLS (`hls.js`); путь воспроизведения форсит HLS-транскод (пустые DirectPlayProfiles в
@@ -219,10 +234,10 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     `SupportsRemoteControl` (устройства с открытым приложением Jellyfin — напр. Sber TV), `POST /media/play-to
     {sessionId,itemId}` шлёт `PlayNow` в `/Sessions/{id}/Playing`. Фронт: на плитке библиотеки контрол «📺»
     с выпадайкой устройств. Предусловие: на ТВ открыто приложение Jellyfin.
-    **Подборки** (ещё не в библиотеке): `GET /media/recommendations` агрегирует import-list discover
-    Radarr `/api/v3/importlist/movie` + Sonarr `/api/v3/importlist/series` (фильтр `isExisting`/`isExcluded`),
-    добавление в один клик через существующий `POST /media/add`. Карточка «Подборки» на `/media`.
-    Предусловие: в Radarr/Sonarr включён хотя бы один import-list (встроенный, ключ TMDB не нужен).
+    **Native media pipeline**: `GET /media/quality-profiles` отдаёт локальные profiles, `GET /media/
+    jackett/health` проверяет Torznab indexers, `GET /media/repair` показывает stuck imports/
+    missing episodes/indexer failures. `MediaSystemTab` рисует Native pipeline summary; `ReleasePicker`
+    показывает score, reasons, warnings, parsed quality/source/codec/HDR/languages.
     **TorrServer (opt-in `TORRSERVER_URL`)** — `integrations/torrserver.ts` (YouROK): мгновенный
     стрим магнета без полной загрузки и без добавления в библиотеку. `POST /media/torrserver/add`
     (magnet→hash+файлы, `pickVideoFile` берёт крупнейший видеофайл), `GET /media/torrserver/list`,
@@ -245,13 +260,11 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     непросмотренное + сортировка + скелетоны; детальная сериала — прогресс сезона, превью эпизодов
     (`jellyfinPosterUrl(epId)`), относительные даты, вышедшие-но-отсутствующие красным; адаптивный поллинг
     медиа (5с при активной загрузке, иначе 15с) в `App.tsx`; mobile/a11y (focus-visible, ≤760px).
-    Env: `JELLYFIN_*`/`SONARR_*`/`RADARR_*`/`QBITTORRENT_*`/`PROWLARR_*`/`TORRSERVER_*`. MCP: `add_movie`/`add_series`
-    (правильный пайплайн, основной), `search_releases`/`grab_release` (интерактивный выбор раздачи с
-    нужной озвучкой/качеством; `grab_release` после своего `search_releases` — кеш по guid),
-    `list_import_candidates`/`import_release` (разложить застрявший multi-season пак: ManualImport
-    в обход реджекта; `import_release` без `fileIds` — авто-выбор по одному файлу на серию),
-    `watch_now` (мгновенный стрим магнета через TorrServer),
-    `add_torrent`/`get_media_status`/`list_devices`/`play_on_device`/`get_recommendations` (Hermes).
+    Env: `JELLYFIN_*`/`QBITTORRENT_*`/`JACKETT_*`/`TORRSERVER_*`/`TMDB_API_KEY`/`MEDIA_ROOT`.
+    MCP: `add_movie`/`add_series`, `search_releases`/`grab_release`, `list_import_candidates`/
+    `import_release`, `list_jackett_indexers`, `test_jackett_search`, `list_media_monitor`,
+    `search_missing_media`, `retry_media_import`, `explain_release_choice`, `watch_now`,
+    `add_torrent`, `get_media_status`, `list_devices`, `play_on_device`.
     **Дискавери-таб (LAMPA/ZONA-style подборки на TMDB)** — таб «Дискавери» (`MediaDiscoverTab.tsx`)
     управляется одним вызовом `GET /media/discover/rails` (`getDiscoverHome` в `integrations/discover.ts`):
     cinematic hero на широком `backdrop_path` (отдельно от мелкого `poster_path`), чипы жанров и
@@ -282,8 +295,8 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     `getDiscoverCollection`/`getTmdbDetail`/preferences helpers + `backdropUrl()` в `lib/api.ts`.
     Detail pages показывают трейлер/жанры/runtime/episodeCount из TMDB и graceful toast, если
     TMDB→TVDB resolve не сработал. MCP: `get_discovery_home`/`search_discovery`/
-    `add_media_preference`/`hide_discovery_title`. (Старые `/media/recommendations` и
-    `/media/discovery/hero` оставлены для MCP/Hermes, дискавери-таб их больше не использует.)
+    `add_media_preference`/`hide_discovery_title`. Старые `/media/recommendations` и
+    `/media/discovery/hero` удалены; discovery и рекомендации живут в TMDB rails/preferences.
 12. **Командная палитра (Cmd-K)** — `CommandPalette.tsx`: оверлей по Cmd/Ctrl+K. Навигация
     (источник — `NAV_ITEMS`) + отправка команды Hermes (`sendHermesCommand`) + действия:
     создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление
@@ -293,8 +306,9 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
 ## Homelab-стек на hermes.lan (отдельный Docker compose)
 
 На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на
-`/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Sonarr, Radarr, Prowlarr,
-qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
+`/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Jackett, qBittorrent,
+TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). Sonarr/Radarr/Prowlarr заменены
+native media pipeline внутри Mission Control. Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
 `host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в
 `/srv/stack/.creds` (chmod 600) и в server `.env` дашборда — в гит не коммитятся.
 
@@ -398,7 +412,12 @@ qBittorrent, TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). С
   (seed из Jellyfin ProviderIds). Расширен `integrations/tmdb.ts` + новый `integrations/discover.ts`;
   `SimilarRail` обобщён в `CardRail`; poster-прокси получил `&w=`. Русские тайтлы/описания (`ru-RU`),
   graceful при TMDB off. Builds зелёные; полная проверка данных — после деплоя с `TMDB_API_KEY`. ✅ ГОТОВО
-- **Отложено**: drag-and-drop виджетов (react-grid-layout); аппаратный транскод для тяжёлых
-  4K/HEVC 10-bit (софт-транскод 4K→h264 грузит CPU VM, может тормозить).
+- **Batch v8 — Native media pipeline + Jackett cutover** (2026-06-28, 5a30a4e): Sonarr/Radarr/
+  Prowlarr убраны из production path; добавлены Prisma-модели `MediaMonitor`/quality profiles/
+  import state, Jackett Torznab search+health, release parsing/scoring, qB category `mc-native`,
+  background importer, Repair Center summary, native Hermes tools и homelab compose без *arr/Prowlarr.
+  Builds backend+frontend зелёные. ✅ ГОТОВО
+- **Отложено**: drag-and-drop виджетов (react-grid-layout); будущий этап удаления Jellyfin
+  (свой transcoding/watch-state) — отдельная большая тема.
 
 Подробный трекинг — в `TASKS.md`.

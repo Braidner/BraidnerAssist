@@ -1,5 +1,11 @@
 # Media Play-To + Recommendations Implementation Plan
 
+> **Status:** partially superseded by Batch v8 (2026-06-28). The Jellyfin
+> Play-To portions remain useful historical context. The recommendations panel
+> and `get_recommendations`/Radarr/Sonarr import-list path were removed; current
+> discovery is TMDB-based and current library additions use native `MediaMonitor`
+> + Jackett Torznab + qBittorrent `mc-native`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add (1) "play a library title on an external device" via Jellyfin remote control, and (2) a recommendations panel of not-yet-downloaded titles with one-click add into the existing Radarr/Sonarr pipeline.

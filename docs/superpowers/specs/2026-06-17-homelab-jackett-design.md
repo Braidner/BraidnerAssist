@@ -1,5 +1,11 @@
 # Homelab compose в репо + индексер Jackett
 
+> **Status:** superseded by Batch v8 (2026-06-28). Jackett теперь не подключается
+> в Prowlarr; Mission Control ходит к Jackett напрямую через Torznab
+> (`JACKETT_URL`/`JACKETT_API_KEY`/`JACKETT_INDEXERS`). Sonarr/Radarr/Prowlarr
+> удалены из целевого homelab compose. Этот документ оставлен как исторический
+> дизайн первоначального добавления Jackett.
+
 **Дата:** 2026-06-17
 **Контекст:** Поиск релизов через Prowlarr+RuTor упирается в особенности
 русского нейминга (год озвучки вместо года шоу, альт-тайтлы слева,

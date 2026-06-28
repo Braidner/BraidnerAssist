@@ -50,8 +50,8 @@ import { cn } from "../../lib/cn.ts";
 import { ui } from "@/lib/ui.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 
-// Дравер «Добавить»: основной путь — поиск тайтла в Radarr/Sonarr (правильный
-// пайплайн в медиатеку); ниже — ручные опции (прямой magnet + raw-поиск Prowlarr).
+// Дравер «Добавить»: основной путь — TMDB → native monitor; ниже — ручные опции
+// (прямой magnet + raw-поиск Jackett).
 function AddTorrentDrawer({
   open,
   onClose,
@@ -137,7 +137,7 @@ function AddTorrentDrawer({
             </button>
           </div>
 
-          {/* Основной путь: Radarr/Sonarr — авто-граб + импорт + скан */}
+          {/* Основной путь: TMDB → native monitor/search/import */}
           <div className={ms.seg}>
             <button
               className={cn(ms.segButton, kind === "movie" && ms.segButtonOn)}
@@ -283,12 +283,12 @@ function AddTorrentDrawer({
             <div className={cn(ms.empty, "mt-3")}>Ничего не найдено.</div>
           )}
 
-          {/* Ручные опции — прямой magnet и сырой поиск Prowlarr */}
+          {/* Ручные опции — прямой magnet и сырой поиск Jackett */}
           <button
             className={ms.subtleToggle}
             onClick={() => setShowManual((v) => !v)}
           >
-            {showManual ? "▾" : "▸"} Вручную (magnet / Prowlarr)
+            {showManual ? "▾" : "▸"} Вручную (magnet / Jackett)
           </button>
 
           {showManual && (
@@ -318,7 +318,7 @@ function AddTorrentDrawer({
                 </button>
               </div>
 
-              <div className={ms.label}>Поиск релизов (Prowlarr)</div>
+              <div className={ms.label}>Поиск релизов (Jackett)</div>
               <div className={ms.field}>
                 <input
                   className={ms.input}
@@ -663,7 +663,7 @@ export function MediaPage({
     setBusy(null);
     if (tvdb) nav(`/media/discover/series/${tvdb}`);
     else
-      toast.error("Не удалось определить tvdbId сериала (нет в Sonarr/TVDB)");
+      toast.error("Не удалось определить tvdbId сериала через TMDB");
   };
 
   // ── Not configured ────────────────────────────────────────────────────────

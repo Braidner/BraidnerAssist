@@ -90,9 +90,11 @@ export const config = {
     },
   },
 
-  // Медиа-стек: Jellyfin (что играет) + Sonarr/Radarr/qBittorrent (очередь загрузок).
+  // Медиа-стек: Jellyfin (что играет) + qBittorrent + Jackett/TorrServer/TMDB.
+  // Sonarr/Radarr/Prowlarr остаются временным rollback-слоем на время миграции.
   // Каждый источник опционален; панель "configured" если задан хотя бы один.
   media: {
+    backend: env("MEDIA_BACKEND") ?? "dual", // arr | native | dual
     jellyfin: {
       url: env("JELLYFIN_URL"),
       apiKey: env("JELLYFIN_API_KEY"),
@@ -119,6 +121,12 @@ export const config = {
       apiKey: env("PROWLARR_API_KEY"),
       get configured() { return Boolean(this.url && this.apiKey); },
     },
+    jackett: {
+      url: env("JACKETT_URL"),
+      apiKey: env("JACKETT_API_KEY"),
+      indexers: env("JACKETT_INDEXERS") ?? "all",
+      get configured() { return Boolean(this.url && this.apiKey); },
+    },
     // TorrServer (YouROK) — мгновенный стриминг магнетов без полной загрузки.
     // Auth опционален (LAN); basic при заданных USER/PASSWORD.
     torrserver: {
@@ -138,6 +146,7 @@ export const config = {
         this.sonarr.configured ||
         this.radarr.configured ||
         this.qbittorrent.configured ||
+        this.jackett.configured ||
         this.prowlarr.configured ||
         this.torrserver.configured ||
         this.tmdb.configured
@@ -167,6 +176,9 @@ export const config = {
     weather: num("POLL_WEATHER", 1_800_000),
     tasks: num("POLL_TASKS", 300_000),
     proxmox: num("POLL_PROXMOX", 30_000),
+    jackettHealth: num("POLL_JACKETT_HEALTH", 300_000),
+    mediaImporter: num("POLL_MEDIA_IMPORTER", 60_000),
+    mediaMonitor: num("POLL_MEDIA_MONITOR", 15 * 60_000),
   },
 };
 

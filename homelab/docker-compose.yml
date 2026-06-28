@@ -1,4 +1,5 @@
-# Homelab stack: AdGuard Home (DNS) + media (Jellyfin, *arr, qBittorrent, Jackett).
+# Homelab stack: AdGuard Home (DNS) + native media dependencies
+# (Jellyfin, qBittorrent, Jackett, TorrServer).
 # Data/config + media library live on the 1TB disk at /srv/stack.
 #
 # Этот файл — каноничный источник конфигурации стека. На hermes.lan
@@ -78,53 +79,9 @@ services:
       - ./media:/data
     restart: unless-stopped
 
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
-    container_name: prowlarr
-    networks: [stack]
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    ports:
-      - "9696:9696"
-    volumes:
-      - ./prowlarr/config:/config
-    restart: unless-stopped
-
-  sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
-    container_name: sonarr
-    networks: [stack]
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    ports:
-      - "8989:8989"
-    volumes:
-      - ./sonarr/config:/config
-      - ./media:/data
-    restart: unless-stopped
-
-  radarr:
-    image: lscr.io/linuxserver/radarr:latest
-    container_name: radarr
-    networks: [stack]
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-    ports:
-      - "7878:7878"
-    volumes:
-      - ./radarr/config:/config
-      - ./media:/data
-    restart: unless-stopped
-
   # Jackett — Cardigann-индексер с широкой библиотекой определений
-  # (особенно для русских/нишевых трекеров). Подключается в Prowlarr как
-  # Torznab. Подробнее: docs/superpowers/specs/2026-06-17-homelab-jackett-design.md
+  # (особенно для русских/нишевых трекеров). Mission Control ходит к нему
+  # напрямую через Torznab API.
   jackett:
     image: lscr.io/linuxserver/jackett:latest
     container_name: jackett

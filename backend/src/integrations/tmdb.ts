@@ -30,6 +30,15 @@ export interface TmdbGenre {
   name: string;
 }
 
+export interface TmdbSeasonEpisode {
+  seasonNumber: number;
+  episodeNumber: number;
+  title: string;
+  airDate: string | null;
+  overview: string;
+  runtime: number | null;
+}
+
 export interface DiscoverOpts {
   genreId?: number | string;
   year?: number | string;
@@ -212,6 +221,36 @@ export async function tmdbDetails(kind: "movie" | "series", tmdbId: number): Pro
   const tv = kind === "series";
   const data = await tmdbGet(`/${tv ? "tv" : "movie"}/${tmdbId}`, { append_to_response: "videos" });
   return mapItem(data, tv ? "tv" : "movie");
+}
+
+export async function tmdbMovieDetail(tmdbId: number): Promise<TmdbItem | null> {
+  return tmdbDetails("movie", tmdbId);
+}
+
+export async function tmdbTvDetail(tmdbId: number): Promise<TmdbItem | null> {
+  return tmdbDetails("series", tmdbId);
+}
+
+export async function tmdbSeason(tmdbId: number, seasonNumber: number): Promise<TmdbSeasonEpisode[]> {
+  const data = await tmdbGet(`/tv/${tmdbId}/season/${seasonNumber}`);
+  const episodes = Array.isArray(data?.episodes) ? data.episodes : [];
+  return episodes.map((e: any) => ({
+    seasonNumber,
+    episodeNumber: Number(e.episode_number),
+    title: String(e.name || `Episode ${e.episode_number}`),
+    airDate: e.air_date ? String(e.air_date) : null,
+    overview: String(e.overview ?? ""),
+    runtime: Number.isFinite(Number(e.runtime)) ? Number(e.runtime) : null,
+  })).filter((e: TmdbSeasonEpisode) => Number.isFinite(e.episodeNumber));
+}
+
+export async function tmdbTvSeasons(tmdbId: number): Promise<number[]> {
+  const data = await tmdbGet(`/tv/${tmdbId}`);
+  const seasons = Array.isArray(data?.seasons) ? data.seasons : [];
+  return seasons
+    .map((s: any) => Number(s.season_number))
+    .filter((n: number) => Number.isFinite(n) && n >= 0)
+    .sort((a: number, b: number) => a - b);
 }
 
 // tvdbId (Sonarr/Jellyfin) → TMDB tv id. ВАЖНО: TMDB tv id ≠ tvdbId.

@@ -644,14 +644,15 @@ export interface ManualImportFile {
   id: number;
   path: string;
   relativePath: string;
-  folderName: string | null;
+  folderName?: string | null;
   size: number;
-  quality: string;
+  quality: string | null;
   languages: string[];
-  releaseGroup: string | null;
+  releaseGroup?: string | null;
   seasonNumber: number | null;
-  episodes: ManualImportEpisode[];
-  movieTitle: string | null;
+  episodes?: ManualImportEpisode[];
+  episodeNumbers?: number[];
+  movieTitle?: string | null;
   rejections: string[];
 }
 
@@ -683,6 +684,82 @@ export async function getMedia(): Promise<MediaData> {
       nowPlaying: [],
       downloads: [],
     };
+  }
+}
+
+export interface MediaQualityProfile {
+  name: string;
+  kind: "movie" | "series" | "both";
+  minResolution: number;
+  maxResolution: number;
+  preferHdr: boolean;
+  allowHdr: boolean;
+  allowHevc: boolean;
+  allowAv1: boolean;
+  preferredLanguages: string[];
+  bannedWords: string[];
+  maxMovieSizeGb: number | null;
+  maxEpisodeSizeGb: number | null;
+}
+
+export interface JackettHealth {
+  id: string;
+  configured: boolean;
+  ok: boolean;
+  latencyMs: number | null;
+  resultCount: number;
+  lastError: string | null;
+  checkedAt: string | null;
+}
+
+export interface MediaRepairState {
+  jackett: JackettHealth[];
+  torrents: {
+    infohash: string;
+    title: string;
+    contentType: "movie" | "series";
+    importStatus: string;
+    progress: number;
+    lastError: string | null;
+    files: { fileIndex: number; path: string; error: string | null; importedPath: string | null }[];
+  }[];
+  missing: {
+    monitorId: string;
+    title: string;
+    seasonNumber: number;
+    episodeNumber: number;
+    airDate: string | null;
+    status: string;
+  }[];
+}
+
+export async function getMediaQualityProfiles(): Promise<MediaQualityProfile[]> {
+  try {
+    const res = await apiFetch("/api/media/quality-profiles");
+    if (!res.ok) return [];
+    return (await res.json()) as MediaQualityProfile[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getJackettHealth(force = false): Promise<JackettHealth[]> {
+  try {
+    const res = await apiFetch(`/api/media/jackett/health${force ? "?force=1" : ""}`);
+    if (!res.ok) return [];
+    return (await res.json()) as JackettHealth[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getMediaRepair(): Promise<MediaRepairState | null> {
+  try {
+    const res = await apiFetch("/api/media/repair");
+    if (!res.ok) return null;
+    return (await res.json()) as MediaRepairState;
+  } catch {
+    return null;
   }
 }
 
@@ -1264,16 +1341,27 @@ export async function unifiedSearch(q: string): Promise<UnifiedSearchResult> {
 
 export interface ReleaseOption {
   guid: string;
-  indexerId: number;
+  indexerId?: number | string;
   title: string;
-  quality: string;
-  languages: string[];
+  quality?: string;
+  languages?: string[];
   size: number;
   seeders: number | null;
   indexer: string;
-  protocol: string;
-  rejected: boolean;
-  rejections: string[];
+  protocol?: string;
+  rejected?: boolean;
+  rejections?: string[];
+  category?: string | null;
+  score?: number;
+  scoreReasons?: string[];
+  warnings?: string[];
+  parsed?: {
+    resolution?: number | null;
+    codec?: string | null;
+    source?: string | null;
+    languages?: string[];
+    hdr?: string | null;
+  };
 }
 
 export async function searchReleaseOptions(p: {
@@ -1297,7 +1385,7 @@ export async function searchReleaseOptions(p: {
 export async function grabRelease(p: {
   type: "movie" | "series";
   guid: string;
-  indexerId: number;
+  indexerId: number | string;
 }): Promise<boolean> {
   try {
     const res = await apiFetch("/api/media/release/grab", {
@@ -1651,36 +1739,6 @@ export async function playOnDevice(
     return res.ok;
   } catch {
     return false;
-  }
-}
-
-export interface Recommendation {
-  kind: "movie" | "series";
-  id: number;
-  title: string;
-  year: number | null;
-  overview: string;
-  poster: string | null;
-  rating: number | null;
-}
-
-export async function getRecommendations(): Promise<Recommendation[]> {
-  try {
-    const res = await apiFetch("/api/media/recommendations");
-    if (!res.ok) return [];
-    return (await res.json()) as Recommendation[];
-  } catch {
-    return [];
-  }
-}
-
-export async function getDiscoveryHeroMovie(): Promise<Recommendation | null> {
-  try {
-    const res = await apiFetch("/api/media/discovery/hero");
-    if (!res.ok) return null;
-    return (await res.json()) as Recommendation;
-  } catch {
-    return null;
   }
 }
 

@@ -1,4 +1,4 @@
-// Детальная страница сериала (/media/series/:id) — Sonarr-style: шапка с
+// Детальная страница сериала (/media/series/:id) — native media detail: шапка с
 // метаданными и monitor/поиском, полный список сезонов/эпизодов (скачано/нет,
 // качество, дата, превью), прогресс по сезону, встроенный плеер, поиск раздач
 // на сезон, bulk-поиск недостающих и ручной импорт застрявшей раздачи.
@@ -379,7 +379,7 @@ export function MediaSeriesPage({
         <DetailStatusBadges
           status={det.status}
           inArr={det.inArr}
-          arrName="Sonarr"
+          arrName="native monitor"
           provider={det.network}
         />
 

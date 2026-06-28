@@ -47,6 +47,8 @@ export interface GrabInput extends ContentKey {
   infohash: string;
   files: PreviewFile[]; // ВСЕ файлы из предпросмотра
   wantedIndexes: number[]; // какие качать
+  category?: string;
+  savePath?: string;
 }
 
 // Грабим выбранные файлы и сохраняем привязку. Идемпотентно по infohash.
@@ -63,8 +65,9 @@ export async function grabSelected(input: GrabInput): Promise<{ infohash: string
       title: input.title,
       infohash,
       magnet: input.source.startsWith("magnet:") ? input.source : null,
+      category: input.category ?? "mc-native",
     },
-    update: { title: input.title, tmdbId: input.tmdbId ?? null, tvdbId: input.tvdbId ?? null },
+    update: { title: input.title, tmdbId: input.tmdbId ?? null, tvdbId: input.tvdbId ?? null, category: input.category ?? "mc-native" },
   });
 
   // Полный список файлов (перезаписываем — источник истины предпросмотр).
@@ -87,6 +90,8 @@ export async function grabSelected(input: GrabInput): Promise<{ infohash: string
     source: input.source,
     files: input.files.map((f) => ({ fileIndex: f.fileIndex, path: f.path })),
     wantedIndexes: input.wantedIndexes,
+    category: input.category ?? "mc-native",
+    savePath: input.savePath,
   });
   return res;
 }

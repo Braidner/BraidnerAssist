@@ -1,8 +1,9 @@
 # Homelab stack
 
 Конфигурация homelab-стека на `hermes.lan` (Proxmox VM): AdGuard Home,
-Jellyfin, Sonarr, Radarr, Prowlarr, Jackett, qBittorrent. Развёрнут
-в `/srv/stack/` на 1ТБ диске.
+Jellyfin, Jackett, qBittorrent, TorrServer. Sonarr/Radarr/Prowlarr заменены
+native media pipeline внутри Mission Control. Стек развёрнут в `/srv/stack/`
+на 1ТБ диске.
 
 `docker-compose.yml` здесь — каноничный источник конфигурации.
 `/srv/stack/docker-compose.yml` на сервере — симлинк сюда.
@@ -25,7 +26,7 @@ homelab/
 ├── .env                         # реальные PUID/PGID/TZ (НЕ в git)
 ├── .creds                       # сгенерированные креды qB+Jellyfin (НЕ в git)
 ├── setup-creds.sh               # реальный скрипт настройки (НЕ в git)
-├── adguard/, jellyfin/, jackett/, prowlarr/, sonarr/, radarr/, qbittorrent/   # config volumes
+├── adguard/, jellyfin/, jackett/, qbittorrent/, torrserver/                  # config volumes
 └── media/                       # библиотека (movies, tv, downloads)
 ```
 
@@ -86,23 +87,16 @@ docker compose -f /srv/stack/docker-compose.yml up -d
 | AdGuard DNS | 53         | DNS (UDP+TCP), на LAN-IP 192.168.2.184   |
 | AdGuard UI  | 8053       | веб-интерфейс/API                        |
 | Jellyfin    | 8096       | медиа-сервер                             |
-| Sonarr      | 8989       | сериалы                                  |
-| Radarr      | 7878       | фильмы                                   |
-| Prowlarr    | 9696       | индексеры (агрегатор)                    |
-| Jackett     | 9117       | дополнительные индексеры (Cardigann)     |
+| Jackett     | 9117       | Torznab индексеры для Mission Control    |
 | qBittorrent | 8080       | торрент-клиент UI                        |
 | qBittorrent | 6881       | peer (TCP+UDP), macvlan 192.168.2.190    |
 
-## Интеграция Jackett → Prowlarr
+## Интеграция Jackett → Mission Control
 
 После того как Jackett поднят и в нём добавлены нужные индексеры (UI:
 Add Indexer → выбрать трекер → скопировать Torznab Feed URL):
 
-1. Prowlarr → Settings → Indexers → Add → Torznab → Custom.
-2. URL: `http://jackett:9117/api/v2.0/indexers/<id>/results/torznab/`
-   (взять из Jackett UI рядом с индексером, кнопка Copy Torznab Feed).
-3. API key: из Jackett (Settings → API Key).
-4. Categories: 2000/5000 (Movies/TV) — стандарт.
-5. Test → Save.
-
-Prowlarr автоматически синкает новый индексер в Sonarr и Radarr.
+1. В `.env` дашборда задать `JACKETT_URL=http://host.docker.internal:9117`.
+2. `JACKETT_API_KEY` взять из Jackett Dashboard.
+3. `JACKETT_INDEXERS=all` или список id через запятую.
+4. Mission Control ищет релизы напрямую через Torznab categories 2000/5000.

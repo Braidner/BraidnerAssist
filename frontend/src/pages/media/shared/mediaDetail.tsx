@@ -90,7 +90,7 @@ export function DetailBody({
 export function DetailStatusBadges({
   status,
   inArr,
-  arrName,
+  arrName: _arrName,
   provider,
   file,
 }: {
@@ -108,8 +108,8 @@ export function DetailStatusBadges({
     <div className="mb-3 flex flex-wrap gap-1.5">
       {status && <span className={ms.badge}>{status}</span>}
       {!inArr && (
-        <span className={ms.reject} title={`Нет в ${arrName} — данные из Jellyfin`}>
-          только Jellyfin
+        <span className={ms.reject} title="Нет в native monitor — данные из Jellyfin/TMDB">
+          вне monitor
         </span>
       )}
       {provider && <span className={ms.lang}>{provider}</span>}

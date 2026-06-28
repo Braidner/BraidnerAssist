@@ -1,11 +1,14 @@
 // System tab for MediaPage: download queue, active TorrServer streams.
 
+import { useEffect, useState } from "react";
 import { Card } from "../../components/ui/Card.tsx";
 import { FileBrowser } from "../../components/panels/FileBrowser.tsx";
 import {
+  getMediaRepair,
   torrserverStreamUrl,
   type MediaData,
   type DownloadItem,
+  type MediaRepairState,
   type TorrServerStream,
 } from "../../lib/api.ts";
 import {
@@ -19,8 +22,8 @@ import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 
 const SOURCE_LABEL: Record<DownloadItem["source"], string> = {
-  sonarr: "Sonarr",
-  radarr: "Radarr",
+  sonarr: "Legacy TV",
+  radarr: "Legacy Movie",
   qbittorrent: "qBittorrent",
 };
 
@@ -52,6 +55,23 @@ export function MediaSystemTab({
   onRemoveStream,
 }: MediaSystemTabProps) {
   const toast = useToast();
+  const [repair, setRepair] = useState<MediaRepairState | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getMediaRepair().then((r) => {
+      if (alive) setRepair(r);
+    });
+    const timer = window.setInterval(() => {
+      getMediaRepair().then((r) => {
+        if (alive) setRepair(r);
+      });
+    }, 30_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const playStream = (s: TorrServerStream) => {
     if (!s.file) {
@@ -69,6 +89,53 @@ export function MediaSystemTab({
 
   return (
     <div className={ms.pageMain}>
+      <Card
+        icon="pulse"
+        title="Native pipeline"
+        action={<span className={ms.panelCount}>{repair ? repair.torrents.length + repair.missing.length : "…"}</span>}
+      >
+        {!repair ? (
+          <div className={ms.empty}>Проверяем Jackett и импорт…</div>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
+              {repair.jackett.map((j) => (
+                <div key={j.id} className="rounded-xl border border-hair bg-surface px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-cell text-ink" title={j.id}>{j.id}</span>
+                    <span className={j.ok ? ms.okText : ms.reject}>{j.ok ? "ok" : "bad"}</span>
+                  </div>
+                  <div className="mt-1 font-mono text-2xs text-muted">
+                    {j.latencyMs != null ? `${j.latencyMs}ms` : "—"} · {j.resultCount} test
+                  </div>
+                  {j.lastError && <div className={cn(ms.reject, "mt-1 line-clamp-2 text-label")} title={j.lastError}>{j.lastError}</div>}
+                </div>
+              ))}
+            </div>
+            {(repair.torrents.length > 0 || repair.missing.length > 0) ? (
+              <div className="flex flex-col gap-2">
+                {repair.torrents.slice(0, 4).map((t) => (
+                  <div key={t.infohash} className="rounded-xl border border-hair bg-surface px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-cell text-ink" title={t.title}>{t.title}</span>
+                      <span className={t.importStatus === "failed" ? ms.reject : ms.badge}>{t.importStatus}</span>
+                    </div>
+                    {t.lastError && <div className={cn(ms.reject, "mt-1 text-label")} title={t.lastError}>{t.lastError}</div>}
+                  </div>
+                ))}
+                {repair.missing.slice(0, 4).map((m) => (
+                  <div key={`${m.monitorId}-${m.seasonNumber}-${m.episodeNumber}`} className="rounded-xl border border-hair bg-surface px-3 py-2 font-mono text-label text-muted">
+                    missing · {m.title} S{m.seasonNumber}E{m.episodeNumber} · {m.status}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={ms.empty}>Repair Center чист: застрявших импортов и missing queue нет.</div>
+            )}
+          </div>
+        )}
+      </Card>
+
       {/* Смотреть онлайн через TorrServer — мгновенный стрим без полной загрузки */}
       {media.torrserver && (
         <Card

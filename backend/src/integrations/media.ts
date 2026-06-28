@@ -23,6 +23,8 @@ export interface DownloadItem {
   eta?: number | null; // секунды до завершения, null = неизвестно
   seeds?: number;
   size?: number; // байт
+  category?: string;
+  savePath?: string;
   downloadId?: string; // qB-хеш (Sonarr/Radarr) — ключ для ручного импорта
   importPending?: boolean; // скачано, но Sonarr/Radarr не смог импортировать (multi-season и т.п.)
   importMessage?: string; // краткая причина из statusMessages
@@ -129,6 +131,11 @@ export interface SearchResult {
   seeders: number;
   indexer: string;
   url: string | null; // magnet или .torrent — то, что отдаём в qBittorrent
+  category?: string | null;
+  score?: number;
+  scoreReasons?: string[];
+  warnings?: string[];
+  parsed?: unknown;
 }
 
 export interface PlayDevice {
@@ -723,9 +730,11 @@ interface QbTorrent {
   eta?: number;
   num_seeds?: number;
   size?: number;
+  category?: string;
+  save_path?: string;
 }
 
-async function qbittorrentDownloads(): Promise<DownloadItem[]> {
+export async function qbittorrentDownloads(): Promise<DownloadItem[]> {
   if (!config.media.qbittorrent.configured) return [];
   const sid = await qbLogin();
   const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/info`, {
@@ -744,6 +753,8 @@ async function qbittorrentDownloads(): Promise<DownloadItem[]> {
     eta: t.eta != null && t.eta < 8_640_000 ? t.eta : null,
     seeds: t.num_seeds ?? 0,
     size: t.size ?? 0,
+    category: t.category,
+    savePath: t.save_path,
   }));
 }
 
@@ -1449,108 +1460,6 @@ export async function manualImportExecute(
   }
   cache = null;
   return files.length;
-}
-
-// ── Подборки (discover) из import-list'ов Radarr/Sonarr ─────────────────────
-// Radarr GET /api/v3/importlist/movie и Sonarr /api/v3/importlist/series отдают
-// тайтлы из настроенных import-list'ов с флагами isExisting/isExcluded. Ключ TMDB
-// не нужен — discover живёт внутри *arr. Предусловие: включён хотя бы один список.
-
-export interface Recommendation {
-  kind: "movie" | "series";
-  id: number; // tmdbId (movie) | tvdbId (series) — то, что принимает arrAdd
-  title: string;
-  year: number | null;
-  overview: string;
-  poster: string | null;
-  rating: number | null;
-}
-
-interface ArrImportListRecord {
-  title?: string;
-  year?: number;
-  tmdbId?: number;
-  tvdbId?: number;
-  overview?: string;
-  images?: ArrImage[];
-  ratings?: {
-    value?: number;
-    tmdb?: { value?: number };
-    imdb?: { value?: number };
-  };
-  isExisting?: boolean;
-  isExcluded?: boolean;
-}
-
-function arrRating(it: ArrImportListRecord): number | null {
-  const value = it.ratings?.value ?? it.ratings?.tmdb?.value ?? it.ratings?.imdb?.value;
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-async function arrImportList(kind: "movie" | "series"): Promise<Recommendation[]> {
-  const cfg = arrCfg(kind);
-  if (!cfg.configured) return [];
-  const path = kind === "movie" ? "movie" : "series";
-  const res = await fetch(`${cfg.url}/api/v3/importlist/${path}`, {
-    headers: { "X-Api-Key": cfg.apiKey! },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`${kind} importlist ${res.status}`);
-  const items = (await res.json()) as ArrImportListRecord[];
-  return items
-    .filter((it) => !it.isExisting && !it.isExcluded)
-    .map((it) => ({
-      kind,
-      id: (kind === "movie" ? it.tmdbId : it.tvdbId) ?? 0,
-      title: it.title ?? "—",
-      year: it.year ?? null,
-      overview: it.overview ?? "",
-      poster: arrPoster(it.images),
-      rating: arrRating(it),
-    }))
-    .filter((r) => r.id > 0);
-}
-
-// Подборки фильмов+сериалов, которых ещё нет в библиотеке.
-export async function getRecommendations(): Promise<Recommendation[]> {
-  if (!config.media.radarr.configured && !config.media.sonarr.configured) return [];
-  const [movies, series] = await Promise.allSettled([
-    arrImportList("movie"),
-    arrImportList("series"),
-  ]);
-  const all = [
-    ...(movies.status === "fulfilled" ? movies.value : []),
-    ...(series.status === "fulfilled" ? series.value : []),
-  ];
-  const seen = new Set<string>();
-  const deduped = all.filter((r) => {
-    const key = `${r.kind}:${r.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  return deduped.slice(0, 40);
-}
-
-// Случайный high-rated фильм для discovery hero. Источник тот же, что у подборок:
-// Radarr import-list уже отфильтрован от существующих/исключённых тайтлов.
-export async function getDiscoveryHeroMovie(): Promise<Recommendation | null> {
-  if (!config.media.radarr.configured) return null;
-  const [movies, library] = await Promise.all([
-    arrImportList("movie"),
-    getLibrary().catch(() => [] as LibraryItem[]),
-  ]);
-  const libraryMovieIds = new Set(
-    library
-      .filter((item) => item.type === "Movie" && item.tmdbId)
-      .map((item) => item.tmdbId),
-  );
-  const candidates = movies.filter((movie) => !libraryMovieIds.has(movie.id));
-  if (candidates.length === 0) return null;
-  const sorted = [...candidates].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-  const highRated = sorted.filter((m) => (m.rating ?? 0) >= 7).slice(0, 20);
-  const pool = highRated.length > 0 ? highRated : sorted.slice(0, Math.min(20, sorted.length));
-  return pool[Math.floor(Math.random() * pool.length)] ?? null;
 }
 
 // ── Расписание / monitor / поиск сезона (удобный пайплайн сериалов) ─────────

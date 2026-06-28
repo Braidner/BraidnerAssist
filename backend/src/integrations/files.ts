@@ -108,7 +108,15 @@ const VIDEO_EXT = /\.(mkv|mp4|avi|m4v|mov|ts|webm|wmv|flv|mpg|mpeg)$/i;
 const sanitize = (s: string) => s.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim() || "Untitled";
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-export async function organizeTorrent(infohash: string): Promise<{ organized: number; skipped: number }> {
+export interface OrganizedFileResult {
+  fileIndex: number;
+  path: string;
+  status: "imported" | "skipped" | "failed";
+  importedPath: string | null;
+  message: string;
+}
+
+export async function organizeTorrent(infohash: string): Promise<{ organized: number; skipped: number; failed: number; files: OrganizedFileResult[] }> {
   if (!config.mediaFs.configured) throw new Error("MEDIA_ROOT не настроен");
   const hash = infohash.toLowerCase();
   const torrent = await prisma.mediaTorrent.findUnique({ where: { infohash: hash }, include: { files: true } });
@@ -123,8 +131,15 @@ export async function organizeTorrent(infohash: string): Promise<{ organized: nu
 
   let organized = 0;
   let skipped = 0;
+  let failed = 0;
+  const results: OrganizedFileResult[] = [];
+  await prisma.mediaTorrent.update({ where: { id: torrent.id }, data: { importStatus: "importing", lastError: null } }).catch(() => {});
   for (const f of torrent.files) {
-    if (!f.wanted || !VIDEO_EXT.test(f.path)) { skipped++; continue; }
+    if (!f.wanted || !VIDEO_EXT.test(f.path)) {
+      skipped++;
+      results.push({ fileIndex: f.fileIndex, path: f.path, status: "skipped", importedPath: null, message: "not wanted or not video" });
+      continue;
+    }
     // Источник: файл лежит под downloads. qB кладёт по относительному пути торрента;
     // ищем сначала по полному относительному пути, затем по basename (на случай иной структуры).
     const ext = path.extname(f.path);
@@ -133,7 +148,13 @@ export async function organizeTorrent(infohash: string): Promise<{ organized: nu
     for (const c of candidates) {
       try { await fs.access(c); src = c; break; } catch { /* нет */ }
     }
-    if (!src) { skipped++; continue; }
+    if (!src) {
+      skipped++;
+      const message = "source file not found";
+      results.push({ fileIndex: f.fileIndex, path: f.path, status: "skipped", importedPath: null, message });
+      await prisma.mediaTorrentFile.update({ where: { id: f.id }, data: { importError: message } }).catch(() => {});
+      continue;
+    }
 
     let destAbs: string;
     if (torrent.contentType === "series" && f.seasonNumber != null && f.episodeNumber != null) {
@@ -145,22 +166,49 @@ export async function organizeTorrent(infohash: string): Promise<{ organized: nu
       await fs.mkdir(movieDir, { recursive: true });
       destAbs = path.join(movieDir, `${showName}${ext}`);
     } else {
-      skipped++; continue; // сериал без распознанной серии — пропускаем (разложить вручную)
+      skipped++;
+      const message = "series episode not parsed";
+      results.push({ fileIndex: f.fileIndex, path: f.path, status: "skipped", importedPath: null, message });
+      await prisma.mediaTorrentFile.update({ where: { id: f.id }, data: { importError: message } }).catch(() => {});
+      continue; // сериал без распознанной серии — пропускаем (разложить вручную)
     }
 
     try {
       await fs.access(destAbs); // уже есть — пропускаем
       skipped++;
+      const importedPath = rel(destAbs);
+      results.push({ fileIndex: f.fileIndex, path: f.path, status: "skipped", importedPath, message: "already exists" });
+      await prisma.mediaTorrentFile.update({ where: { id: f.id }, data: { importedPath, importedAt: new Date(), importError: null } }).catch(() => {});
       continue;
     } catch { /* нет — кладём */ }
     try {
       await fs.link(src, destAbs); // hardlink
     } catch {
-      await fs.copyFile(src, destAbs); // другой том → копия
+      try {
+        await fs.copyFile(src, destAbs); // другой том → копия
+      } catch (e) {
+        failed++;
+        const message = String(e);
+        results.push({ fileIndex: f.fileIndex, path: f.path, status: "failed", importedPath: null, message });
+        await prisma.mediaTorrentFile.update({ where: { id: f.id }, data: { importError: message } }).catch(() => {});
+        continue;
+      }
     }
     organized++;
+    const importedPath = rel(destAbs);
+    results.push({ fileIndex: f.fileIndex, path: f.path, status: "imported", importedPath, message: "imported" });
+    await prisma.mediaTorrentFile.update({ where: { id: f.id }, data: { importedPath, importedAt: new Date(), importError: null } }).catch(() => {});
   }
 
   if (organized > 0) await jellyfinRefresh().catch(() => {});
-  return { organized, skipped };
+  const importStatus = failed > 0 ? "failed" : organized > 0 ? "imported" : "needs_review";
+  await prisma.mediaTorrent.update({
+    where: { id: torrent.id },
+    data: {
+      importStatus,
+      importedAt: importStatus === "imported" ? new Date() : null,
+      lastError: failed > 0 ? results.find((r) => r.status === "failed")?.message ?? "import failed" : null,
+    },
+  }).catch(() => {});
+  return { organized, skipped, failed, files: results };
 }

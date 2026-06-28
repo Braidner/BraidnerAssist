@@ -1,4 +1,4 @@
-// Детальная страница фильма (/media/movie/:id) — Radarr-style: шапка с
+// Детальная страница фильма (/media/movie/:id) — native media detail: шапка с
 // метаданными, статус файла (качество/размер или «отсутствует»), встроенный
 // плеер + игра на устройство, поиск раздач и ручной импорт застрявшей раздачи.
 
@@ -253,7 +253,7 @@ export function MediaMoviePage({
         <DetailStatusBadges
           status={det.status}
           inArr={det.inArr}
-          arrName="Radarr"
+          arrName="native monitor"
           provider={det.studio}
           file={{
             hasFile: det.hasFile,
@@ -324,7 +324,7 @@ export function MediaMoviePage({
             <button
               className={ms.button.accentSm}
               disabled={act === "add"}
-              title="Добавить в Radarr и запустить поиск"
+              title="Добавить в native monitor и запустить поиск"
               onClick={addToLib}
             >
               {act === "add" ? "…" : "➕ В библиотеку"}

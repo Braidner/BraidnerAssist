@@ -86,6 +86,12 @@ model MediaTorrent {
   infohash    String             @unique // qB/TorrServer hash (lowercase hex)
   magnet      String?
   savePath    String?
+  category    String?            @default("mc-native")
+  importStatus String            @default("queued") // queued | downloading | completed | importing | imported | failed | needs_review | ignored
+  importedAt  DateTime?
+  completedAt DateTime?
+  progress    Float              @default(0) // 0..1 from qB
+  lastError   String?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   files       MediaTorrentFile[]
@@ -103,8 +109,125 @@ model MediaTorrentFile {
   wanted        Boolean      @default(false)
   seasonNumber  Int?
   episodeNumber Int?
+  importedPath  String?
+  importedAt    DateTime?
+  importError   String?
 
   @@unique([torrentId, fileIndex])
+}
+
+// Native media: локальные профили качества вместо Sonarr/Radarr quality profiles.
+model MediaQualityProfile {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  kind               String   @default("both") // movie | series | both
+  minResolution      Int      @default(720)
+  maxResolution      Int      @default(1080)
+  preferHdr          Boolean  @default(false)
+  allowHdr           Boolean  @default(true)
+  allowHevc          Boolean  @default(true)
+  allowAv1           Boolean  @default(true)
+  preferredLanguages String   @default("ru,en") // comma-separated
+  bannedWords        String   @default("")
+  maxMovieSizeGb     Float?
+  maxEpisodeSizeGb   Float?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  monitors           MediaMonitor[]
+}
+
+// Native media monitor: собственная замена add/monitor/missing из *arr.
+model MediaMonitor {
+  id               String                 @id @default(cuid())
+  kind             String                 // movie | series
+  tmdbId           Int
+  tvdbId           Int?
+  title            String
+  year             Int?
+  poster           String?
+  backdrop         String?
+  overview         String?
+  monitored        Boolean                @default(true)
+  searchMode       String                 @default("manual") // manual | automatic | paused
+  qualityProfileId String?
+  qualityProfile   MediaQualityProfile?   @relation(fields: [qualityProfileId], references: [id], onDelete: SetNull)
+  lastSearchAt     DateTime?
+  lastGrabAt       DateTime?
+  failureCount     Int                    @default(0)
+  lastError        String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  seasons          MediaMonitorSeason[]
+  episodes         MediaMonitorEpisode[]
+  decisions        MediaReleaseDecision[]
+  events           MediaImportEvent[]
+
+  @@unique([kind, tmdbId])
+  @@index([monitored, updatedAt])
+}
+
+model MediaMonitorSeason {
+  id          String       @id @default(cuid())
+  monitorId   String
+  monitor     MediaMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  seasonNumber Int
+  monitored   Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([monitorId, seasonNumber])
+}
+
+model MediaMonitorEpisode {
+  id            String       @id @default(cuid())
+  monitorId     String
+  monitor       MediaMonitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  seasonNumber  Int
+  episodeNumber Int
+  title         String?
+  airDate       DateTime?
+  monitored     Boolean      @default(true)
+  status        String       @default("wanted") // upcoming | wanted | downloading | downloaded | ignored
+  importedPath  String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([monitorId, seasonNumber, episodeNumber])
+  @@index([status, airDate])
+}
+
+model MediaReleaseDecision {
+  id          String       @id @default(cuid())
+  monitorId   String?
+  monitor     MediaMonitor? @relation(fields: [monitorId], references: [id], onDelete: SetNull)
+  kind        String       // movie | series
+  tmdbId      Int?
+  tvdbId      Int?
+  query       String
+  guid        String?
+  title       String
+  indexer     String?
+  score       Int          @default(0)
+  reasons     String       @default("[]") // JSON array
+  warnings    String       @default("[]") // JSON array
+  selected    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  @@index([kind, tmdbId, createdAt])
+}
+
+model MediaImportEvent {
+  id        String        @id @default(cuid())
+  monitorId String?
+  monitor   MediaMonitor? @relation(fields: [monitorId], references: [id], onDelete: SetNull)
+  torrentId String?
+  infohash  String?
+  level     String        @default("info") // info | warn | error
+  message   String
+  payload   String?
+  createdAt DateTime      @default(now())
+
+  @@index([level, createdAt])
 }
 
 // Локальные предпочтения discovery-каталога. Это состояние только дашборда:

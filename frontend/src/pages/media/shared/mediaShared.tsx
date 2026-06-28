@@ -244,9 +244,8 @@ export function useVideoPlayer(url: string | null, direct = false) {
   return { videoRef, vidPlaying, setVidPlaying, vidMuted, setVidMuted, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, toggleMute, seekTo, seekBy };
 }
 
-// ── Интерактивный выбор раздачи (Sonarr/Radarr /release) ──────────────
-// Показывает релизы с качеством/озвучкой/сидами; отклонённые (multi-season
-// и т.п.) выделены, но грабятся принудительно через force-grab.
+// ── Интерактивный выбор раздачи (Jackett Torznab + native scoring) ─────
+// Показывает релизы с качеством/озвучкой/сидами и объяснением score.
 export function ReleasePicker({
   params,
   onGrabbed,
@@ -280,7 +279,7 @@ export function ReleasePicker({
     const ok = await grabRelease({
       type: params.type,
       guid: r.guid,
-      indexerId: r.indexerId,
+      indexerId: r.indexerId ?? r.indexer,
     });
     if (ok) setDone((p) => ({ ...p, [r.guid]: true }));
     return ok;
@@ -351,21 +350,36 @@ export function ReleasePicker({
             </label>
             <div className={cn(media.rowFoot, "flex-wrap gap-1.5")}>
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 font-mono text-label text-muted">
-                <span className={media.badge}>{r.quality}</span>
-                {r.languages.map((l) => (
+                <span className={media.badge}>
+                  {r.quality ?? (r.parsed?.resolution ? `${r.parsed.resolution}p` : "—")}
+                </span>
+                {r.parsed?.codec && <span className={media.badge}>{r.parsed.codec}</span>}
+                {r.parsed?.source && <span className={media.badge}>{r.parsed.source}</span>}
+                {r.parsed?.hdr && <span className={media.badge}>{r.parsed.hdr}</span>}
+                {(r.languages ?? r.parsed?.languages ?? []).map((l) => (
                   <span key={l} className={media.lang}>
                     {l}
                   </span>
                 ))}
+                {r.score != null && (
+                  <span className={r.score >= 60 ? media.okText : r.score < 0 ? media.reject : media.badge}>
+                    score {r.score}
+                  </span>
+                )}
                 <span>{fmtSize(r.size)}</span>
                 <span className={media.okText}>{r.seeders ?? 0} seed</span>
                 <span>{r.indexer}</span>
                 {r.rejected && (
                   <span
                     className={media.reject}
-                    title={r.rejections.join("; ")}
+                    title={(r.rejections ?? []).join("; ")}
                   >
                     ⚠ отклонён
+                  </span>
+                )}
+                {(r.warnings?.length ?? 0) > 0 && (
+                  <span className={media.reject} title={r.warnings?.join("; ")}>
+                    ⚠ warning
                   </span>
                 )}
               </span>
@@ -381,7 +395,12 @@ export function ReleasePicker({
                     : "Скачать"}
               </button>
             </div>
-            {done[r.guid] && /multi-season/i.test(r.rejections.join(" ")) && (
+            {(r.scoreReasons?.length ?? 0) > 0 && (
+              <div className="font-mono text-label text-muted">
+                {r.scoreReasons?.slice(0, 4).join(" · ")}
+              </div>
+            )}
+            {done[r.guid] && /multi-season/i.test((r.rejections ?? []).join(" ")) && (
               <div className={cn(media.reject, "text-label")}>
                 Пак нескольких сезонов — после скачивания нажми «Импорт» в
                 Загрузках, чтобы разложить серии.
@@ -411,13 +430,17 @@ export function autoSelectFiles(
   const usable = files.filter((f) => {
     if (f.rejections.some((m) => /not an upgrade|already imported/i.test(m)))
       return false;
-    return kind === "series" ? f.episodes.length > 0 : Boolean(f.movieTitle);
+    return kind === "series"
+      ? (f.episodes?.length ?? f.episodeNumbers?.length ?? 0) > 0
+      : Boolean(f.movieTitle ?? f.path);
   });
   const best = new Map<string, ManualImportFile>();
   for (const f of usable) {
     const keys =
       kind === "series"
-        ? f.episodes.map((e) => `S${e.seasonNumber}E${e.episodeNumber}`)
+        ? (f.episodes?.map((e) => `S${e.seasonNumber}E${e.episodeNumber}`) ??
+          f.episodeNumbers?.map((e) => `S${f.seasonNumber ?? 0}E${e}`) ??
+          [])
         : [`movie-${f.movieTitle}`];
     for (const key of keys) {
       const prev = best.get(key);
@@ -500,7 +523,7 @@ export function ImportDrawer({
       }[];
     const map = new Map<number, ManualImportFile[]>();
     for (const f of files) {
-      const sn = f.episodes[0]?.seasonNumber ?? f.seasonNumber ?? 0;
+      const sn = f.episodes?.[0]?.seasonNumber ?? f.seasonNumber ?? 0;
       if (!map.has(sn)) map.set(sn, []);
       map.get(sn)!.push(f);
     }
@@ -511,22 +534,28 @@ export function ImportDrawer({
         label: sn === 0 ? "Спецвыпуски" : `Сезон ${sn}`,
         files: fs.sort(
           (a, b) =>
-            (a.episodes[0]?.episodeNumber ?? 0) -
-            (b.episodes[0]?.episodeNumber ?? 0),
+            (a.episodes?.[0]?.episodeNumber ?? a.episodeNumbers?.[0] ?? 0) -
+            (b.episodes?.[0]?.episodeNumber ?? b.episodeNumbers?.[0] ?? 0),
         ),
       }));
   })();
 
   const fileLabel = (f: ManualImportFile) => {
-    if (kind === "series" && f.episodes.length > 0) {
-      const e = f.episodes[0];
+    const episodes = f.episodes ?? f.episodeNumbers?.map((episodeNumber) => ({
+      id: episodeNumber,
+      seasonNumber: f.seasonNumber ?? 0,
+      episodeNumber,
+      title: "",
+    })) ?? [];
+    if (kind === "series" && episodes.length > 0) {
+      const e = episodes[0];
       const range =
-        f.episodes.length > 1
-          ? `–E${f.episodes[f.episodes.length - 1].episodeNumber}`
+        episodes.length > 1
+          ? `–E${episodes[episodes.length - 1].episodeNumber}`
           : "";
       return `S${e.seasonNumber}E${e.episodeNumber}${range}`;
     }
-    return f.movieTitle ?? "—";
+    return f.movieTitle ?? f.path.split("/").pop() ?? "—";
   };
 
   return (
@@ -578,7 +607,7 @@ export function ImportDrawer({
                           {fileLabel(f)}
                         </span>
                         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                          <span className={media.badge}>{f.quality}</span>
+                          <span className={media.badge}>{f.quality ?? "—"}</span>
                           {f.languages.map((l) => (
                             <span key={l} className={media.lang}>
                               {l}

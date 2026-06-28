@@ -71,6 +71,11 @@ export function MediaLibraryTab({
     const location = useLocation();
     const toast = useToast();
     const from = `${location.pathname}${location.search}`;
+    const returnState = () => ({
+        from,
+        scrollY: window.scrollY,
+        mediaReturn: true,
+    });
 
     const openDetail = (it: LibraryItem, autoplay = false) =>
         nav(
@@ -79,8 +84,8 @@ export function MediaLibraryTab({
             }`,
             {
                 state: autoplay
-                    ? {from, autoplay: true, autoplayItemId: it.id}
-                    : {from},
+                    ? {...returnState(), autoplay: true, autoplayItemId: it.id}
+                    : returnState(),
             },
         );
 

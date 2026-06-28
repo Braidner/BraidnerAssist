@@ -3,7 +3,7 @@
 // вы смотрели». Hero использует широкий backdrop; заголовки жанровых рейлов ведут в жанровый хаб.
 
 import {useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {useLocation, useNavigate} from "react-router-dom";
 import {
     posterUrl,
     backdropUrl,
@@ -295,7 +295,14 @@ export function MediaDiscoverTab({
     onRefresh, onOpenDiscover, onOpenTmdb, onAddTmdb, onPreference,
 }: MediaDiscoverTabProps) {
     const nav = useNavigate();
+    const location = useLocation();
     const [searchOpen] = useState(true);
+    const from = `${location.pathname}${location.search}`;
+    const returnState = () => ({
+        from,
+        scrollY: window.scrollY,
+        mediaReturn: true,
+    });
 
     const seriesItems = library.filter((i) => i.type === "Series");
     const movieItems = library.filter((i) => i.type === "Movie");
@@ -342,7 +349,7 @@ export function MediaDiscoverTab({
                     {seriesItems.map((it) => (
                         <DiscPosterCard key={it.id} title={it.name} year={it.year} sub="сериал"
                             imgUrl={jellyfinPosterUrl(it.id)} seasonCount={it.childCount}
-                            onClick={() => nav(`/media/series/${it.id}`)}/>
+                            onClick={() => nav(`/media/series/${it.id}`, {state: returnState()})}/>
                     ))}
                 </DiscSection>
             )}
@@ -351,7 +358,7 @@ export function MediaDiscoverTab({
                     {movieItems.map((it) => (
                         <DiscPosterCard key={it.id} title={it.name} year={it.year} sub="фильм"
                             imgUrl={jellyfinPosterUrl(it.id)}
-                            onClick={() => nav(`/media/movie/${it.id}`)}/>
+                            onClick={() => nav(`/media/movie/${it.id}`, {state: returnState()})}/>
                     ))}
                 </DiscSection>
             )}

@@ -410,6 +410,11 @@ export function MediaPage({
   const location = useLocation();
   const toast = useToast();
   const from = `${location.pathname}${location.search}`;
+  const returnState = () => ({
+    from,
+    scrollY: window.scrollY,
+    mediaReturn: true,
+  });
 
   useEffect(() => {
     const legacyTab = new URLSearchParams(location.search).get("tab") as MediaTab | null;
@@ -529,13 +534,13 @@ export function MediaPage({
   const playResume = async (it: ResumeItem) => {
     if (it.kind === "movie") {
       nav(`/media/movie/${it.id}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
-        state: { autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
+        state: { ...returnState(), autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
       });
       return;
     }
     if (it.seriesId) {
       nav(`/media/series/${it.seriesId}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
-        state: { autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
+        state: { ...returnState(), autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
       });
       return;
     }
@@ -665,18 +670,18 @@ export function MediaPage({
   const openDiscover = (it: ArrLookupItem) =>
     nav(
       `/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`,
-      { state: { from } },
+      { state: returnState() },
     );
 
   const openTmdb = async (it: TmdbItem) => {
     if (it.kind === "movie") {
-      nav(`/media/discover/movie/${it.tmdbId}`, { state: { from } });
+      nav(`/media/discover/movie/${it.tmdbId}`, { state: returnState() });
       return;
     }
     setBusy("tmdb" + it.tmdbId);
     const tvdb = await tmdbResolveTvdb(it.tmdbId);
     setBusy(null);
-    if (tvdb) nav(`/media/discover/series/${tvdb}`, { state: { from } });
+    if (tvdb) nav(`/media/discover/series/${tvdb}`, { state: returnState() });
     else
       toast.error("Не удалось определить tvdbId сериала через TMDB");
   };

@@ -805,7 +805,7 @@ export async function resolveTorrent(
 
 // Разбираем ответ qBittorrent /torrents/add: новые версии (5.x) отдают JSON
 // {added_torrent_ids, failure_count}, старые — текст "Ok."/"Fails.".
-async function assertQbAdded(res: Response): Promise<void> {
+async function assertQbAdded(res: Response): Promise<string[]> {
   if (!res.ok) throw new Error(`qBittorrent add ${res.status}`);
   const text = (await res.text()).trim();
   if (text.startsWith("{")) {
@@ -822,17 +822,21 @@ async function assertQbAdded(res: Response): Promise<void> {
     ) {
       throw new Error("qBittorrent не смог добавить торрент (источник недоступен)");
     }
+    return Array.isArray(json?.added_torrent_ids)
+      ? json.added_torrent_ids.map((id) => String(id).toLowerCase()).filter(Boolean)
+      : [];
   } else if (/^fails/i.test(text)) {
     throw new Error("qBittorrent отклонил торрент");
   }
+  return [];
 }
 
 // Добавить торрент в qBittorrent с опциями (paused/category/savePath). Базовый
 // метод — qbAdd и пофайловый граб (qbApplySelection) идут через него.
-async function qbAddRaw(
+export async function qbAddRaw(
   urlOrMagnet: string,
   opts: { paused?: boolean; category?: string; savePath?: string } = {},
-): Promise<void> {
+): Promise<string[]> {
   if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
   const sid = await qbLogin();
   const addUrl = `${config.media.qbittorrent.url}/api/v2/torrents/add`;
@@ -869,8 +873,9 @@ async function qbAddRaw(
       signal: AbortSignal.timeout(15_000),
     });
   }
-  await assertQbAdded(res);
+  const addedIds = await assertQbAdded(res);
   cache = null;
+  return addedIds;
 }
 
 // Добавить торрент в qBittorrent (magnet или http(s) .torrent URL).

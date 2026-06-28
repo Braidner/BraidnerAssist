@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { jackettHealth, jackettSearchMany } from "./jackett.js";
 import { listQualityProfiles, getQualityProfile, scoreRelease } from "./releaseScore.js";
 import { tmdbDetails, tmdbSearch, tmdbSeason, tmdbTvSeasons, tmdbTvToTvdb, tmdbFindByTvdb, type TmdbItem } from "./tmdb.js";
-import { previewTorrent, grabSelected } from "./torrentPick.js";
+import { previewTorrent, grabFromQbMetadata, grabSelected } from "./torrentPick.js";
 import { organizeTorrent } from "./files.js";
 import { qbittorrentDownloads, resolveTorrent, type SearchResult, type SeriesPageDetail, type MoviePageDetail, type DetailSeason } from "./media.js";
 
@@ -227,7 +227,23 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
     const resolved = await resolveTorrent(source).catch(() => null);
     if (resolved?.magnet) previewSource = resolved.magnet;
   }
-  const preview = await previewTorrent(previewSource);
+  let preview;
+  try {
+    preview = await previewTorrent(previewSource);
+  } catch {
+    const res = await grabFromQbMetadata({
+      contentType: item.type,
+      tmdbId: item.tmdbId,
+      tvdbId: item.tvdbId,
+      title: item.titleHint,
+      source: previewSource,
+      category: "mc-native",
+    });
+    const monitor = item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
+    if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
+    await prisma.mediaReleaseDecision.updateMany({ where: { kind: item.type, guid }, data: { selected: true } }).catch(() => {});
+    return { ok: true, ...res };
+  }
   const videoFiles = preview.files.filter((f) => f.isVideo);
   const wantedIndexes = item.type === "movie"
     ? [videoFiles.slice().sort((a, b) => b.length - a.length)[0]?.fileIndex].filter((x): x is number => Number.isFinite(x))

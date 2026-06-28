@@ -5,7 +5,7 @@
 
 import { prisma } from "../db/client.js";
 import { torrserverFiles } from "./torrserver.js";
-import { qbApplySelection, qbFiles } from "./media.js";
+import { qbAction, qbAddRaw, qbApplySelection, qbFiles, qbSetFilePrio } from "./media.js";
 import { parseEpisode, isVideoFile } from "./episodeParse.js";
 
 export type ContentType = "movie" | "series";
@@ -94,6 +94,104 @@ export async function grabSelected(input: GrabInput): Promise<{ infohash: string
     savePath: input.savePath,
   });
   return res;
+}
+
+function base32ToHex(raw: string): string | null {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of raw.toUpperCase()) {
+    const val = alphabet.indexOf(ch);
+    if (val < 0) return null;
+    bits += val.toString(2).padStart(5, "0");
+  }
+  let hex = "";
+  for (let i = 0; i + 4 <= bits.length; i += 4) {
+    hex += Number.parseInt(bits.slice(i, i + 4), 2).toString(16);
+  }
+  return hex.length >= 40 ? hex.slice(0, 40).toLowerCase() : null;
+}
+
+function infohashFromMagnet(source: string): string | null {
+  if (!source.startsWith("magnet:")) return null;
+  const xt = new URL(source).searchParams.get("xt") ?? "";
+  const raw = xt.match(/btih:([^&]+)/i)?.[1];
+  if (!raw) return null;
+  if (/^[a-f0-9]{40}$/i.test(raw)) return raw.toLowerCase();
+  if (/^[a-z2-7]{32}$/i.test(raw)) return base32ToHex(raw);
+  return null;
+}
+
+function previewFileFromQb(f: { index: number; name: string; size: number }): PreviewFile {
+  const isVideo = isVideoFile(f.name);
+  const { season, episodes } = isVideo ? parseEpisode(f.name) : { season: null, episodes: [] };
+  return {
+    fileIndex: f.index,
+    path: f.name,
+    length: f.size,
+    isVideo,
+    season,
+    episodes,
+  };
+}
+
+async function waitForQbFiles(infohash: string): Promise<PreviewFile[]> {
+  for (let i = 0; i < 25; i++) {
+    const files = await qbFiles(infohash);
+    if (files.length) return files.map(previewFileFromQb);
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error("qBittorrent ещё не получил метаданные торрента — повтори через минуту");
+}
+
+export async function grabFromQbMetadata(input: Omit<GrabInput, "infohash" | "files" | "wantedIndexes">): Promise<{ infohash: string; added: boolean }> {
+  const addedIds = await qbAddRaw(input.source, {
+    paused: true,
+    category: input.category ?? "mc-native",
+    savePath: input.savePath,
+  });
+  const infohash = addedIds[0]?.toLowerCase() ?? infohashFromMagnet(input.source);
+  if (!infohash) throw new Error("qBittorrent добавил торрент, но не вернул hash");
+
+  const files = await waitForQbFiles(infohash);
+  const videos = files.filter((f) => f.isVideo);
+  const wantedIndexes = input.contentType === "movie"
+    ? [videos.slice().sort((a, b) => b.length - a.length)[0]?.fileIndex].filter((x): x is number => Number.isFinite(x))
+    : videos.filter((f) => f.episodes.length > 0).map((f) => f.fileIndex);
+  if (wantedIndexes.length === 0) throw new Error("No video files selected for release");
+
+  const torrent = await prisma.mediaTorrent.upsert({
+    where: { infohash },
+    create: {
+      contentType: input.contentType,
+      tmdbId: input.tmdbId ?? null,
+      tvdbId: input.tvdbId ?? null,
+      title: input.title,
+      infohash,
+      magnet: input.source.startsWith("magnet:") ? input.source : null,
+      category: input.category ?? "mc-native",
+    },
+    update: { title: input.title, tmdbId: input.tmdbId ?? null, tvdbId: input.tvdbId ?? null, category: input.category ?? "mc-native" },
+  });
+
+  const wanted = new Set(wantedIndexes);
+  await prisma.mediaTorrentFile.deleteMany({ where: { torrentId: torrent.id } });
+  await prisma.mediaTorrentFile.createMany({
+    data: files.map((f) => ({
+      torrentId: torrent.id,
+      fileIndex: f.fileIndex,
+      path: f.path,
+      length: f.length,
+      wanted: wanted.has(f.fileIndex),
+      seasonNumber: f.season,
+      episodeNumber: f.episodes[0] ?? null,
+    })),
+  });
+
+  const unwantedIndexes = files.filter((f) => !wanted.has(f.fileIndex)).map((f) => f.fileIndex);
+  if (unwantedIndexes.length) await qbSetFilePrio(infohash, unwantedIndexes, 0);
+  if (wantedIndexes.length) await qbSetFilePrio(infohash, wantedIndexes, 1);
+  await qbAction(infohash, "resume").catch(() => {});
+  return { infohash, added: true };
 }
 
 // Докачать ещё файлы (серии/сезон) через уже добавленный торрент: объединяем с

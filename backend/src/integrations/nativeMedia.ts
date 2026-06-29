@@ -207,6 +207,7 @@ export async function nativeReleaseSearch(kind: MediaKind, id: number, seasonNum
         guid: r.guid,
         title: r.title,
         indexer: r.indexer,
+        seasonNumber: kind === "series" ? seasonNumber ?? null : null,
         score: r.score ?? 0,
         reasons: JSON.stringify(r.scoreReasons ?? []),
         warnings: JSON.stringify(r.warnings ?? []),
@@ -247,7 +248,10 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
       ? await prisma.mediaMonitor.findUnique({ where: { id: ensuredMonitor.monitorId } })
       : item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
     if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
-    await prisma.mediaReleaseDecision.updateMany({ where: { kind: item.type, guid }, data: { selected: true } }).catch(() => {});
+    await prisma.mediaReleaseDecision.updateMany({
+      where: { kind: item.type, guid },
+      data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedAt: new Date() },
+    }).catch(() => {});
     return { ok: true, ...res };
   }
   const videoFiles = preview.files.filter((f) => f.isVideo);
@@ -270,7 +274,10 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
     ? await prisma.mediaMonitor.findUnique({ where: { id: ensuredMonitor.monitorId } })
     : item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
   if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
-  await prisma.mediaReleaseDecision.updateMany({ where: { kind: item.type, guid }, data: { selected: true } }).catch(() => {});
+  await prisma.mediaReleaseDecision.updateMany({
+    where: { kind: item.type, guid },
+    data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedAt: new Date() },
+  }).catch(() => {});
   return { ok: true, ...res };
 }
 

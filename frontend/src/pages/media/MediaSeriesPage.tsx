@@ -515,6 +515,7 @@ export function MediaSeriesPage({
               </div>
               <ReleasePicker
                 params={{ type: "series", id: tvdbId }}
+                downloads={media.downloads}
                 onGrabbed={onMediaUpdate}
               />
             </div>
@@ -637,6 +638,7 @@ export function MediaSeriesPage({
                           id: tvdbId,
                           seasonNumber: s.seasonNumber,
                         }}
+                        downloads={media.downloads}
                         onGrabbed={onMediaUpdate}
                       />
                     )}

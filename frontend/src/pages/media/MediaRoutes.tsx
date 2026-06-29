@@ -47,11 +47,11 @@ export function MediaRoutes() {
 
   useEffect(() => {
     getMedia().then(setMedia);
-    // const t = setInterval(
-    //   () => getMedia().then(setMedia),
-    //   dlActive ? 5_000 : 15_000,
-    // );
-    // return () => clearInterval(t);
+    const t = setInterval(
+      () => getMedia().then(setMedia),
+      dlActive ? 3_000 : 15_000,
+    );
+    return () => clearInterval(t);
   }, [dlActive]);
 
   const onMediaUpdate = () => getMedia().then(setMedia);

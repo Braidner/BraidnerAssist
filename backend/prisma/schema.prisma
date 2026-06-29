@@ -211,9 +211,13 @@ model MediaReleaseDecision {
   reasons     String       @default("[]") // JSON array
   warnings    String       @default("[]") // JSON array
   selected    Boolean      @default(false)
+  seasonNumber Int?
+  selectedInfohash String?
+  selectedAt   DateTime?
   createdAt   DateTime     @default(now())
 
   @@index([kind, tmdbId, createdAt])
+  @@index([selectedInfohash])
 }
 
 model MediaReleaseDetailCache {

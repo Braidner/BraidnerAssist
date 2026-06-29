@@ -60,6 +60,7 @@ function AddTorrentDrawer({
   onGrabbed,
   onWatchNow,
   torrserver,
+  downloads,
   busy,
 }: {
   open: boolean;
@@ -69,6 +70,7 @@ function AddTorrentDrawer({
   onGrabbed: () => void;
   onWatchNow: (url: string, title: string, key: string) => Promise<void>;
   torrserver: boolean;
+  downloads: DownloadItem[];
   busy: string | null;
 }) {
   const [kind, setKind] = useState<"movie" | "series">("movie");
@@ -274,6 +276,7 @@ function AddTorrentDrawer({
                                 }
                               : { type: "movie", id: it.id }
                           }
+                          downloads={downloads}
                           onGrabbed={onGrabbed}
                         />
                       </div>
@@ -711,6 +714,7 @@ export function MediaPage({
         onGrabbed={onMediaUpdate}
         onWatchNow={onWatchNow}
         torrserver={media.torrserver}
+        downloads={media.downloads}
         busy={busy}
       />
       {player && (

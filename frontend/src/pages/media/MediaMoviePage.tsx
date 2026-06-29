@@ -386,6 +386,7 @@ export function MediaMoviePage({
 						{showPicker && det.tmdbId != null ? (
 							<ReleasePicker
 								params={{type: "movie", id: det.tmdbId}}
+								downloads={media.downloads}
 								onGrabbed={onMediaUpdate}
 							/>
 						) : (

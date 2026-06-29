@@ -235,6 +235,10 @@ export interface ContentTorrent {
   infohash: string;
   title: string;
   magnet: string | null;
+  selectedTitle: string | null;
+  selectedIndexer: string | null;
+  selectedSeasonNumber: number | null;
+  selectedAt: string | null;
   files: ContentTorrentFile[];
 }
 
@@ -251,9 +255,26 @@ export async function listContentTorrents(key: ContentKey): Promise<ContentTorre
     include: { files: true },
     orderBy: { createdAt: "desc" },
   });
+  const decisions = torrents.length
+    ? await prisma.mediaReleaseDecision.findMany({
+        where: {
+          kind: key.contentType,
+          selected: true,
+          selectedInfohash: { in: torrents.map((t) => t.infohash) },
+        },
+        orderBy: { selectedAt: "desc" },
+      }).catch(() => [])
+    : [];
+  const decisionByHash = new Map<string, (typeof decisions)[number]>();
+  for (const d of decisions) {
+    if (d.selectedInfohash && !decisionByHash.has(d.selectedInfohash)) {
+      decisionByHash.set(d.selectedInfohash, d);
+    }
+  }
 
   const out: ContentTorrent[] = [];
   for (const t of torrents) {
+    const decision = decisionByHash.get(t.infohash);
     let prog = new Map<number, number>();
     try {
       const qf = await qbFiles(t.infohash);
@@ -265,6 +286,10 @@ export async function listContentTorrents(key: ContentKey): Promise<ContentTorre
       infohash: t.infohash,
       title: t.title,
       magnet: t.magnet,
+      selectedTitle: decision?.title ?? null,
+      selectedIndexer: decision?.indexer ?? null,
+      selectedSeasonNumber: decision?.seasonNumber ?? null,
+      selectedAt: decision?.selectedAt?.toISOString() ?? null,
       files: t.files
         .slice()
         .sort((a, b) => a.fileIndex - b.fileIndex)

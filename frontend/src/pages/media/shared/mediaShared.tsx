@@ -83,29 +83,42 @@ function voiceTagClass(): string {
   return "whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-2xs text-warn";
 }
 
+function findReleaseDownload(
+  downloads: DownloadItem[],
+  grabbedHash?: string,
+): DownloadItem | null {
+  const hash = grabbedHash?.toLowerCase();
+  if (!hash) return null;
+  return downloads.find((d) => d.hash.toLowerCase() === hash || d.downloadId?.toLowerCase() === hash) ?? null;
+}
+
 function DownloadProgressButton({
   busy,
   done,
+  progress,
   disabled,
   onClick,
 }: {
   busy: boolean;
   done: boolean;
+  progress?: number | null;
   disabled: boolean;
   onClick: () => void;
 }) {
-  const [progress, setProgress] = useState(0);
+  const [pendingProgress, setPendingProgress] = useState(0);
+  const realProgress = progress != null ? Math.max(0, Math.min(100, progress)) / 100 : null;
+  const visualProgress = realProgress ?? pendingProgress;
 
   useEffect(() => {
     if (!busy) {
-      setProgress(done ? 1 : 0);
+      setPendingProgress(done ? 1 : 0);
       return;
     }
     let raf = 0;
     const started = Date.now();
     const tick = () => {
       const elapsed = Date.now() - started;
-      setProgress(Math.min(0.92, elapsed / 2600));
+      setPendingProgress(Math.min(0.92, elapsed / 2600));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -114,7 +127,6 @@ function DownloadProgressButton({
 
   const radius = 11;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - progress);
 
   return (
     <button
@@ -124,12 +136,12 @@ function DownloadProgressButton({
       onClick={onClick}
       className={cn(
         "relative grid size-[34px] flex-none place-items-center overflow-hidden rounded-full border-0 p-0 text-white transition-[background,opacity,color,transform]",
-        busy ? "cursor-default bg-transparent text-accent opacity-100" : "bg-white/[0.16] opacity-60 hover:bg-accent hover:opacity-100",
+        busy || realProgress != null ? "cursor-default bg-transparent text-accent opacity-100" : "bg-white/[0.16] opacity-60 hover:bg-accent hover:opacity-100",
         done && "bg-ok/20 text-ok opacity-100",
-        !busy && !done && "hover:scale-105",
+        !busy && !done && realProgress == null && "hover:scale-105",
       )}
     >
-      {busy ? (
+      {busy || realProgress != null ? (
         <svg
           width="34"
           height="34"
@@ -145,7 +157,7 @@ function DownloadProgressButton({
             stroke="currentColor"
             strokeWidth="2"
             strokeDasharray={circumference}
-            strokeDashoffset={offset}
+            strokeDashoffset={circumference * (1 - visualProgress)}
             strokeLinecap="round"
           />
         </svg>
@@ -153,6 +165,11 @@ function DownloadProgressButton({
         <Check size={16} strokeWidth={2.2} />
       ) : (
         <Download size={16} strokeWidth={2.2} />
+      )}
+      {realProgress != null && realProgress < 1 && (
+        <span className="relative z-10 font-mono text-[9px] font-bold text-white">
+          {Math.round(realProgress * 100)}
+        </span>
       )}
     </button>
   );
@@ -353,12 +370,14 @@ function TorrentCard({
   busy,
   done,
   disabled,
+  download,
   onGrab,
 }: {
   release: ReleaseOption;
   busy: boolean;
   done: boolean;
   disabled: boolean;
+  download?: DownloadItem | null;
   onGrab: () => void;
 }) {
   const details = release.details;
@@ -374,6 +393,8 @@ function TorrentCard({
   const titleLines = titleParts(title);
   const voiceTags = tech?.voiceCodes?.length ? tech.voiceCodes : voice ? [voice] : [];
   const link = releaseLink(release);
+  const progress = download?.progress;
+  const isComplete = Boolean(done) || Boolean(download && progress != null && progress >= 100);
   const titleContent = (
     <div className="space-y-0.5 text-[11.5px] font-bold leading-[1.18] text-white [font-family:Syne,var(--font-ui)]" title={title}>
       {(titleLines.length ? titleLines : [title]).map((line, index) => (
@@ -448,11 +469,19 @@ function TorrentCard({
             </span>
             <DownloadProgressButton
               busy={busy}
-              done={done}
-              disabled={disabled}
+              done={isComplete}
+              progress={progress}
+              disabled={disabled || Boolean(download)}
               onClick={onGrab}
             />
           </div>
+          {download && (
+            <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] text-white/58">
+              <span className="truncate">{download.state}</span>
+              {download.dlspeed ? <span>{fmtSpeed(download.dlspeed)}</span> : null}
+              {download.eta ? <span>{fmtEta(download.eta)}</span> : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -470,14 +499,17 @@ function TorrentCard({
 export function ReleasePicker({
   params,
   onGrabbed,
+  downloads = [],
 }: {
   params: { type: "movie" | "series"; id: number; seasonNumber?: number };
   onGrabbed?: () => void;
+  downloads?: DownloadItem[];
 }) {
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
+  const [grabbedHashes, setGrabbedHashes] = useState<Record<string, string>>({});
   const toast = useToast();
 
   useEffect(() => {
@@ -485,6 +517,7 @@ export function ReleasePicker({
     setReleases(null);
     setError(null);
     setDone({});
+    setGrabbedHashes({});
     searchReleaseOptions(params).then((r) => {
       if (!alive) return;
       setReleases([...r.items].sort((a, b) => {
@@ -507,7 +540,10 @@ export function ReleasePicker({
       guid: r.guid,
       indexerId: r.indexerId ?? r.indexer,
     });
-    if (res.ok) setDone((p) => ({ ...p, [r.guid]: true }));
+    if (res.ok) {
+      setDone((p) => ({ ...p, [r.guid]: true }));
+      if (res.infohash) setGrabbedHashes((p) => ({ ...p, [r.guid]: res.infohash! }));
+    }
     return res;
   };
 
@@ -535,16 +571,20 @@ export function ReleasePicker({
       countLabel={`${releases.length} раздач`}
       className="mt-3"
     >
-      {releases.map((r) => (
-        <TorrentCard
-          key={r.guid}
-          release={r}
-          busy={busyGuid === r.guid}
-          done={Boolean(done[r.guid])}
-          disabled={busyGuid === r.guid || done[r.guid]}
-          onGrab={() => onGrab(r)}
-        />
-      ))}
+      {releases.map((r) => {
+        const download = findReleaseDownload(downloads, grabbedHashes[r.guid]);
+        return (
+          <TorrentCard
+            key={r.guid}
+            release={r}
+            busy={busyGuid === r.guid}
+            done={Boolean(done[r.guid])}
+            disabled={busyGuid === r.guid || Boolean(done[r.guid])}
+            download={download}
+            onGrab={() => onGrab(r)}
+          />
+        );
+      })}
     </MediaRail>
   );
 }

@@ -1460,7 +1460,7 @@ export async function grabRelease(p: {
   type: "movie" | "series";
   guid: string;
   indexerId: number | string;
-}): Promise<{ ok: boolean; error: string | null }> {
+}): Promise<{ ok: boolean; error: string | null; infohash?: string; added?: boolean }> {
   try {
     const res = await apiFetch("/api/media/release/grab", {
       method: "POST",
@@ -1468,7 +1468,8 @@ export async function grabRelease(p: {
       body: JSON.stringify(p),
     });
     if (!res.ok) return { ok: false, error: await readMediaSearchError(res) };
-    return { ok: true, error: null };
+    const body = (await res.json()) as { infohash?: string; added?: boolean };
+    return { ok: true, error: null, infohash: body.infohash, added: body.added };
   } catch {
     return { ok: false, error: "Ошибка сети" };
   }
@@ -1655,6 +1656,10 @@ export interface ContentTorrent {
   infohash: string;
   title: string;
   magnet: string | null;
+  selectedTitle: string | null;
+  selectedIndexer: string | null;
+  selectedSeasonNumber: number | null;
+  selectedAt: string | null;
   files: ContentTorrentFile[];
 }
 

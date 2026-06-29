@@ -14,15 +14,13 @@ import {
 import {
   DetailBody,
   DetailHero,
-  DetailStatusBadges,
   SimilarRail,
   CardRail,
   tmdbRailCards,
-  StuckImportButtons,
   type DetailPlayer,
   type QueueItem,
 } from "./shared/mediaDetail.tsx";
-import { TorrentFilePicker, ContentTorrents } from "./shared/mediaPick.tsx";
+import { ContentTorrents } from "./shared/mediaPick.tsx";
 import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 import {
@@ -46,7 +44,6 @@ import {
 } from "@/lib/api.ts";
 import { useToast } from "../../components/ui/Toast.tsx";
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-zа-я0-9]/gi, "");
 type AutoplayLocationState = {
   from?: string;
   scrollY?: number;
@@ -96,7 +93,6 @@ export function MediaSeriesPage({
   const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
   const [showAllPicker, setShowAllPicker] = useState(false);
-  const [showPick, setShowPick] = useState(false);
   const [pickReload, setPickReload] = useState(0);
   const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const autoplayConsumedRef = useRef<string | null>(null);
@@ -315,19 +311,6 @@ export function MediaSeriesPage({
     } else toast.error("Не удалось добавить в библиотеку");
   };
 
-  // Один и тот же пак приходит несколькими queue-записями → дедуп по downloadId.
-  const stuck = [
-    ...new Map(
-      media.downloads
-        .filter(
-          (x) =>
-            x.importPending &&
-            norm(x.title).includes(norm(det.title)),
-        )
-        .map((x) => [x.downloadId ?? x.hash, x]),
-    ).values(),
-  ];
-
   // Похожие — из библиотеки по жанрам
   const similarItems = library
     .filter((x) => x.id !== id && x.type === "Series")
@@ -383,13 +366,6 @@ export function MediaSeriesPage({
         />
 
         <DetailBody className="pt-[38px]">
-          <DetailStatusBadges
-            status={det.status}
-            inMonitor={det.inMonitor}
-            monitorName="native monitor"
-            provider={det.network}
-          />
-
           {/* Actions */}
           <div className="flex flex-wrap gap-3 mb-7">
             {watchTarget && (
@@ -410,7 +386,7 @@ export function MediaSeriesPage({
                 {busy === watchTarget.jellyfinId ? "…" : watchLabel}
               </button>
             )}
-            {!det.inMonitor && tvdbId != null && (
+            {!det.jellyfinId && tvdbId != null && (
               <button
                 className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
                 disabled={act === "add"}
@@ -427,70 +403,14 @@ export function MediaSeriesPage({
                 {act === "add" ? "…" : "В библиотеку"}
               </button>
             )}
-            {det.inMonitor && tvdbId != null && (
-              <>
-                <button
-                  className={cn(
-                    ms.button.sm,
-                    det.monitored && ms.button.accentSm,
-                  )}
-                  disabled={act === "mon"}
-                  title={
-                    det.monitored
-                      ? "Снять весь сериал с мониторинга"
-                      : "Мониторить весь сериал"
-                  }
-                  onClick={() => toggleMonitor(!det.monitored)}
-                >
-                  {act === "mon"
-                    ? "…"
-                    : det.monitored
-                      ? "★ Мониторится"
-                      : "☆ Мониторить"}
-                </button>
-                <button
-                  className={ms.button.sm}
-                  disabled={act === "find"}
-                  title="Найти все недостающие серии"
-                  onClick={() => findSeason()}
-                >
-                  {act === "find" ? "…" : "⬇ Найти недостающие"}
-                </button>
-              </>
-            )}
             {tvdbId != null && (
               <button
-                className={ms.button.sm}
+                className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
                 title="Поиск всех раздач сериала (включая мультисезонные паки)"
                 onClick={() => setShowAllPicker((v) => !v)}
               >
-                {showAllPicker ? "Скрыть раздачи" : "🔍 Все раздачи"}
+                {showAllPicker ? "Скрыть поиск" : "Найти"}
               </button>
-            )}
-            <StuckImportButtons
-              items={stuck}
-              label="⚠ Импорт застрявшей раздачи"
-              onSelect={setImportItem}
-            />
-          </div>
-
-          {/* Пофайловый выбор серий из торрента (Media v2) */}
-          <div style={{ marginTop: 16 }}>
-            <button
-              className={cn(ms.button.sm, "mb-2")}
-              onClick={() => setShowPick((v) => !v)}
-            >
-              {showPick
-                ? "Скрыть серии из торрента"
-                : "🔍 Скачать по сериям (торрент)"}
-            </button>
-            {showPick && (
-              <TorrentFilePicker
-                contentType="series"
-                tvdbId={tvdbId}
-                title={det.title}
-                onGrabbed={() => setPickReload((n) => n + 1)}
-              />
             )}
           </div>
 

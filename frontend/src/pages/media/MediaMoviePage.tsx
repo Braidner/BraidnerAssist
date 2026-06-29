@@ -6,7 +6,6 @@ import {useEffect, useRef, useState} from "react";
 import {useParams, useNavigate, useLocation, useSearchParams} from "react-router-dom";
 import {
 	ReleasePicker,
-	ImportDrawer,
 } from "./shared/mediaShared.tsx";
 import {
 	DetailBody,
@@ -16,7 +15,6 @@ import {
 	tmdbRailCards,
 	type DetailPlayer,
 } from "./shared/mediaDetail.tsx";
-import {ContentTorrents} from "./shared/mediaPick.tsx";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {
@@ -32,7 +30,6 @@ import {
 	tmdbResolveTvdb,
 	backdropUrl,
 	type MoviePageDetail,
-	type DownloadItem,
 	type MediaData,
 	type LibraryItem,
 	type TmdbItem,
@@ -68,8 +65,6 @@ export function MediaMoviePage({
 	const [busy, setBusy] = useState(false);
 	const [act, setAct] = useState<string | null>(null);
 	const [showPicker, setShowPicker] = useState(false);
-	const [pickReload, setPickReload] = useState(0);
-	const [importItem, setImportItem] = useState<DownloadItem | null>(null);
 	const autoplayConsumedRef = useRef<string | null>(null);
 	const locationState = location.state as AutoplayLocationState;
 	const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
@@ -189,21 +184,8 @@ export function MediaMoviePage({
 
 	return (
 		<div>
-			<div className={ms.page}>
-				{importItem && (
-					<ImportDrawer
-						item={importItem}
-						type="movie"
-						onClose={() => setImportItem(null)}
-						onDone={() => {
-							setImportItem(null);
-							onMediaUpdate();
-							fetchDetail().then(setD);
-						}}
-					/>
-				)}
-
-				<DetailHero
+				<div className={ms.page}>
+					<DetailHero
 					kindLabel="ФИЛЬМ"
 					title={det.title}
 					jellyfinId={det.jellyfinId}
@@ -245,7 +227,7 @@ export function MediaMoviePage({
 							<button
 								className={ms.button.accentSm}
 								disabled={act === "add"}
-								title="Добавить в native monitor и запустить поиск"
+								title="Зарегистрировать тайтл и выбрать релиз"
 								onClick={addToLib}
 							>
 								{act === "add" ? "…" : "➕ В библиотеку"}
@@ -263,12 +245,11 @@ export function MediaMoviePage({
 					{showPicker && det.tmdbId != null && (
 						<ReleasePicker
 							params={{type: "movie", id: det.tmdbId}}
-							downloads={media.downloads}
-							onGrabbed={() => {
-								onMediaUpdate();
-								setPickReload((n) => n + 1);
-							}}
-						/>
+								downloads={media.downloads}
+								onGrabbed={() => {
+									onMediaUpdate();
+								}}
+							/>
 					)}
 				</DetailBody>
 			</div>
@@ -286,12 +267,6 @@ export function MediaMoviePage({
 			) : (
 				<SimilarRail items={similarItems}/>
 			)}
-			{/* Качается из торрента (Media v2) */}
-			<ContentTorrents
-				contentType="movie"
-				tmdbId={det.tmdbId}
-				reloadKey={pickReload}
-			/>
-		</div>
+			</div>
 	);
 }

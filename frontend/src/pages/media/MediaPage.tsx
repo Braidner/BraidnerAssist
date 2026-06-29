@@ -7,9 +7,9 @@ import { useRegisterTabs } from "../../lib/tabsContext.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import {
   getMediaLibrary,
+  getTorrentRail,
   addTorrent,
   torrentAction,
-  refreshJellyfin,
   lookupTitle,
   addTitle,
   searchReleases,
@@ -27,6 +27,7 @@ import {
   getContinueWatching,
   type MediaData,
   type DownloadItem,
+  type TorrentRailItem,
   type LibraryItem,
   type SearchResult,
   type MediaLookupItem,
@@ -38,7 +39,6 @@ import {
 } from "@/lib/api.ts";
 import {
   ReleasePicker,
-  ImportDrawer,
   Player,
   fmtSize,
 } from "./shared/mediaShared.tsx";
@@ -50,7 +50,7 @@ import { cn } from "../../lib/cn.ts";
 import { ui } from "@/lib/ui.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 
-// Дравер «Добавить»: основной путь — TMDB → native monitor; ниже — ручные опции
+// Дравер «Добавить»: основной путь — TMDB → выбор релиза; ниже — ручные опции
 // (прямой magnet + raw-поиск Jackett).
 function AddTorrentDrawer({
   open,
@@ -143,7 +143,7 @@ function AddTorrentDrawer({
             </button>
           </div>
 
-          {/* Основной путь: TMDB → native monitor/search/import */}
+          {/* Основной путь: TMDB → поиск и выбор релиза */}
           <div className={ms.seg}>
             <button
               className={cn(ms.segButton, kind === "movie" && ms.segButtonOn)}
@@ -443,8 +443,8 @@ export function MediaPage({
 
   // ── Shared state ──────────────────────────────────────────────────────────
   const [library, setLibrary] = useState<LibraryItem[]>([]);
+  const [torrentRail, setTorrentRail] = useState<TorrentRailItem[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [importFor, setImportFor] = useState<DownloadItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [player, setPlayer] = useState<{
     url: string;
@@ -463,6 +463,20 @@ export function MediaPage({
         setLibReady(true);
       });
   }, [media.configured]);
+
+  useEffect(() => {
+    if (!media.configured) return;
+    let alive = true;
+    const load = () => getTorrentRail().then((items) => {
+      if (alive) setTorrentRail(items);
+    });
+    load();
+    const timer = window.setInterval(load, 15_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [media.configured, media.downloads]);
 
   // Discovery home (LAMPA/ZONA-style rails: hero + genres + rails + because-you-watched)
   const [discoverHome, setDiscoverHome] = useState<DiscoverHome>({
@@ -725,24 +739,12 @@ export function MediaPage({
           onClose={() => setPlayer(null)}
         />
       )}
-      {importFor && (
-        <ImportDrawer
-          item={importFor}
-          type={importFor.contentType ?? "series"}
-          onClose={() => setImportFor(null)}
-          onDone={() => {
-            setImportFor(null);
-            onMediaUpdate();
-            refreshJellyfin();
-          }}
-        />
-      )}
-
       {tab === "library" && (
         <MediaLibraryTab
           library={library}
           setLibrary={setLibrary}
           libReady={libReady}
+          torrentRail={torrentRail}
           resume={resume}
           onPlayResume={playResume}
         />
@@ -773,13 +775,12 @@ export function MediaPage({
         <MediaSystemTab
           media={media}
           tsStreams={tsStreams}
-          magnet={magnet}
+        magnet={magnet}
           setMagnet={setMagnet}
           busy={busy}
           onWatchNow={onWatchNow}
           onSetPlayer={setPlayer}
-          onSetImportFor={setImportFor}
-          onTorrent={onTorrent}
+        onTorrent={onTorrent}
           onSetAddOpen={setAddOpen}
           onRemoveStream={removeStream}
         />

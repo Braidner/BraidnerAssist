@@ -9,7 +9,6 @@ import { torrserverStreamRouter } from "./api/torrserverStream.js";
 import { jwtAuth } from "./middleware/jwtAuth.js";
 import { mcpRouter } from "./mcp/handler.js";
 import { startSampler } from "./sampler.js";
-import { startMediaImporter } from "./mediaImporter.js";
 
 const app = express();
 app.use(cors());
@@ -50,5 +49,4 @@ app.listen(config.backendPort, () => {
     `[mission-control] backend listening on :${config.backendPort} (${config.nodeEnv})`,
   );
   startSampler();
-  startMediaImporter();
 });

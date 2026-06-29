@@ -9,21 +9,25 @@ import {
     jellyfinBackdropUrl,
     getMoviePageDetail,
     getSeriesPageDetail,
+    posterUrl,
     type LibraryItem,
     type ResumeItem,
     type MoviePageDetail,
     type SeriesPageDetail,
+    type TorrentRailItem,
 } from "@/lib/api.ts";
 import {useToast} from "../../components/ui/Toast.tsx";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {MediaHero} from "./shared/MediaHero.tsx";
 import {ContinueWatchingCard, MediaPosterCard, MediaRail} from "./shared/mediaRails.tsx";
+import {ProgressBar, fmtEta, fmtSize, fmtSpeed} from "./shared/mediaShared.tsx";
 
 interface MediaLibraryTabProps {
     library: LibraryItem[];
     setLibrary: (l: LibraryItem[]) => void;
     libReady: boolean;
+    torrentRail: TorrentRailItem[];
     resume: ResumeItem[];
     onPlayResume: (it: ResumeItem) => void;
 }
@@ -52,6 +56,7 @@ export function MediaLibraryTab({
                                     library,
                                     setLibrary,
                                     libReady,
+                                    torrentRail,
                                     resume,
                                     onPlayResume,
                                 }: MediaLibraryTabProps) {
@@ -100,6 +105,14 @@ export function MediaLibraryTab({
     return (
         <div id="libraryContainer" className={ms.libPage}>
             <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail} scan={scan}/>
+
+            {torrentRail.length > 0 && (
+                <MediaRail title="СКАЧИВАЕТСЯ / СКОРО В БИБЛИОТЕКЕ" countLabel={String(torrentRail.length)} className={ms.section}>
+                    {torrentRail.map((it) => (
+                        <TorrentRailCard key={it.infohash} item={it} />
+                    ))}
+                </MediaRail>
+            )}
 
             {resume.length > 0 && (
                 <MediaRail title="ПРОДОЛЖИТЬ ПРОСМОТР" countLabel={String(resume.length)} className={ms.section}>
@@ -158,6 +171,56 @@ export function MediaLibraryTab({
                     )}
                 </>
             )}
+        </div>
+    );
+}
+
+function TorrentRailCard({item}: { item: TorrentRailItem }) {
+    const meta = [
+        item.kind === "series" ? "сериал" : "фильм",
+        item.year ? String(item.year) : "",
+        item.seasonNumber != null ? `сезон ${item.seasonNumber}` : "",
+        item.indexer ?? "",
+    ].filter(Boolean).join(" · ");
+    const queue = [
+        item.status === "awaiting_jellyfin" ? "ждём Jellyfin" : fmtSpeed(item.dlspeed),
+        fmtEta(item.eta),
+        item.seeders != null ? `${item.seeders} seed` : "",
+        item.size != null ? fmtSize(item.size) : "",
+    ].filter(Boolean).join(" · ");
+
+    return (
+        <div className={cn(ms.posterCard, "group cursor-default")}>
+            <div className={ms.posterArt}>
+                <div className="absolute inset-0 z-0 bg-[#09090d]" />
+                {item.poster ? (
+                    <img
+                        src={posterUrl(item.poster)}
+                        alt=""
+                        loading="lazy"
+                        className="absolute inset-0 z-[1] size-full object-cover"
+                        onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                    />
+                ) : null}
+                <div className="absolute inset-0 z-[2] bg-[linear-gradient(to_top,rgba(0,0,0,0.78)_0%,transparent_62%)]" />
+                <span className={ms.posterBadge}>{item.status === "awaiting_jellyfin" ? "scan" : `${item.progress}%`}</span>
+                <div className="absolute bottom-0 left-0 right-0 z-[4] h-1 bg-black/40">
+                    <div className="h-full bg-[var(--accent)]" style={{width: `${Math.max(0, Math.min(100, item.progress))}%`}} />
+                </div>
+            </div>
+            <div className={ms.posterInfo}>
+                <div className={ms.posterTitle}>{item.title}</div>
+                <div className={ms.posterSub}>{meta}</div>
+                <div className="mt-2">
+                    <ProgressBar pct={item.progress} />
+                </div>
+                <div className={cn(ms.posterSub, "mt-1 line-clamp-2")} title={item.releaseTitle}>
+                    {item.releaseTitle}
+                </div>
+                <div className={cn(ms.posterSub, "mt-1")}>{queue || item.state}</div>
+            </div>
         </div>
     );
 }

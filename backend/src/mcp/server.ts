@@ -8,7 +8,7 @@ import { getWeather } from "../integrations/weather.js";
 import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
 import { getMedia, qbAdd, jellyfinSessions, jellyfinPlayTo } from "../integrations/media.js";
-import { nativeLookup, nativeAdd, nativeReleaseSearch, nativeGrabRelease, nativeImportCandidates, nativeImportRelease, nativeRepair, nativeMonitorList, listQualityProfiles } from "../integrations/nativeMedia.js";
+import { nativeLookup, nativeReleaseSearch, nativeGrabRelease } from "../integrations/nativeMedia.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import { torrserverAdd, pickVideoFile, isBrowserPlayable } from "../integrations/torrserver.js";
 import { getAdguard } from "../integrations/adguard.js";
@@ -33,7 +33,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: Discovery uses TMDB only. get_discovery_home/search_discovery are read-only; add_media_preference/hide_discovery_title update the dashboard's local SQLite preferences (watchlist/hidden/liked/disliked) and NEVER add/delete media in Jellyfin. To get a movie or show into the library, use add_movie({ query }) / add_series({ query }) — these create native MediaMonitor entries in SQLite. Release search uses Jackett Torznab; downloads go to qBittorrent category mc-native and the importer hardlinks files into the Jellyfin library. To pick a SPECIFIC release, use search_releases({ type, query, season? }) then grab_release({ type, guid, indexerId }). If a download finishes but never appears in the library, use list_import_candidates({type, downloadId}) then import_release({type, downloadId, fileIds?}); omit fileIds to import the selected native mapping. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library). get_media_status shows what's playing and the download queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: Discovery uses TMDB only. get_discovery_home/search_discovery are read-only; add_media_preference/hide_discovery_title update the dashboard's local SQLite preferences (watchlist/hidden/liked/disliked). To get a movie or show into the Jellyfin library, use search_releases({ type, query, season? }) then grab_release({ type, guid, indexerId }). Release search uses Jackett Torznab; selected releases go to qBittorrent and are saved directly into the Jellyfin movies/tv folders. There is no native monitor, missing queue, hardlink importer, or manual import step. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library). get_media_status shows what's playing and the qBittorrent queue; get_dns_stats shows AdGuard query/block statistics.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -242,30 +242,6 @@ export function createMcpServer() {
   );
 
   server.tool(
-    "add_movie",
-    "Find a movie by name in TMDB and add it to the native Mission Control media monitor.",
-    { query: z.string().describe("Movie title, optionally with year, e.g. \"Tetris 2023\"") },
-    async ({ query }) => {
-      const found = await nativeLookup("movie", query);
-      if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
-      const result = await nativeAdd("movie", found[0].id);
-      return ok({ ok: true, added: result.title, monitorId: result.monitorId, alreadyInLibrary: result.alreadyInLibrary });
-    },
-  );
-
-  server.tool(
-    "add_series",
-    "Find a TV series by name in TMDB and add it to the native Mission Control media monitor.",
-    { query: z.string().describe("Series title, optionally with year") },
-    async ({ query }) => {
-      const found = await nativeLookup("series", query);
-      if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
-      const result = await nativeAdd("series", found[0].id);
-      return ok({ ok: true, added: result.title, monitorId: result.monitorId, alreadyInLibrary: result.alreadyInLibrary });
-    },
-  );
-
-  server.tool(
     "search_releases",
     "Interactive release search for a movie or series season. Finds the title, then lists available torrent releases with quality, languages (dubbing/озвучка), size, seeders and any rejection reasons. Use grab_release to download a chosen one. For series pass the season number. Releases are cached for 10 min so grab_release can re-submit the full record — always call this before grab_release.",
     { type: z.enum(["movie", "series"]), query: z.string(), season: z.number().optional().describe("season number, series only") },
@@ -279,30 +255,10 @@ export function createMcpServer() {
 
   server.tool(
     "grab_release",
-    "Force-grab a specific release returned by search_releases (by guid + indexerId/indexer). Mission Control previews the torrent, selects video files, and adds it to qBittorrent category mc-native.",
+    "Force-grab a specific release returned by search_releases (by guid + indexerId/indexer). Mission Control adds it to qBittorrent and saves it directly into the Jellyfin movies/tv library path.",
     { type: z.enum(["movie", "series"]), guid: z.string(), indexerId: z.union([z.number(), z.string()]) },
     async ({ type, guid, indexerId }) => {
       return ok(await nativeGrabRelease(type, guid, indexerId));
-    },
-  );
-
-  server.tool(
-    "list_import_candidates",
-    "List native import candidates for a qBittorrent download. downloadId is the qBittorrent hash from get_media_status or Repair Center.",
-    { type: z.enum(["movie", "series"]), downloadId: z.string() },
-    async ({ type, downloadId }) => {
-      const files = await nativeImportCandidates(type, downloadId);
-      return ok({ ok: true, count: files.length, files });
-    },
-  );
-
-  server.tool(
-    "import_release",
-    "Import selected files of a native qBittorrent download into the Jellyfin library using Mission Control's hardlink/copy organizer. Omit fileIds to import the current wanted mapping.",
-    { type: z.enum(["movie", "series"]), downloadId: z.string(), fileIds: z.array(z.number()).optional() },
-    async ({ type, downloadId, fileIds }) => {
-      const imported = await nativeImportRelease(type, downloadId, fileIds);
-      return ok({ ok: true, imported });
     },
   );
 
@@ -350,7 +306,7 @@ export function createMcpServer() {
 
   server.tool(
     "search_discovery",
-    "Search TMDB discovery titles without adding them. Use add_movie/add_series for actual native library additions.",
+    "Search TMDB discovery titles without adding them. Use search_releases then grab_release for actual library additions.",
     { query: z.string().describe("Movie or series title") },
     async ({ query }) => {
       const data = await tmdbSearch(query);
@@ -413,45 +369,8 @@ export function createMcpServer() {
   );
 
   server.tool(
-    "set_quality_profile",
-    "List current native media quality profiles. UI editing is available through the dashboard; Hermes should use this to inspect profile names before searches.",
-    async () => ok(await listQualityProfiles()),
-  );
-
-  server.tool(
-    "list_media_monitor",
-    "List native MediaMonitor entries: movies/series tracked by Mission Control.",
-    async () => ok(await nativeMonitorList()),
-  );
-
-  server.tool(
-    "search_missing_media",
-    "Inspect Repair Center state for missing monitored episodes, stuck downloads and import failures.",
-    async () => ok(await nativeRepair()),
-  );
-
-  server.tool(
-    "retry_media_import",
-    "Retry native import for a qBittorrent hash using the current wanted file mapping.",
-    { type: z.enum(["movie", "series"]), downloadId: z.string() },
-    async ({ type, downloadId }) => ok({ ok: true, imported: await nativeImportRelease(type, downloadId) }),
-  );
-
-  server.tool(
-    "explain_release_choice",
-    "Search Jackett and return the top scored releases with score reasons and warnings.",
-    { type: z.enum(["movie", "series"]), query: z.string(), season: z.number().optional() },
-    async ({ type, query, season }) => {
-      const found = await nativeLookup(type, query);
-      if (!found.length) return ok({ ok: false, error: "Ничего не найдено" });
-      const releases = await nativeReleaseSearch(type, found[0].id, season);
-      return ok({ ok: true, title: found[0].title, releases: releases.slice(0, 10) });
-    },
-  );
-
-  server.tool(
     "watch_now",
-    "Stream a magnet/torrent instantly via TorrServer without a full download or adding it to the library. Returns the torrent hash, the best video file and a relative streamUrl (/api/media/torrserver/stream?hash=&index=) playable in a browser for mp4/m4v/webm; other containers (mkv/avi) need an external player. Use for a quick one-off watch; for permanent library additions prefer add_movie/add_series.",
+    "Stream a magnet/torrent instantly via TorrServer without a full download or adding it to the library. Returns the torrent hash, the best video file and a relative streamUrl (/api/media/torrserver/stream?hash=&index=) playable in a browser for mp4/m4v/webm; other containers (mkv/avi) need an external player. Use for a quick one-off watch; for permanent library additions prefer search_releases/grab_release.",
     { magnet: z.string().describe("magnet: link or .torrent URL") },
     async ({ magnet }) => {
       if (!config.media.torrserver.configured) return ok({ error: "TorrServer не настроен" });

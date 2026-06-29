@@ -1,17 +1,32 @@
+import path from "node:path";
 import { prisma } from "../db/client.js";
 import { config } from "../config.js";
-import { jackettHealth, jackettSearchMany } from "./jackett.js";
-import { listQualityProfiles, getQualityProfile, scoreRelease } from "./releaseScore.js";
-import { tmdbDetails, tmdbSearch, tmdbSeason, tmdbTvSeasons, tmdbTvToTvdb, tmdbFindByTvdb, type TmdbItem } from "./tmdb.js";
-import { previewTorrent, grabFromQbMetadata, grabSelected } from "./torrentPick.js";
-import { organizeTorrent } from "./files.js";
-import { qbittorrentDownloads, resolveTorrent, type SearchResult, type SeriesPageDetail, type MoviePageDetail, type DetailSeason } from "./media.js";
+import { jackettSearchMany } from "./jackett.js";
+import {
+  jellyfinRefresh,
+  qbAddRaw,
+  qbittorrentDownloads,
+  type DownloadItem,
+  type MoviePageDetail,
+  type SearchResult,
+  type SeriesPageDetail,
+  type DetailSeason,
+} from "./media.js";
+import {
+  tmdbDetails,
+  tmdbFindByTvdb,
+  tmdbSearch,
+  tmdbSeason,
+  tmdbTvSeasons,
+  tmdbTvToTvdb,
+  type TmdbItem,
+} from "./tmdb.js";
 
 type MediaKind = "movie" | "series";
 
 export interface MediaLookupItem {
   kind: MediaKind;
-  id: number; // native: tmdbId for both movie and series
+  id: number;
   tmdbId: number;
   tvdbId: number | null;
   title: string;
@@ -23,37 +38,32 @@ export interface MediaLookupItem {
   monitored: boolean;
 }
 
-export interface NativeManualImportFile {
-  id: number;
-  path: string;
-  relativePath: string;
-  size: number;
+export interface TorrentRailItem {
+  kind: MediaKind;
+  tmdbId: number;
+  tvdbId: number | null;
+  jellyfinId: string | null;
+  title: string;
+  year: number | null;
+  poster: string | null;
+  backdrop: string | null;
+  infohash: string;
+  releaseTitle: string;
+  indexer: string | null;
+  size: number | null;
+  seeders: number | null;
+  savePath: string | null;
   seasonNumber: number | null;
-  episodeNumbers: number[];
-  quality: string | null;
-  languages: string[];
-  rejected: boolean;
-  rejections: string[];
+  progress: number;
+  state: string;
+  dlspeed: number;
+  eta: number | null;
+  status: "downloading" | "awaiting_jellyfin";
 }
 
-const releaseCache = new Map<string, { at: number; item: SearchResult & { type: MediaKind; tmdbId?: number | null; tvdbId?: number | null; titleHint: string } }>();
-const CACHE_TTL = 10 * 60_000;
-
-function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: number): string[] {
-  const titles = [title, detail?.originalTitle]
-    .map((v) => String(v ?? "").trim())
-    .filter(Boolean);
-  const uniqueTitles = [...new Set(titles.map((v) => v.toLowerCase()))]
-    .map((key) => titles.find((v) => v.toLowerCase() === key)!)
-    .filter(Boolean);
-  const season = seasonNumber != null ? ` S${String(seasonNumber).padStart(2, "0")}` : "";
-  const queries: string[] = [];
-  for (const t of uniqueTitles) {
-    queries.push(`${t}${season}`);
-    if (detail?.year) queries.push(`${t} ${detail.year}${season}`);
-  }
-  return queries;
-}
+const RELEASE_CACHE_TTL = 10 * 60_000;
+const LIBRARY_CATEGORY = "mc-library";
+const releaseCache = new Map<string, { at: number; item: SearchResult & { type: MediaKind; tmdbId: number; tvdbId: number | null; titleHint: string; seasonNumber?: number } }>();
 
 function cacheKey(type: MediaKind, guid: string, indexerId: number | string): string {
   return `${type}:${indexerId}:${guid}`;
@@ -61,56 +71,77 @@ function cacheKey(type: MediaKind, guid: string, indexerId: number | string): st
 
 function keepCacheFresh(): void {
   const now = Date.now();
-  for (const [k, v] of releaseCache) if (now - v.at > CACHE_TTL) releaseCache.delete(k);
-}
-
-function selectedReleaseJson(item: SearchResult): string {
-  return JSON.stringify({
-    guid: item.guid,
-    indexerId: item.indexerId,
-    title: item.title,
-    query: item.query,
-    size: item.size,
-    seeders: item.seeders,
-    leechers: item.leechers,
-    peers: item.peers,
-    grabs: item.grabs,
-    indexer: item.indexer,
-    trackerName: item.trackerName,
-    trackerId: item.trackerId,
-    url: item.url,
-    detailUrl: item.detailUrl,
-    publishDate: item.publishDate,
-    description: item.description,
-    posterRemote: item.posterRemote,
-    imdb: item.imdb,
-    tmdb: item.tmdb,
-    infoHash: item.infoHash,
-    category: item.category,
-    voice: item.voice,
-    voiceLabel: item.voiceLabel,
-    releaseGroup: item.releaseGroup,
-    studioHint: item.studioHint,
-    details: item.details,
-    score: item.score,
-    scoreReasons: item.scoreReasons,
-    warnings: item.warnings,
-    parsed: item.parsed,
-  });
-}
-
-async function monitorFor(kind: MediaKind, id: number) {
-  if (kind === "series") {
-    const byTmdb = await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind, tmdbId: id } } });
-    if (byTmdb) return byTmdb;
-    return prisma.mediaMonitor.findFirst({ where: { kind, tvdbId: id } });
+  for (const [key, value] of releaseCache) {
+    if (now - value.at > RELEASE_CACHE_TTL) releaseCache.delete(key);
   }
-  return prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind, tmdbId: id } } });
+}
+
+function mediaRoot(): string | null {
+  return config.mediaFs.root ? path.resolve(config.mediaFs.root) : null;
+}
+
+function librarySavePath(kind: MediaKind): string | undefined {
+  const root = mediaRoot();
+  if (!root) return undefined;
+  return path.join(root, kind === "series" ? config.mediaFs.tv : config.mediaFs.movies);
+}
+
+function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: number): string[] {
+  const titles = [title, detail?.originalTitle]
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean);
+  const unique = [...new Set(titles.map((v) => v.toLowerCase()))]
+    .map((key) => titles.find((v) => v.toLowerCase() === key)!)
+    .filter(Boolean);
+  const season = seasonNumber != null ? ` S${String(seasonNumber).padStart(2, "0")}` : "";
+  return unique.flatMap((titleValue) => [
+    `${titleValue}${season}`,
+    ...(detail?.year ? [`${titleValue} ${detail.year}${season}`] : []),
+  ]);
+}
+
+async function resolveTmdbId(kind: MediaKind, id: number): Promise<{ tmdbId: number; tvdbId: number | null }> {
+  if (kind === "movie") return { tmdbId: id, tvdbId: null };
+  const detailByTmdb = await tmdbDetails("series", id).catch(() => null);
+  if (detailByTmdb) {
+    return { tmdbId: id, tvdbId: await tmdbTvToTvdb(id).catch(() => null) };
+  }
+  const tmdbId = await tmdbFindByTvdb(id).catch(() => null);
+  if (!tmdbId) throw new Error("series not found in TMDB");
+  return { tmdbId, tvdbId: id };
+}
+
+async function ensureTitle(kind: MediaKind, id: number) {
+  const { tmdbId, tvdbId } = await resolveTmdbId(kind, id);
+  const detail = await tmdbDetails(kind, tmdbId);
+  if (!detail) throw new Error("TMDB title not found");
+  const resolvedTvdb = kind === "series" ? tvdbId ?? await tmdbTvToTvdb(tmdbId).catch(() => null) : null;
+  return prisma.mediaTitle.upsert({
+    where: { kind_tmdbId: { kind, tmdbId } },
+    create: {
+      kind,
+      tmdbId,
+      tvdbId: resolvedTvdb,
+      title: detail.title,
+      year: detail.year,
+      poster: detail.poster,
+      backdrop: detail.backdrop,
+      overview: detail.overview,
+    },
+    update: {
+      tvdbId: resolvedTvdb,
+      title: detail.title,
+      year: detail.year,
+      poster: detail.poster,
+      backdrop: detail.backdrop,
+      overview: detail.overview,
+    },
+  });
 }
 
 async function lookupItem(item: TmdbItem): Promise<MediaLookupItem> {
   const tvdbId = item.kind === "series" ? await tmdbTvToTvdb(item.tmdbId).catch(() => null) : null;
-  const monitor = await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.kind, tmdbId: item.tmdbId } } });
+  const title = await prisma.mediaTitle.findUnique({ where: { kind_tmdbId: { kind: item.kind, tmdbId: item.tmdbId } } });
   return {
     kind: item.kind,
     id: item.tmdbId,
@@ -121,13 +152,13 @@ async function lookupItem(item: TmdbItem): Promise<MediaLookupItem> {
     overview: item.overview,
     poster: item.poster,
     backdrop: item.backdrop,
-    added: Boolean(monitor),
-    monitored: monitor?.monitored ?? false,
+    added: Boolean(title?.jellyfinId),
+    monitored: false,
   };
 }
 
 export async function nativeLookup(kind: MediaKind, query: string): Promise<MediaLookupItem[]> {
-  const items = (await tmdbSearch(query)).filter((i) => i.kind === kind);
+  const items = (await tmdbSearch(query)).filter((item) => item.kind === kind);
   return Promise.all(items.slice(0, 12).map(lookupItem));
 }
 
@@ -136,284 +167,146 @@ export async function nativeLookupAll(query: string): Promise<MediaLookupItem[]>
   return Promise.all(items.slice(0, 16).map(lookupItem));
 }
 
-export async function nativeAdd(kind: MediaKind, id: number, opts: { monitored?: boolean; searchMode?: "manual" | "automatic" | "paused"; qualityProfileName?: string | null } = {}): Promise<{ title: string; monitorId: string; alreadyInLibrary: boolean }> {
-  let tmdbId = id;
-  if (kind === "series") {
-    const resolved = await tmdbFindByTvdb(id).catch(() => null);
-    if (resolved) tmdbId = resolved;
-  }
-  const detail = await tmdbDetails(kind, tmdbId);
-  if (!detail) throw new Error("TMDB title not found");
-  const tvdbId = kind === "series" ? await tmdbTvToTvdb(tmdbId).catch(() => null) : null;
-  const profile = await getQualityProfile(opts.qualityProfileName);
-  const existing = await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind, tmdbId } } });
-  const monitor = await prisma.mediaMonitor.upsert({
-    where: { kind_tmdbId: { kind, tmdbId } },
-    create: {
-      kind,
-      tmdbId,
-      tvdbId,
-      title: detail.title,
-      year: detail.year,
-      poster: detail.poster,
-      backdrop: detail.backdrop,
-      overview: detail.overview,
-      monitored: opts.monitored ?? true,
-      searchMode: opts.searchMode ?? "manual",
-      qualityProfileId: (await prisma.mediaQualityProfile.findUnique({ where: { name: profile.name } }))?.id,
-    },
-    update: {
-      tvdbId,
-      title: detail.title,
-      year: detail.year,
-      poster: detail.poster,
-      backdrop: detail.backdrop,
-      overview: detail.overview,
-      monitored: opts.monitored ?? true,
-    },
-  });
-
-  if (kind === "series") await syncMonitorEpisodes(monitor.id, tmdbId).catch(() => {});
-  await prisma.mediaImportEvent.create({ data: { monitorId: monitor.id, level: "info", message: "monitor added", payload: JSON.stringify({ kind, tmdbId }) } }).catch(() => {});
-  return { title: detail.title, monitorId: monitor.id, alreadyInLibrary: Boolean(existing) };
-}
-
-export async function syncMonitorEpisodes(monitorId: string, tmdbId: number): Promise<void> {
-  const seasons = await tmdbTvSeasons(tmdbId);
-  for (const seasonNumber of seasons) {
-    await prisma.mediaMonitorSeason.upsert({
-      where: { monitorId_seasonNumber: { monitorId, seasonNumber } },
-      create: { monitorId, seasonNumber },
-      update: {},
-    });
-    const eps = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
-    for (const ep of eps) {
-      await prisma.mediaMonitorEpisode.upsert({
-        where: { monitorId_seasonNumber_episodeNumber: { monitorId, seasonNumber, episodeNumber: ep.episodeNumber } },
-        create: {
-          monitorId,
-          seasonNumber,
-          episodeNumber: ep.episodeNumber,
-          title: ep.title,
-          airDate: ep.airDate ? new Date(ep.airDate) : null,
-          status: ep.airDate && new Date(ep.airDate).getTime() > Date.now() ? "upcoming" : "wanted",
-        },
-        update: {
-          title: ep.title,
-          airDate: ep.airDate ? new Date(ep.airDate) : null,
-        },
-      });
-    }
-  }
+export async function nativeAdd(kind: MediaKind, id: number): Promise<{ title: string; titleId: string; alreadyInLibrary: boolean }> {
+  const title = await ensureTitle(kind, id);
+  return { title: title.title, titleId: title.id, alreadyInLibrary: Boolean(title.jellyfinId) };
 }
 
 export async function nativeReleaseSearch(kind: MediaKind, id: number, seasonNumber?: number): Promise<SearchResult[]> {
   keepCacheFresh();
-  const monitor = await monitorFor(kind, id);
-  let tmdbId = monitor?.tmdbId ?? id;
-  let tvdbId = monitor?.tvdbId ?? null;
-  if (kind === "series" && !monitor) {
-    const resolved = await tmdbFindByTvdb(id).catch(() => null);
-    if (resolved) {
-      tmdbId = resolved;
-      tvdbId = id;
-    }
+  const title = await ensureTitle(kind, id);
+  const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
+  const queries = releaseQueries(detail, title.title, kind === "series" ? seasonNumber : undefined);
+  const releases = await jackettSearchMany(queries, { kind });
+  for (const release of releases) {
+    const item = {
+      ...release,
+      type: kind,
+      tmdbId: title.tmdbId,
+      tvdbId: title.tvdbId,
+      titleHint: title.title,
+      seasonNumber: kind === "series" ? seasonNumber : undefined,
+    };
+    releaseCache.set(cacheKey(kind, release.guid, release.indexerId ?? release.trackerId ?? release.indexer), { at: Date.now(), item });
+    releaseCache.set(cacheKey(kind, release.guid, release.indexer), { at: Date.now(), item });
   }
-  const detail = await tmdbDetails(kind, tmdbId).catch(() => null);
-  const title = monitor?.title ?? detail?.title ?? String(id);
-  const queries = releaseQueries(detail, title, kind === "series" ? seasonNumber : undefined);
-  const query = queries[0] ?? title;
-  const profileName = monitor?.qualityProfileId
-    ? (await prisma.mediaQualityProfile.findUnique({ where: { id: monitor.qualityProfileId } }))?.name
-    : null;
-  const releases = await jackettSearchMany(queries, { kind, profileName });
-  for (const r of releases) {
-    releaseCache.set(cacheKey(kind, r.guid, r.indexerId ?? r.trackerId ?? r.indexer), { at: Date.now(), item: { ...r, type: kind, tmdbId, tvdbId, titleHint: title } });
-    releaseCache.set(cacheKey(kind, r.guid, r.indexer), { at: Date.now(), item: { ...r, type: kind, tmdbId, tvdbId, titleHint: title } });
-  }
-  await Promise.all(releases.slice(0, 20).map((r) =>
-    prisma.mediaReleaseDecision.create({
-      data: {
-        monitorId: monitor?.id,
-        kind,
-        tmdbId,
-        tvdbId,
-        query,
-        guid: r.guid,
-        title: r.title,
-        indexer: r.indexer,
-        seasonNumber: kind === "series" ? seasonNumber ?? null : null,
-        score: r.score ?? 0,
-        reasons: JSON.stringify(r.scoreReasons ?? []),
-        warnings: JSON.stringify(r.warnings ?? []),
-      },
-    }).catch(() => null),
-  ));
-  if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastSearchAt: new Date(), lastError: null } }).catch(() => {});
   return releases;
 }
 
 export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId: number | string): Promise<{ ok: true; infohash: string; added: boolean }> {
   keepCacheFresh();
-  const cached = releaseCache.get(cacheKey(kind, guid, indexerId)) ?? [...releaseCache.values()].find((v) => v.item.type === kind && v.item.guid === guid);
-  const source = cached?.item.url;
-  if (!source) throw new Error("Release not in cache; run search_releases first");
+  const cached = releaseCache.get(cacheKey(kind, guid, indexerId)) ?? [...releaseCache.values()].find((value) => value.item.type === kind && value.item.guid === guid);
+  if (!cached?.item.url) throw new Error("Release not in cache; run search_releases first");
   const item = cached.item;
-  const ensuredMonitor = item.tmdbId
-    ? await nativeAdd(kind, item.tmdbId, { monitored: true, searchMode: "manual" }).catch(() => null)
-    : null;
-  let previewSource = source;
-  if (!source.startsWith("magnet:")) {
-    const resolved = await resolveTorrent(source).catch(() => null);
-    if (resolved?.magnet) previewSource = resolved.magnet;
-  }
-  let preview;
-  try {
-    preview = await previewTorrent(previewSource);
-  } catch {
-    const res = await grabFromQbMetadata({
-      contentType: item.type,
-      tmdbId: item.tmdbId,
-      tvdbId: item.tvdbId,
-      title: item.titleHint,
-      source: previewSource,
-      category: "mc-native",
-    });
-    const monitor = ensuredMonitor?.monitorId
-      ? await prisma.mediaMonitor.findUnique({ where: { id: ensuredMonitor.monitorId } })
-      : item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
-    if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
-    await prisma.mediaReleaseDecision.updateMany({
-      where: { kind: item.type, guid },
-      data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedReleaseJson: selectedReleaseJson(item), selectedAt: new Date() },
-    }).catch(() => {});
-    return { ok: true, ...res };
-  }
-  const videoFiles = preview.files.filter((f) => f.isVideo);
-  const wantedIndexes = item.type === "movie"
-    ? [videoFiles.slice().sort((a, b) => b.length - a.length)[0]?.fileIndex].filter((x): x is number => Number.isFinite(x))
-    : videoFiles.filter((f) => f.episodes.length > 0).map((f) => f.fileIndex);
-  if (wantedIndexes.length === 0) throw new Error("No video files selected for release");
-  const res = await grabSelected({
-    contentType: item.type,
-    tmdbId: item.tmdbId,
-    tvdbId: item.tvdbId,
-    title: item.titleHint,
-    source: previewSource,
-    infohash: preview.infohash,
-    files: preview.files,
-    wantedIndexes,
-    category: "mc-native",
+  const source = String(item.url);
+  const title = await ensureTitle(kind, item.tmdbId);
+  const savePath = librarySavePath(kind);
+  const addedIds = await qbAddRaw(source, { category: LIBRARY_CATEGORY, savePath });
+  const infohash = (addedIds[0] ?? item.infoHash ?? "").toLowerCase();
+  if (!infohash) throw new Error("qBittorrent добавил торрент, но не вернул hash");
+  await prisma.mediaTorrent.upsert({
+    where: { infohash },
+    create: {
+      titleId: title.id,
+      infohash,
+      releaseTitle: item.title,
+      releaseUrl: source,
+      guid: item.guid,
+      indexer: item.trackerName ?? item.indexer,
+      size: item.size,
+      seeders: item.seeders,
+      savePath: savePath ?? null,
+      category: LIBRARY_CATEGORY,
+      seasonNumber: item.seasonNumber ?? null,
+    },
+    update: {
+      titleId: title.id,
+      releaseTitle: item.title,
+      releaseUrl: source,
+      guid: item.guid,
+      indexer: item.trackerName ?? item.indexer,
+      size: item.size,
+      seeders: item.seeders,
+      savePath: savePath ?? null,
+      category: LIBRARY_CATEGORY,
+      seasonNumber: item.seasonNumber ?? null,
+    },
   });
-  const monitor = ensuredMonitor?.monitorId
-    ? await prisma.mediaMonitor.findUnique({ where: { id: ensuredMonitor.monitorId } })
-    : item.tmdbId ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: item.type, tmdbId: item.tmdbId } } }) : null;
-  if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
-  await prisma.mediaReleaseDecision.updateMany({
-    where: { kind: item.type, guid },
-    data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedReleaseJson: selectedReleaseJson(item), selectedAt: new Date() },
-  }).catch(() => {});
-  return { ok: true, ...res };
+  await jellyfinRefresh().catch(() => {});
+  return { ok: true, infohash, added: true };
 }
 
-export async function nativeImportCandidates(_kind: MediaKind, downloadId: string): Promise<NativeManualImportFile[]> {
-  const torrent = await prisma.mediaTorrent.findUnique({ where: { infohash: downloadId.toLowerCase() }, include: { files: true } });
-  if (!torrent) return [];
-  const profile = await getQualityProfile();
-  return torrent.files.filter((f) => f.wanted).map((f) => {
-    const scored = scoreRelease({ title: f.path, size: f.length, seeders: 1, profile, kind: torrent.contentType as MediaKind });
-    return {
-      id: f.fileIndex,
-      path: f.path,
-      relativePath: f.path,
-      size: f.length,
-      seasonNumber: f.seasonNumber,
-      episodeNumbers: f.episodeNumber == null ? [] : [f.episodeNumber],
-      quality: scored.parsed.resolution ? `${scored.parsed.resolution}p` : null,
-      languages: scored.parsed.languages,
-      rejected: Boolean(f.importError),
-      rejections: f.importError ? [f.importError] : [],
-    };
-  });
-}
-
-export async function nativeImportRelease(_kind: MediaKind, downloadId: string, fileIds?: number[]): Promise<number> {
-  if (fileIds?.length) {
-    const torrent = await prisma.mediaTorrent.findUnique({ where: { infohash: downloadId.toLowerCase() }, include: { files: true } });
-    if (torrent) {
-      const keep = new Set(fileIds);
-      await Promise.all(torrent.files.map((f) => prisma.mediaTorrentFile.update({ where: { id: f.id }, data: { wanted: keep.has(f.fileIndex) } })));
-    }
+export async function linkMediaTitlesToJellyfin(): Promise<void> {
+  if (!config.media.jellyfin.configured) return;
+  const { getLibrary } = await import("./media.js");
+  const library = await getLibrary().catch(() => []);
+  const byTmdb = new Map<string, string>();
+  const byTvdb = new Map<string, string>();
+  for (const item of library) {
+    const kind: MediaKind = item.type === "Series" ? "series" : "movie";
+    if (item.tmdbId) byTmdb.set(`${kind}:${item.tmdbId}`, item.id);
+    if (kind === "series" && item.tvdbId) byTvdb.set(`series:${item.tvdbId}`, item.id);
   }
-  const res = await organizeTorrent(downloadId);
-  return res.organized;
-}
-
-export async function nativeSetMonitored(kind: MediaKind, id: number, monitored: boolean, seasonNumber?: number): Promise<void> {
-  const monitor = await monitorFor(kind, id) ?? (await nativeAdd(kind, id, { monitored })).monitorId;
-  const monitorId = typeof monitor === "string" ? monitor : monitor.id;
-  if (seasonNumber != null) {
-    await prisma.mediaMonitorSeason.upsert({
-      where: { monitorId_seasonNumber: { monitorId, seasonNumber } },
-      create: { monitorId, seasonNumber, monitored },
-      update: { monitored },
-    });
-  } else {
-    await prisma.mediaMonitor.update({ where: { id: monitorId }, data: { monitored } });
-  }
-}
-
-export async function nativeCalendar(days = 14) {
-  const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const rows = await prisma.mediaMonitorEpisode.findMany({
-    where: { airDate: { gte: since, lte: until }, monitor: { monitored: true } },
-    include: { monitor: true },
-    orderBy: { airDate: "asc" },
-  });
-  return rows.map((e) => ({
-    kind: "episode",
-    title: `${e.monitor.title} S${String(e.seasonNumber).padStart(2, "0")}E${String(e.episodeNumber).padStart(2, "0")}`,
-    seriesTitle: e.monitor.title,
-    seasonNumber: e.seasonNumber,
-    episodeNumber: e.episodeNumber,
-    airDate: e.airDate?.toISOString() ?? null,
-    hasFile: Boolean(e.importedPath) || e.status === "downloaded",
-    monitored: e.monitored && e.monitor.monitored,
-    status: e.status,
+  const titles = await prisma.mediaTitle.findMany({ where: { jellyfinId: null } });
+  await Promise.all(titles.map((title) => {
+    const jellyfinId = byTmdb.get(`${title.kind}:${title.tmdbId}`) ?? (title.kind === "series" && title.tvdbId ? byTvdb.get(`series:${title.tvdbId}`) : null);
+    if (!jellyfinId) return Promise.resolve();
+    return prisma.mediaTitle.update({ where: { id: title.id }, data: { jellyfinId } });
   }));
 }
 
-export async function nativeRepair() {
-  const torrents = await prisma.mediaTorrent.findMany({
-    where: { OR: [{ importStatus: { in: ["failed", "needs_review", "completed"] } }, { files: { some: { importError: { not: null } } } }] },
-    include: { files: true },
+export async function getTorrentRail(): Promise<TorrentRailItem[]> {
+  await linkMediaTitlesToJellyfin().catch(() => {});
+  const downloads = await qbittorrentDownloads().catch(() => []);
+  const byHash = new Map(downloads.map((download) => [download.hash.toLowerCase(), download]));
+  const rows = await prisma.mediaTorrent.findMany({
+    include: { title: true },
     orderBy: { updatedAt: "desc" },
     take: 50,
   });
-  const missing = await prisma.mediaMonitorEpisode.findMany({
-    where: { status: { in: ["wanted", "downloading"] }, monitor: { monitored: true } },
-    include: { monitor: true },
-    orderBy: { updatedAt: "desc" },
-    take: 50,
-  });
-  return {
-    jackett: await jackettHealth().catch((e) => [{ id: "all", configured: config.media.jackett.configured, ok: false, latencyMs: null, resultCount: 0, lastError: String(e), checkedAt: new Date().toISOString() }]),
-    torrents: torrents.map((t) => ({
-      infohash: t.infohash,
-      title: t.title,
-      contentType: t.contentType,
-      importStatus: t.importStatus,
-      progress: t.progress,
-      lastError: t.lastError,
-      files: t.files.filter((f) => f.importError || (f.wanted && !f.importedPath)).map((f) => ({ fileIndex: f.fileIndex, path: f.path, error: f.importError, importedPath: f.importedPath })),
-    })),
-    missing: missing.map((e) => ({ monitorId: e.monitorId, title: e.monitor.title, seasonNumber: e.seasonNumber, episodeNumber: e.episodeNumber, airDate: e.airDate, status: e.status })),
-  };
-}
-
-export async function nativeMonitorList() {
-  return prisma.mediaMonitor.findMany({ include: { seasons: true }, orderBy: { updatedAt: "desc" } });
+  const visible: TorrentRailItem[] = [];
+  for (const row of rows) {
+    const download = byHash.get(row.infohash.toLowerCase());
+    const progress = download?.progress ?? Math.round(row.progress * 100);
+    const completed = progress >= 100;
+    const linked = Boolean(row.title.jellyfinId);
+    await prisma.mediaTorrent.update({
+      where: { id: row.id },
+      data: {
+        progress: Math.max(0, Math.min(1, progress / 100)),
+        state: download?.state ?? row.state,
+        lastSeenAt: download ? new Date() : row.lastSeenAt,
+        completedAt: completed && !row.completedAt ? new Date() : row.completedAt,
+        seeders: download?.seeds ?? row.seeders,
+        size: download?.size ?? row.size,
+        savePath: download?.savePath ?? row.savePath,
+      },
+    }).catch(() => {});
+    if (completed && linked) continue;
+    visible.push({
+      kind: row.title.kind === "series" ? "series" : "movie",
+      tmdbId: row.title.tmdbId,
+      tvdbId: row.title.tvdbId,
+      jellyfinId: row.title.jellyfinId,
+      title: row.title.title,
+      year: row.title.year,
+      poster: row.title.poster,
+      backdrop: row.title.backdrop,
+      infohash: row.infohash,
+      releaseTitle: row.releaseTitle,
+      indexer: row.indexer,
+      size: download?.size ?? row.size ?? null,
+      seeders: download?.seeds ?? row.seeders ?? null,
+      savePath: download?.savePath ?? row.savePath,
+      seasonNumber: row.seasonNumber,
+      progress,
+      state: download?.state ?? row.state ?? "queued",
+      dlspeed: download?.dlspeed ?? 0,
+      eta: download?.eta ?? null,
+      status: completed ? "awaiting_jellyfin" : "downloading",
+    });
+  }
+  return visible.slice(0, 24);
 }
 
 export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPageDetail> {
@@ -421,35 +314,31 @@ export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPage
   const detail = await tmdbDetails("series", tmdbId);
   if (!detail) throw new Error("series not found in TMDB");
   const tvdbId = await tmdbTvToTvdb(tmdbId).catch(() => null);
-  const monitor = await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: "series", tmdbId } } });
-  const imported = await prisma.mediaTorrentFile.findMany({
-    where: { torrent: { contentType: "series", OR: [{ tmdbId }, ...(tvdbId ? [{ tvdbId }] : [])] }, importedPath: { not: null } },
-  });
-  const fileKeys = new Set(imported.map((f) => `S${f.seasonNumber}E${f.episodeNumber}`));
+  const title = await prisma.mediaTitle.findUnique({ where: { kind_tmdbId: { kind: "series", tmdbId } } }).catch(() => null);
   const seasonNumbers = await tmdbTvSeasons(tmdbId).catch(() => []);
   const seasons: DetailSeason[] = [];
   for (const seasonNumber of seasonNumbers) {
-    const eps = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
+    const episodes = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
     seasons.push({
       seasonNumber,
-      episodes: eps.map((e) => ({
+      episodes: episodes.map((episode) => ({
         seasonNumber,
-        episodeNumber: e.episodeNumber,
-        title: e.title,
-        airDate: e.airDate,
-        hasFile: fileKeys.has(`S${seasonNumber}E${e.episodeNumber}`),
+        episodeNumber: episode.episodeNumber,
+        title: episode.title,
+        airDate: episode.airDate,
+        hasFile: false,
         quality: null,
         size: null,
         jellyfinId: null,
         played: false,
       })),
-      fileCount: eps.filter((e) => fileKeys.has(`S${seasonNumber}E${e.episodeNumber}`)).length,
-      totalCount: eps.length,
-      monitored: monitor?.monitored ?? false,
+      fileCount: 0,
+      totalCount: episodes.length,
+      monitored: false,
     });
   }
   return {
-    jellyfinId: "",
+    jellyfinId: title?.jellyfinId ?? "",
     title: detail.title,
     year: detail.year,
     overview: detail.overview,
@@ -461,8 +350,8 @@ export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPage
     posterRemote: detail.poster,
     backdropRemote: detail.backdrop,
     tvdbId,
-    inMonitor: Boolean(monitor),
-    monitored: monitor?.monitored ?? false,
+    inMonitor: false,
+    monitored: false,
     seasons,
   };
 }
@@ -470,13 +359,9 @@ export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPage
 export async function nativeMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail> {
   const detail = await tmdbDetails("movie", tmdbId);
   if (!detail) throw new Error("movie not found in TMDB");
-  const monitor = await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: "movie", tmdbId } } });
-  const file = await prisma.mediaTorrentFile.findFirst({
-    where: { torrent: { contentType: "movie", tmdbId }, importedPath: { not: null } },
-    orderBy: { importedAt: "desc" },
-  });
+  const title = await prisma.mediaTitle.findUnique({ where: { kind_tmdbId: { kind: "movie", tmdbId } } }).catch(() => null);
   return {
-    jellyfinId: "",
+    jellyfinId: title?.jellyfinId ?? "",
     title: detail.title,
     year: detail.year,
     overview: detail.overview,
@@ -488,36 +373,21 @@ export async function nativeMovieDiscoverDetail(tmdbId: number): Promise<MoviePa
     posterRemote: detail.poster,
     backdropRemote: detail.backdrop,
     tmdbId,
-    inMonitor: Boolean(monitor),
-    monitored: monitor?.monitored ?? false,
-    hasFile: Boolean(file),
+    inMonitor: false,
+    monitored: false,
+    hasFile: Boolean(title?.jellyfinId),
     quality: null,
-    size: file?.length ?? null,
+    size: null,
   };
 }
 
-export async function nativeImporterTick(): Promise<void> {
-  const downloads = await qbittorrentDownloads().catch(() => []);
-  for (const d of downloads) {
-    const hash = d.hash.toLowerCase();
-    if (d.category && d.category !== "mc-native") continue;
-    const torrent = await prisma.mediaTorrent.findUnique({ where: { infohash: hash } });
-    if (!torrent) continue;
-    const completed = d.progress >= 100 || ["uploading", "stalledUP", "pausedUP", "queuedUP", "checkingUP", "forcedUP"].includes(d.state);
-    await prisma.mediaTorrent.update({
-      where: { id: torrent.id },
-      data: {
-        progress: Math.max(0, Math.min(1, d.progress / 100)),
-        completedAt: completed && !torrent.completedAt ? new Date() : torrent.completedAt,
-        importStatus: completed && ["queued", "downloading"].includes(torrent.importStatus) ? "completed" : torrent.importStatus,
-      },
-    }).catch(() => {});
-    if (completed && !["imported", "importing", "ignored"].includes(torrent.importStatus)) {
-      await organizeTorrent(hash).catch(async (e) => {
-        await prisma.mediaTorrent.update({ where: { id: torrent.id }, data: { importStatus: "failed", lastError: String(e) } }).catch(() => {});
-      });
-    }
-  }
+export async function registerRawTorrent(urlOrMagnet: string, kind?: MediaKind): Promise<void> {
+  await qbAddRaw(urlOrMagnet, {
+    category: kind ? LIBRARY_CATEGORY : undefined,
+    savePath: kind ? librarySavePath(kind) : undefined,
+  });
 }
 
-export { listQualityProfiles };
+export function isLibraryCategory(download: DownloadItem): boolean {
+  return download.category === LIBRARY_CATEGORY;
+}

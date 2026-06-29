@@ -1,4 +1,3 @@
-import { prisma } from "../db/client.js";
 import { parseReleaseTitle, type ParsedRelease } from "./releaseParse.js";
 
 export interface ReleaseQualityProfile {
@@ -33,58 +32,8 @@ const DEFAULTS: ReleaseQualityProfile[] = [
   { name: "original audio", kind: "both", minResolution: 720, maxResolution: 1080, preferHdr: false, allowHdr: true, allowHevc: true, allowAv1: true, preferredLanguages: ["en", "ru"], bannedWords: ["dubbed", "camrip", "ts"], maxMovieSizeGb: 20, maxEpisodeSizeGb: 5 },
 ];
 
-function fromRow(row: any): ReleaseQualityProfile {
-  return {
-    name: row.name,
-    kind: row.kind,
-    minResolution: row.minResolution,
-    maxResolution: row.maxResolution,
-    preferHdr: row.preferHdr,
-    allowHdr: row.allowHdr,
-    allowHevc: row.allowHevc,
-    allowAv1: row.allowAv1,
-    preferredLanguages: String(row.preferredLanguages || "ru,en").split(",").map((s) => s.trim()).filter(Boolean),
-    bannedWords: String(row.bannedWords || "").split(",").map((s) => s.trim()).filter(Boolean),
-    maxMovieSizeGb: row.maxMovieSizeGb,
-    maxEpisodeSizeGb: row.maxEpisodeSizeGb,
-  };
-}
-
-export async function ensureDefaultQualityProfiles(): Promise<void> {
-  for (const p of DEFAULTS) {
-    await prisma.mediaQualityProfile.upsert({
-      where: { name: p.name },
-      create: {
-        name: p.name,
-        kind: p.kind,
-        minResolution: p.minResolution,
-        maxResolution: p.maxResolution,
-        preferHdr: p.preferHdr,
-        allowHdr: p.allowHdr,
-        allowHevc: p.allowHevc,
-        allowAv1: p.allowAv1,
-        preferredLanguages: p.preferredLanguages.join(","),
-        bannedWords: p.bannedWords.join(","),
-        maxMovieSizeGb: p.maxMovieSizeGb,
-        maxEpisodeSizeGb: p.maxEpisodeSizeGb,
-      },
-      update: {},
-    });
-  }
-}
-
-export async function listQualityProfiles(): Promise<ReleaseQualityProfile[]> {
-  await ensureDefaultQualityProfiles();
-  const rows = await prisma.mediaQualityProfile.findMany({ orderBy: { name: "asc" } });
-  return rows.map(fromRow);
-}
-
 export async function getQualityProfile(name?: string | null): Promise<ReleaseQualityProfile> {
-  await ensureDefaultQualityProfiles();
-  const row = name
-    ? await prisma.mediaQualityProfile.findUnique({ where: { name } })
-    : await prisma.mediaQualityProfile.findUnique({ where: { name: "1080p balanced" } });
-  return row ? fromRow(row) : DEFAULTS[0];
+  return DEFAULTS.find((profile) => profile.name === name) ?? DEFAULTS[0];
 }
 
 export function scoreRelease(input: {

@@ -1,5 +1,6 @@
 // Медиа-стек: Jellyfin (что играет + библиотека + плеер) + qBittorrent.
-// Нативный pipeline (TMDB + Jackett + SQLite monitor/import) живёт в nativeMedia.ts.
+// Торрент-пайплайн упрощён: выбранные релизы качаются сразу в movies/tv,
+// а nativeMedia.ts хранит только lightweight registry TMDB↔torrent↔Jellyfin.
 // Каждый источник опционален и изолирован
 // через Promise.allSettled — падение одного не ломает остальные. Не настроено → "Not configured".
 
@@ -30,8 +31,8 @@ export interface DownloadItem {
   savePath?: string;
   contentType?: "movie" | "series";
   downloadId?: string; // qB-хеш — ключ для ручного импорта
-  importPending?: boolean; // скачано, но native importer ещё не разложил файлы
-  importMessage?: string; // краткая причина из statusMessages
+  importPending?: boolean; // legacy UI field; simplified pipeline does not set it
+  importMessage?: string;
 }
 
 export interface MediaData {
@@ -75,7 +76,7 @@ export interface SeriesDetail {
   seasons: SeriesSeason[];
 }
 
-// ── Детальные страницы (Native monitor + Jellyfin playback state) ──────
+// ── Детальные страницы (TMDB + Jellyfin playback state) ──────
 export interface DetailEpisode {
   seasonNumber: number;
   episodeNumber: number;
@@ -255,15 +256,10 @@ async function localizedMediaText(
   kind: "movie" | "series",
   ids: { tmdbId?: number | null; tvdbId?: number | null },
 ): Promise<{ title: string | null; overview: string | null }> {
-  const monitor = ids.tmdbId
-    ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind, tmdbId: ids.tmdbId } } }).catch(() => null)
-    : ids.tvdbId
-      ? await prisma.mediaMonitor.findFirst({ where: { kind, tvdbId: ids.tvdbId } }).catch(() => null)
-      : null;
   const tmdb = await tmdbLibraryDetail(kind === "movie" ? "Movie" : "Series", ids.tmdbId ?? null);
   return {
-    title: monitor?.title ?? tmdb?.title ?? null,
-    overview: monitor?.overview ?? tmdb?.overview ?? null,
+    title: tmdb?.title ?? null,
+    overview: tmdb?.overview ?? null,
   };
 }
 
@@ -272,9 +268,6 @@ async function localizedMediaText(
 export async function getLibrary(): Promise<LibraryItem[]> {
   if (!config.media.jellyfin.configured) return [];
   const userId = await jellyfinUserId();
-  const monitors = await prisma.mediaMonitor.findMany().catch(() => []);
-  const monitorByTmdb = new Map(monitors.map((m) => [`${m.kind}:${m.tmdbId}`, m.title]));
-  const monitorByTvdb = new Map(monitors.filter((m) => m.tvdbId).map((m) => [`series:${m.tvdbId}`, m.title]));
   const fetchItems = async (type: "Movie" | "Series"): Promise<LibraryItem[]> => {
     const url = new URL(`${config.media.jellyfin.url}/Items`);
     url.searchParams.set("Recursive", "true");
@@ -289,10 +282,7 @@ export async function getLibrary(): Promise<LibraryItem[]> {
     return Promise.all((body.Items ?? []).map(async (it) => {
       const tmdbId = Number(it.ProviderIds?.Tmdb) || null;
       const tvdbId = type === "Series" ? Number(it.ProviderIds?.Tvdb) || null : null;
-      const kind = type === "Movie" ? "movie" : "series";
       const localizedName =
-        (tmdbId ? monitorByTmdb.get(`${kind}:${tmdbId}`) : null) ??
-        (tvdbId ? monitorByTvdb.get(`series:${tvdbId}`) : null) ??
         await tmdbLibraryTitle(type, tmdbId) ??
         it.Name ??
         "—";
@@ -396,25 +386,7 @@ const episodeKey = (seasonNumber: number | null | undefined, episodeNumber: numb
     ? `S${seasonNumber}E${episodeNumber}`
     : null;
 
-async function importedEpisodeKeys(tmdbId: number | null, tvdbId: number | null): Promise<Set<string>> {
-  if (!tmdbId && !tvdbId) return new Set();
-  const files = await prisma.mediaTorrentFile.findMany({
-    where: {
-      importedPath: { not: null },
-      torrent: {
-        contentType: "series",
-        OR: [
-          ...(tmdbId ? [{ tmdbId }] : []),
-          ...(tvdbId ? [{ tvdbId }] : []),
-        ],
-      },
-    },
-    select: { seasonNumber: true, episodeNumber: true },
-  }).catch(() => []);
-  return new Set(files.map((f) => episodeKey(f.seasonNumber, f.episodeNumber)).filter((k): k is string => Boolean(k)));
-}
-
-// Детальная страница сериала: Native monitor metadata + Jellyfin episodes/play state.
+// Детальная страница сериала: TMDB metadata + Jellyfin episodes/play state.
 export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPageDetail> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
   const [jfItemR, jfEpisodesR] = await Promise.allSettled([
@@ -427,18 +399,6 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
   const tmdbId = Number(jf?.ProviderIds?.Tmdb) || (tvdbId ? await tmdbFindByTvdb(tvdbId).catch(() => null) : null);
 
   const localizedText = await localizedMediaText("series", { tmdbId, tvdbId });
-  const monitor = tmdbId
-    ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: "series", tmdbId } } }).catch(() => null)
-    : tvdbId
-      ? await prisma.mediaMonitor.findFirst({ where: { kind: "series", tvdbId } }).catch(() => null)
-      : null;
-  const seasonMonitored = new Map(
-    (monitor
-      ? await prisma.mediaMonitorSeason.findMany({ where: { monitorId: monitor.id } }).catch(() => [])
-      : []
-    ).map((s) => [s.seasonNumber, s.monitored]),
-  );
-  const importedKeys = await importedEpisodeKeys(tmdbId, tvdbId);
   const jellyfinEpisodeByKey = new Map(
     (jfDetail?.seasons ?? []).flatMap((s) =>
       s.episodes.flatMap((e) => {
@@ -446,18 +406,6 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
         return key ? [[key, e] as const] : [];
       }),
     ),
-  );
-  const monitorEpisodes = monitor
-    ? await prisma.mediaMonitorEpisode.findMany({
-      where: { monitorId: monitor.id },
-      orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }],
-    }).catch(() => [])
-    : [];
-  const monitorEpisodeByKey = new Map(
-    monitorEpisodes.flatMap((e) => {
-      const key = episodeKey(e.seasonNumber, e.episodeNumber);
-      return key ? [[key, e] as const] : [];
-    }),
   );
 
   let seasons: DetailSeason[] = [];
@@ -470,13 +418,12 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
         episodes: eps.map((e) => {
           const key = episodeKey(seasonNumber, e.episodeNumber);
           const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
-          const monEp = key ? monitorEpisodeByKey.get(key) : null;
           return {
             seasonNumber,
             episodeNumber: e.episodeNumber,
-            title: e.title || monEp?.title || jfEp?.name || `Episode ${e.episodeNumber}`,
+            title: e.title || jfEp?.name || `Episode ${e.episodeNumber}`,
             airDate: e.airDate,
-            hasFile: Boolean(monEp?.importedPath) || monEp?.status === "downloaded" || (key ? importedKeys.has(key) || Boolean(jfEp) : false),
+            hasFile: Boolean(jfEp),
             quality: null,
             size: null,
             jellyfinId: jfEp?.id ?? null,
@@ -485,11 +432,10 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
         }),
         fileCount: eps.filter((e) => {
           const key = episodeKey(seasonNumber, e.episodeNumber);
-          const monEp = key ? monitorEpisodeByKey.get(key) : null;
-          return Boolean(monEp?.importedPath) || monEp?.status === "downloaded" || (key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false);
+          return key ? jellyfinEpisodeByKey.has(key) : false;
         }).length,
         totalCount: eps.length,
-        monitored: seasonMonitored.get(seasonNumber) ?? monitor?.monitored ?? false,
+        monitored: false,
       };
     }));
   }
@@ -509,85 +455,51 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
       })),
       fileCount: s.episodes.length,
       totalCount: s.episodes.length,
-      monitored: seasonMonitored.get(s.seasonNumber) ?? monitor?.monitored ?? false,
-    }));
-  }
-  if (seasons.length === 0 && monitorEpisodes.length > 0) {
-    const grouped = new Map<number, (typeof monitorEpisodes)[number][]>();
-    for (const ep of monitorEpisodes) {
-      if (!grouped.has(ep.seasonNumber)) grouped.set(ep.seasonNumber, []);
-      grouped.get(ep.seasonNumber)!.push(ep);
-    }
-    seasons = [...grouped.entries()].map(([seasonNumber, eps]) => ({
-      seasonNumber,
-      episodes: eps.map((e) => {
-        const key = episodeKey(e.seasonNumber, e.episodeNumber);
-        const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
-        return {
-          seasonNumber,
-          episodeNumber: e.episodeNumber,
-          title: e.title ?? jfEp?.name ?? `Episode ${e.episodeNumber}`,
-          airDate: e.airDate ? e.airDate.toISOString().slice(0, 10) : null,
-          hasFile: Boolean(e.importedPath) || e.status === "downloaded" || (key ? importedKeys.has(key) || Boolean(jfEp) : false),
-          quality: null,
-          size: null,
-          jellyfinId: jfEp?.id ?? null,
-          played: Boolean(jfEp?.played),
-        };
-      }),
-      fileCount: eps.filter((e) => {
-        const key = episodeKey(e.seasonNumber, e.episodeNumber);
-        return Boolean(e.importedPath) || e.status === "downloaded" || (key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false);
-      }).length,
-      totalCount: eps.length,
-      monitored: seasonMonitored.get(seasonNumber) ?? monitor?.monitored ?? false,
+      monitored: false,
     }));
   }
 
   return {
     jellyfinId,
     title: String(localizedText.title ?? jf?.Name ?? jfDetail?.name ?? "—"),
-    year: monitor?.year ?? jf?.ProductionYear ?? null,
+    year: jf?.ProductionYear ?? null,
     overview: localizedText.overview ?? jf?.Overview ?? null,
     genres: jf?.Genres ?? [],
     network: jf?.Studios?.[0]?.Name ?? null,
     status: jf?.Status ?? null,
     runtime: ticksToMin(jf?.RunTimeTicks),
     rating: jf?.CommunityRating ?? null,
-    posterRemote: monitor?.poster ?? null,
-    backdropRemote: monitor?.backdrop ?? null,
+    posterRemote: null,
+    backdropRemote: null,
     tvdbId,
-    inMonitor: Boolean(monitor),
-    monitored: Boolean(monitor?.monitored),
+    inMonitor: false,
+    monitored: false,
     seasons,
   };
 }
 
-// Детальная страница фильма: Native monitor metadata + Jellyfin playback state.
+// Детальная страница фильма: TMDB metadata + Jellyfin playback state.
 export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageDetail> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
   const jf = await jellyfinItem(jellyfinId);
   const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
-  const monitor = tmdbId
-    ? await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind: "movie", tmdbId } } }).catch(() => null)
-    : null;
   const localizedText = await localizedMediaText("movie", { tmdbId });
   const hasJellyfinMovie = jf?.Type === "Movie";
   return {
     jellyfinId,
     title: String(localizedText.title ?? jf?.Name ?? "—"),
-    year: monitor?.year ?? jf?.ProductionYear ?? null,
+    year: jf?.ProductionYear ?? null,
     overview: localizedText.overview ?? jf?.Overview ?? null,
     genres: jf?.Genres ?? [],
     studio: jf?.Studios?.[0]?.Name ?? null,
     status: jf?.Status ?? null,
     runtime: ticksToMin(jf?.RunTimeTicks),
     rating: jf?.CommunityRating ?? null,
-    posterRemote: monitor?.poster ?? null,
-    backdropRemote: monitor?.backdrop ?? null,
+    posterRemote: null,
+    backdropRemote: null,
     tmdbId,
-    inMonitor: Boolean(monitor),
-    monitored: Boolean(monitor?.monitored),
+    inMonitor: false,
+    monitored: false,
     hasFile: hasJellyfinMovie,
     quality: null,
     size: null,
@@ -758,13 +670,13 @@ export async function qbittorrentDownloads(): Promise<DownloadItem[]> {
   const tracked = hashes.length
     ? await prisma.mediaTorrent.findMany({
         where: { infohash: { in: hashes } },
-        select: { infohash: true, contentType: true },
+        select: { infohash: true, title: { select: { kind: true } } },
       }).catch(() => [])
     : [];
   const contentTypeByHash = new Map(
     tracked
-      .filter((t) => t.contentType === "movie" || t.contentType === "series")
-      .map((t) => [t.infohash.toLowerCase(), t.contentType as "movie" | "series"]),
+      .filter((t) => t.title.kind === "movie" || t.title.kind === "series")
+      .map((t) => [t.infohash.toLowerCase(), t.title.kind as "movie" | "series"]),
   );
   return torrents.map((t) => ({
     hash: t.hash ?? "—",
@@ -1030,7 +942,7 @@ export async function qbAction(hash: string, action: string): Promise<void> {
 export interface CalendarItem {
   kind: "movie" | "series";
   title: string;
-  externalId: number | null; // tvdbId (series) | tmdbId (movie) — для monitor/поиска
+  externalId: number | null; // tvdbId (series) | tmdbId (movie)
   seasonNumber: number | null;
   episodeNumber: number | null;
   episodeTitle: string | null;

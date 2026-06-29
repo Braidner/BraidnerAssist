@@ -635,34 +635,35 @@ export interface DownloadItem {
   importMessage?: string;
 }
 
-export interface ManualImportEpisode {
-  id: number;
-  seasonNumber: number;
-  episodeNumber: number;
-  title: string;
-}
-export interface ManualImportFile {
-  id: number;
-  path: string;
-  relativePath: string;
-  folderName?: string | null;
-  size: number;
-  quality: string | null;
-  languages: string[];
-  releaseGroup?: string | null;
-  seasonNumber: number | null;
-  episodes?: ManualImportEpisode[];
-  episodeNumbers?: number[];
-  movieTitle?: string | null;
-  rejections: string[];
-}
-
 export interface MediaData {
   configured: boolean;
   torrserver: boolean;
   tmdb: boolean;
   nowPlaying: NowPlaying[];
   downloads: DownloadItem[];
+}
+
+export interface TorrentRailItem {
+  kind: "movie" | "series";
+  tmdbId: number;
+  tvdbId: number | null;
+  jellyfinId: string | null;
+  title: string;
+  year: number | null;
+  poster: string | null;
+  backdrop: string | null;
+  infohash: string;
+  releaseTitle: string;
+  indexer: string | null;
+  size: number | null;
+  seeders: number | null;
+  savePath: string | null;
+  seasonNumber: number | null;
+  progress: number;
+  state: string;
+  dlspeed: number;
+  eta: number | null;
+  status: "downloading" | "awaiting_jellyfin";
 }
 
 export async function getMedia(): Promise<MediaData> {
@@ -688,19 +689,14 @@ export async function getMedia(): Promise<MediaData> {
   }
 }
 
-export interface MediaQualityProfile {
-  name: string;
-  kind: "movie" | "series" | "both";
-  minResolution: number;
-  maxResolution: number;
-  preferHdr: boolean;
-  allowHdr: boolean;
-  allowHevc: boolean;
-  allowAv1: boolean;
-  preferredLanguages: string[];
-  bannedWords: string[];
-  maxMovieSizeGb: number | null;
-  maxEpisodeSizeGb: number | null;
+export async function getTorrentRail(): Promise<TorrentRailItem[]> {
+  try {
+    const res = await apiFetch("/api/media/torrent-rail");
+    if (!res.ok) return [];
+    return (await res.json()) as TorrentRailItem[];
+  } catch {
+    return [];
+  }
 }
 
 export interface JackettHealth {
@@ -713,37 +709,6 @@ export interface JackettHealth {
   checkedAt: string | null;
 }
 
-export interface MediaRepairState {
-  jackett: JackettHealth[];
-  torrents: {
-    infohash: string;
-    title: string;
-    contentType: "movie" | "series";
-    importStatus: string;
-    progress: number;
-    lastError: string | null;
-    files: { fileIndex: number; path: string; error: string | null; importedPath: string | null }[];
-  }[];
-  missing: {
-    monitorId: string;
-    title: string;
-    seasonNumber: number;
-    episodeNumber: number;
-    airDate: string | null;
-    status: string;
-  }[];
-}
-
-export async function getMediaQualityProfiles(): Promise<MediaQualityProfile[]> {
-  try {
-    const res = await apiFetch("/api/media/quality-profiles");
-    if (!res.ok) return [];
-    return (await res.json()) as MediaQualityProfile[];
-  } catch {
-    return [];
-  }
-}
-
 export async function getJackettHealth(force = false): Promise<JackettHealth[]> {
   try {
     const res = await apiFetch(`/api/media/jackett/health${force ? "?force=1" : ""}`);
@@ -751,16 +716,6 @@ export async function getJackettHealth(force = false): Promise<JackettHealth[]> 
     return (await res.json()) as JackettHealth[];
   } catch {
     return [];
-  }
-}
-
-export async function getMediaRepair(): Promise<MediaRepairState | null> {
-  try {
-    const res = await apiFetch("/api/media/repair");
-    if (!res.ok) return null;
-    return (await res.json()) as MediaRepairState;
-  } catch {
-    return null;
   }
 }
 
@@ -1128,7 +1083,7 @@ export async function getSeriesDetail(
   }
 }
 
-// ── Детальные страницы (native monitor + Jellyfin) ──────────────────────
+// ── Детальные страницы (TMDB + Jellyfin) ──────────────────────
 export interface DetailEpisode {
   seasonNumber: number;
   episodeNumber: number;
@@ -1247,65 +1202,6 @@ export async function getMovieDiscoverDetail(
     return (await res.json()) as MoviePageDetail;
   } catch {
     return null;
-  }
-}
-
-// ── Расписание / monitor / поиск сезона ────────────────────────────────
-export interface CalendarItem {
-  kind: "movie" | "series";
-  title: string;
-  externalId: number | null;
-  seasonNumber: number | null;
-  episodeNumber: number | null;
-  episodeTitle: string | null;
-  airDate: string | null;
-  hasFile: boolean;
-  monitored: boolean;
-}
-
-export async function getCalendar(days = 14): Promise<CalendarItem[]> {
-  try {
-    const res = await apiFetch(`/api/media/calendar?days=${days}`);
-    if (!res.ok) return [];
-    return (await res.json()) as CalendarItem[];
-  } catch {
-    return [];
-  }
-}
-
-// Запуск поиска: весь сезон (seasonNumber) / недостающие (без него) / фильм. id = tvdbId|tmdbId.
-export async function seasonSearch(
-  type: "series" | "movie",
-  id: number,
-  seasonNumber?: number,
-): Promise<boolean> {
-  try {
-    const res = await apiFetch("/api/media/season/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, id, seasonNumber }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-export async function setMonitored(
-  type: "series" | "movie",
-  id: number,
-  monitored: boolean,
-  seasonNumber?: number,
-): Promise<boolean> {
-  try {
-    const res = await apiFetch("/api/media/monitor", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, id, monitored, seasonNumber }),
-    });
-    return res.ok;
-  } catch {
-    return false;
   }
 }
 
@@ -1475,41 +1371,6 @@ export async function grabRelease(p: {
   }
 }
 
-export async function getImportCandidates(p: {
-  type: "movie" | "series";
-  downloadId: string;
-}): Promise<ManualImportFile[]> {
-  try {
-    const res = await apiFetch("/api/media/import/candidates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(p),
-    });
-    if (!res.ok) return [];
-    return (await res.json()) as ManualImportFile[];
-  } catch {
-    return [];
-  }
-}
-
-export async function executeImport(p: {
-  type: "movie" | "series";
-  downloadId: string;
-  fileIds: number[];
-  importMode?: "copy" | "move";
-}): Promise<boolean> {
-  try {
-    const res = await apiFetch("/api/media/import/execute", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(p),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 // Постеры тащим через бэкенд-прокси: у клиентов часто нет IPv6-egress до BunnyCDN
 // (TMDB резолвится в AAAA) → прямой <img> виснет по таймауту. Бэкенд ходит по IPv4.
 export function posterUrl(
@@ -1571,116 +1432,6 @@ export async function searchReleases(q: string): Promise<MediaSearchResponse<Sea
   }
 }
 
-// ── Media v2: пофайловый выбор серий (preview → grab selected) ──────────
-export interface PickFile {
-  fileIndex: number;
-  path: string;
-  length: number;
-  isVideo: boolean;
-  season: number | null;
-  episodes: number[];
-}
-export interface TorrentPreview {
-  infohash: string;
-  title: string;
-  files: PickFile[];
-}
-
-// Предпросмотр файлов торрента (через TorrServer, без скачивания).
-export async function previewTorrentFiles(
-  source: string,
-): Promise<TorrentPreview | null> {
-  try {
-    const res = await apiFetch("/api/media/pick/preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source }),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as TorrentPreview;
-  } catch {
-    return null;
-  }
-}
-
-// Скачать только выбранные файлы + сохранить привязку торрент↔контент.
-export async function grabSelectedFiles(input: {
-  contentType: "movie" | "series";
-  tmdbId?: number | null;
-  tvdbId?: number | null;
-  title: string;
-  source: string;
-  infohash: string;
-  files: PickFile[];
-  wantedIndexes: number[];
-}): Promise<boolean> {
-  try {
-    const res = await apiFetch("/api/media/pick/grab", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-// Докачать ещё файлы через тот же торрент.
-export async function pickMoreFiles(
-  infohash: string,
-  addIndexes: number[],
-): Promise<boolean> {
-  try {
-    const res = await apiFetch("/api/media/pick/more", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ infohash, addIndexes }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-export interface ContentTorrentFile {
-  fileIndex: number;
-  path: string;
-  length: number;
-  wanted: boolean;
-  seasonNumber: number | null;
-  episodeNumber: number | null;
-  progress: number; // 0..1
-}
-export interface ContentTorrent {
-  infohash: string;
-  title: string;
-  magnet: string | null;
-  selectedRelease: ReleaseOption | null;
-  selectedTitle: string | null;
-  selectedIndexer: string | null;
-  selectedSeasonNumber: number | null;
-  selectedAt: string | null;
-  files: ContentTorrentFile[];
-}
-
-// Разложить скачанные файлы торрента в библиотеку (свой органайзер).
-export async function organizeTorrent(
-  infohash: string,
-): Promise<{ organized: number; skipped: number } | null> {
-  try {
-    const res = await apiFetch("/api/media/pick/organize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ infohash }),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as { organized: number; skipped: number };
-  } catch {
-    return null;
-  }
-}
-
 // ── Media v2 (Фаза 3): файловый менеджер медиатеки ──────────────────────
 export interface FileEntry {
   name: string;
@@ -1731,25 +1482,7 @@ export const fsMove = (src: string, dest: string) =>
   fsAction("move", { src, dest });
 export const fsDelete = (path: string) => fsAction("delete", { path });
 
-// Торренты, привязанные к тайтлу (секция «Уже качается из этого торрента»).
-export async function getContentTorrents(p: {
-  type: "movie" | "series";
-  tmdbId?: number | null;
-  tvdbId?: number | null;
-}): Promise<ContentTorrent[]> {
-  try {
-    const qs = new URLSearchParams({ type: p.type });
-    if (p.tmdbId) qs.set("tmdbId", String(p.tmdbId));
-    if (p.tvdbId) qs.set("tvdbId", String(p.tvdbId));
-    const res = await apiFetch(`/api/media/pick/torrents?${qs.toString()}`);
-    if (!res.ok) return [];
-    return (await res.json()) as ContentTorrent[];
-  } catch {
-    return [];
-  }
-}
-
-// Поиск/добавление через native monitor (TMDB + Jackett + qBittorrent).
+// Поиск/добавление через TMDB + Jackett + qBittorrent.
 export interface MediaLookupItem {
   kind: "movie" | "series";
   id: number;

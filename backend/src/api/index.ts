@@ -32,15 +32,9 @@ import {
   nativeAdd,
   nativeReleaseSearch,
   nativeGrabRelease,
-  nativeImportCandidates,
-  nativeImportRelease,
-  nativeSetMonitored,
-  nativeCalendar,
-  nativeRepair,
-  nativeMonitorList,
   nativeSeriesDiscoverDetail,
   nativeMovieDiscoverDetail,
-  listQualityProfiles,
+  getTorrentRail,
 } from "../integrations/nativeMedia.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import {
@@ -50,13 +44,6 @@ import {
   pickVideoFile,
   isBrowserPlayable,
 } from "../integrations/torrserver.js";
-import {
-  previewTorrent,
-  grabSelected,
-  setWantedFiles,
-  listContentTorrents,
-  type ContentType,
-} from "../integrations/torrentPick.js";
 import { tmdbSearch, tmdbTrending, tmdbPopular, tmdbTvToTvdb, tmdbDiscover, tmdbGenres } from "../integrations/tmdb.js";
 import {
   getDiscoverHome,
@@ -72,9 +59,7 @@ import {
   upsertMediaPreference,
   type MediaPreferenceStatus,
 } from "../integrations/mediaPreferences.js";
-import {
-  listDir, makeDir, renameEntry, moveEntry, removeEntry, organizeTorrent,
-} from "../integrations/files.js";
+import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integrations/files.js";
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
@@ -315,14 +300,6 @@ apiRouter.get("/media", async (_req, res) => {
   }
 });
 
-apiRouter.get("/media/quality-profiles", async (_req, res) => {
-  try {
-    res.json(await listQualityProfiles());
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
 apiRouter.get("/media/jackett/health", async (req, res) => {
   try {
     res.json(await jackettHealth(req.query.force === "1"));
@@ -331,17 +308,9 @@ apiRouter.get("/media/jackett/health", async (req, res) => {
   }
 });
 
-apiRouter.get("/media/repair", async (_req, res) => {
+apiRouter.get("/media/torrent-rail", async (_req, res) => {
   try {
-    res.json(await nativeRepair());
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-apiRouter.get("/media/monitor", async (_req, res) => {
-  try {
-    res.json(await nativeMonitorList());
+    res.json(await getTorrentRail());
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -367,7 +336,7 @@ apiRouter.get("/media/series/:id", async (req, res) => {
   }
 });
 
-// Детальная страница сериала: native monitor + Jellyfin playback state.
+// Детальная страница сериала: TMDB + Jellyfin playback state.
 apiRouter.get("/media/detail/series/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
@@ -377,7 +346,7 @@ apiRouter.get("/media/detail/series/:id", async (req, res) => {
   }
 });
 
-// Детальная страница фильма: native monitor + Jellyfin playback state.
+// Детальная страница фильма: TMDB + Jellyfin playback state.
 apiRouter.get("/media/detail/movie/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
@@ -458,7 +427,7 @@ apiRouter.get("/media/search", async (req, res) => {
   }
 });
 
-// Поиск тайтла в TMDB для добавления в native monitor.
+// Поиск тайтла в TMDB для выбора релиза.
 apiRouter.get("/media/lookup", async (req, res) => {
   const kind = String(req.query.type ?? "") === "series" ? "series" : "movie";
   if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
@@ -471,7 +440,7 @@ apiRouter.get("/media/lookup", async (req, res) => {
   }
 });
 
-// Добавить тайтл в native monitor.
+// Зарегистрировать тайтл в lightweight registry.
 apiRouter.post("/media/add", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
   if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
@@ -507,32 +476,6 @@ apiRouter.post("/media/release/grab", async (req, res) => {
   if (!guid || !indexerId) return res.status(400).json({ error: "guid and indexerId required" });
   try {
     res.json(await nativeGrabRelease(kind, guid, indexerId));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Кандидаты для ручного импорта застрявшей раздачи (по downloadId = qB-хеш).
-apiRouter.post("/media/import/candidates", async (req, res) => {
-  const kind = String(req.body?.type ?? "") === "movie" ? "movie" : "series";
-  const downloadId = String(req.body?.downloadId ?? "").trim();
-  if (!downloadId) return res.status(400).json({ error: "downloadId required" });
-  try {
-    res.json(await nativeImportCandidates(kind, downloadId));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Импорт выбранных файлов (ManualImport — в обход реджекта «not in grabbed release»).
-apiRouter.post("/media/import/execute", async (req, res) => {
-  const kind = String(req.body?.type ?? "") === "movie" ? "movie" : "series";
-  const downloadId = String(req.body?.downloadId ?? "").trim();
-  const fileIds = Array.isArray(req.body?.fileIds) ? req.body.fileIds.map(Number).filter(Number.isFinite) : [];
-  if (!downloadId) return res.status(400).json({ error: "downloadId required" });
-  try {
-    const imported = await nativeImportRelease(kind, downloadId, fileIds.length ? fileIds : undefined);
-    res.json({ ok: true, imported });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -758,60 +701,6 @@ apiRouter.delete("/media/preferences/:kind/:tmdbId", async (req, res) => {
   }
 });
 
-// ── Media v2: пофайловый выбор серий ───────────────────────────────────
-// Предпросмотр файлов торрента (без скачивания) — дерево с распарсенными сериями.
-apiRouter.post("/media/pick/preview", async (req, res) => {
-  if (!config.media.torrserver.configured) return res.status(503).json({ configured: false });
-  const source = String(req.body?.source ?? "").trim();
-  if (!source) return res.status(400).json({ error: "source required" });
-  try {
-    res.json(await previewTorrent(source));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Грабим выбранные файлы (качаем только их) + сохраняем привязку торрент↔контент.
-apiRouter.post("/media/pick/grab", async (req, res) => {
-  if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
-  const b = req.body ?? {};
-  const contentType: ContentType = b.contentType === "series" ? "series" : "movie";
-  const source = String(b.source ?? "").trim();
-  const infohash = String(b.infohash ?? "").trim();
-  const files = Array.isArray(b.files) ? b.files : [];
-  const wantedIndexes = Array.isArray(b.wantedIndexes) ? b.wantedIndexes.map(Number) : [];
-  if (!infohash || !source || files.length === 0) {
-    return res.status(400).json({ error: "infohash, source, files required" });
-  }
-  try {
-    res.json(await grabSelected({
-      contentType,
-      tmdbId: b.tmdbId != null ? Number(b.tmdbId) : null,
-      tvdbId: b.tvdbId != null ? Number(b.tvdbId) : null,
-      title: String(b.title ?? "—"),
-      source,
-      infohash,
-      files,
-      wantedIndexes,
-      category: "mc-native",
-    }));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Разложить скачанные файлы торрента в библиотеку (свой органайзер вместо *arr).
-apiRouter.post("/media/pick/organize", async (req, res) => {
-  if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
-  const infohash = String(req.body?.infohash ?? "").trim();
-  if (!infohash) return res.status(400).json({ error: "infohash required" });
-  try {
-    res.json(await organizeTorrent(infohash));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
 // ── Media v2 (Фаза 3): файловый менеджер медиатеки (заперт в MEDIA_ROOT) ──
 apiRouter.get("/media/files", async (req, res) => {
   if (!config.mediaFs.configured) return res.status(503).json({ configured: false });
@@ -862,31 +751,6 @@ apiRouter.post("/media/files/delete", async (req, res) => {
   }
 });
 
-// Докачать ещё файлы через уже добавленный торрент (тот же infohash).
-apiRouter.post("/media/pick/more", async (req, res) => {
-  if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
-  const infohash = String(req.body?.infohash ?? "").trim();
-  const addIndexes = Array.isArray(req.body?.addIndexes) ? req.body.addIndexes.map(Number) : [];
-  if (!infohash || addIndexes.length === 0) return res.status(400).json({ error: "infohash, addIndexes required" });
-  try {
-    res.json(await setWantedFiles(infohash, addIndexes));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Торренты, привязанные к тайтлу (для секции «Уже качается из этого торрента»).
-apiRouter.get("/media/pick/torrents", async (req, res) => {
-  const contentType: ContentType = String(req.query.type ?? "") === "series" ? "series" : "movie";
-  const tmdbId = req.query.tmdbId != null ? Number(req.query.tmdbId) : null;
-  const tvdbId = req.query.tvdbId != null ? Number(req.query.tvdbId) : null;
-  try {
-    res.json(await listContentTorrents({ contentType, tmdbId, tvdbId }));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
 // Управление торрентом (pause|resume|delete).
 apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
   if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
@@ -919,50 +783,6 @@ apiRouter.get("/media/unified", async (req, res) => {
   if (!q) return res.json({ inLibrary: [], discover: [], releases: [] });
   try {
     res.json(await unifiedSearch(q));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// ── Расписание / monitor / поиск сезона (удобный пайплайн сериалов) ──────
-apiRouter.get("/media/calendar", async (req, res) => {
-  if (!config.media.tmdb.configured) {
-    return res.status(503).json({ configured: false });
-  }
-  const days = Math.min(Math.max(Number(req.query.days ?? 14) || 14, 1), 60);
-  try {
-    res.json(await nativeCalendar(days));
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Запустить поиск: весь сезон / недостающие серии / фильм. id = внешний (tvdbId/tmdbId).
-apiRouter.post("/media/season/search", async (req, res) => {
-  const type = req.body?.type === "movie" ? "movie" : "series";
-  if (!config.media.jackett.configured) return res.status(503).json({ configured: false });
-  const id = Number(req.body?.id);
-  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
-  const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
-  try {
-    await nativeReleaseSearch(type, id, seasonNumber);
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(502).json({ error: String(e) });
-  }
-});
-
-// Monitor toggle: сезон сериала / весь сериал / фильм.
-apiRouter.post("/media/monitor", async (req, res) => {
-  const type = req.body?.type === "movie" ? "movie" : "series";
-  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
-  const id = Number(req.body?.id);
-  if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
-  const monitored = Boolean(req.body?.monitored);
-  const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
-  try {
-    await nativeSetMonitored(type, id, monitored, seasonNumber);
-    res.json({ ok: true, monitored });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

@@ -7,7 +7,6 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   ReleasePicker,
-  ImportDrawer,
   ProgressBar,
   fmtSize,
 } from "./shared/mediaShared.tsx";
@@ -20,7 +19,6 @@ import {
   type DetailPlayer,
   type QueueItem,
 } from "./shared/mediaDetail.tsx";
-import { ContentTorrents } from "./shared/mediaPick.tsx";
 import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 import {
@@ -30,14 +28,11 @@ import {
   getMediaPlayUrl,
   jellyfinPosterUrl,
   posterUrl,
-  seasonSearch,
-  setMonitored,
   getMediaLibrary,
   getDiscoverSimilar,
   tmdbResolveTvdb,
   backdropUrl,
   type SeriesPageDetail,
-  type DownloadItem,
   type MediaData,
   type LibraryItem,
   type TmdbItem,
@@ -93,8 +88,6 @@ export function MediaSeriesPage({
   const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
   const [showAllPicker, setShowAllPicker] = useState(false);
-  const [pickReload, setPickReload] = useState(0);
-  const [importItem, setImportItem] = useState<DownloadItem | null>(null);
   const autoplayConsumedRef = useRef<string | null>(null);
   const locationState = location.state as AutoplayLocationState;
   const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
@@ -260,45 +253,6 @@ export function MediaSeriesPage({
     activeIndex >= 0 ? (episodeQueue[activeIndex + 1] ?? null) : null;
   const tvdbId = det.tvdbId;
 
-  const patchSeasonMon = (sn: number, val: boolean) =>
-    setD((p) =>
-      p && p !== "loading"
-        ? {
-            ...p,
-            seasons: p.seasons.map((s) =>
-              s.seasonNumber === sn ? { ...s, monitored: val } : s,
-            ),
-          }
-        : p,
-    );
-  const patchSeriesMon = (val: boolean) =>
-    setD((p) => (p && p !== "loading" ? { ...p, monitored: val } : p));
-
-  const toggleMonitor = async (val: boolean, sn?: number) => {
-    if (tvdbId == null) return;
-    setAct(sn == null ? "mon" : "mon" + sn);
-    const ok = await setMonitored("series", tvdbId, val, sn);
-    setAct(null);
-    if (ok) {
-      sn == null ? patchSeriesMon(val) : patchSeasonMon(sn, val);
-      toast.success(val ? "Мониторинг включён" : "Мониторинг выключен");
-    } else toast.error("Не удалось изменить мониторинг");
-  };
-
-  const findSeason = async (sn?: number) => {
-    if (tvdbId == null) return;
-    setAct(sn == null ? "find" : "find" + sn);
-    const ok = await seasonSearch("series", tvdbId, sn);
-    setAct(null);
-    if (ok)
-      toast.success(
-        sn == null
-          ? "Поиск недостающих серий запущен"
-          : `Поиск сезона ${sn} запущен`,
-      );
-    else toast.error("Не удалось запустить поиск");
-  };
-
   const addToLib = async () => {
     if (tvdbId == null) return;
     setAct("add");
@@ -329,19 +283,6 @@ export function MediaSeriesPage({
   return (
     <div>
       <div className={ms.page}>
-        {importItem && (
-          <ImportDrawer
-            item={importItem}
-            type="series"
-            onClose={() => setImportItem(null)}
-            onDone={() => {
-              setImportItem(null);
-              onMediaUpdate();
-              fetchDetail().then(setD);
-            }}
-          />
-        )}
-
         <DetailHero
           kindLabel="СЕРИАЛ"
           title={det.title}
@@ -418,15 +359,13 @@ export function MediaSeriesPage({
             <div style={{ marginTop: 16 }}>
               <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ВСЕ РАЗДАЧИ</div>
               <div className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0" style={{ marginBottom: 8 }}>
-                Включая мультисезонные паки. После загрузки пака разложи серии
-                кнопкой «Импорт» в Загрузках.
+                Включая мультисезонные паки. Выбранный релиз qBittorrent сохранит сразу в папку сериалов.
               </div>
               <ReleasePicker
                 params={{ type: "series", id: tvdbId }}
                 downloads={media.downloads}
                 onGrabbed={() => {
                   onMediaUpdate();
-                  setPickReload((n) => n + 1);
                 }}
               />
             </div>
@@ -464,44 +403,6 @@ export function MediaSeriesPage({
                         {s.fileCount}/{s.totalCount} эп.
                       </span>
                     </span>
-                      {/* Season action buttons */}
-                      {det.inMonitor && tvdbId != null && (
-                        <>
-                          <button
-                            className={cn(
-                              ms.button.iconSm,
-                              s.monitored && ms.button.accentIconSm,
-                            )}
-                            disabled={act === "mon" + s.seasonNumber}
-                            title={
-                              s.monitored
-                                ? "Снять сезон с мониторинга"
-                                : "Мониторить сезон"
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleMonitor(!s.monitored, s.seasonNumber);
-                            }}
-                          >
-                            {act === "mon" + s.seasonNumber
-                              ? "…"
-                              : s.monitored
-                                ? "★"
-                                : "☆"}
-                          </button>
-                          <button
-                            className={ms.button.sm}
-                            disabled={act === "find" + s.seasonNumber}
-                            title="Найти весь сезон (force search)"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              findSeason(s.seasonNumber);
-                            }}
-                          >
-                            {act === "find" + s.seasonNumber ? "…" : "⬇ Сезон"}
-                          </button>
-                        </>
-                      )}
                       <button
                         className={ms.button.sm}
                         disabled={tvdbId == null}
@@ -552,7 +453,6 @@ export function MediaSeriesPage({
                         downloads={media.downloads}
                         onGrabbed={() => {
                           onMediaUpdate();
-                          setPickReload((n) => n + 1);
                         }}
                       />
                     )}
@@ -662,12 +562,6 @@ export function MediaSeriesPage({
         <SimilarRail items={similarItems} />
       )}
 
-      {/* Качается из торрента (Media v2) — прогресс по сериям + докачать ещё */}
-      <ContentTorrents
-        contentType="series"
-        tvdbId={tvdbId}
-        reloadKey={pickReload}
-      />
     </div>
   );
 }

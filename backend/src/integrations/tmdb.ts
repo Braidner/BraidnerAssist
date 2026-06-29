@@ -260,7 +260,7 @@ export async function tmdbTvSeasons(tmdbId: number): Promise<number[]> {
     .sort((a: number, b: number) => a - b);
 }
 
-// tvdbId (Jellyfin/native monitor) → TMDB tv id. ВАЖНО: TMDB tv id ≠ tvdbId.
+// tvdbId (Jellyfin/external ids) → TMDB tv id. ВАЖНО: TMDB tv id ≠ tvdbId.
 export async function tmdbFindByTvdb(tvdbId: number): Promise<number | null> {
   const data = await tmdbGet(`/find/${tvdbId}`, { external_source: "tvdb_id" });
   const tv = Array.isArray(data?.tv_results) ? data.tv_results : [];

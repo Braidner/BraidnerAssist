@@ -447,28 +447,72 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
       }),
     ),
   );
-  let seasons: DetailSeason[] = (jfDetail?.seasons ?? []).map((s) => ({
-    seasonNumber: s.seasonNumber,
-    episodes: s.episodes.map((e) => ({
-      seasonNumber: s.seasonNumber,
-      episodeNumber: e.episodeNumber ?? 0,
-      title: e.name,
-      airDate: null,
-      hasFile: true,
-      quality: null,
-      size: null,
-      jellyfinId: e.id,
-      played: e.played,
-    })),
-    fileCount: s.episodes.length,
-    totalCount: s.episodes.length,
-    monitored: seasonMonitored.get(s.seasonNumber) ?? monitor?.monitored ?? false,
-  }));
-  if (seasons.length === 0 && monitor) {
-    const monitorEpisodes = await prisma.mediaMonitorEpisode.findMany({
+  const monitorEpisodes = monitor
+    ? await prisma.mediaMonitorEpisode.findMany({
       where: { monitorId: monitor.id },
       orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }],
-    }).catch(() => []);
+    }).catch(() => [])
+    : [];
+  const monitorEpisodeByKey = new Map(
+    monitorEpisodes.flatMap((e) => {
+      const key = episodeKey(e.seasonNumber, e.episodeNumber);
+      return key ? [[key, e] as const] : [];
+    }),
+  );
+
+  let seasons: DetailSeason[] = [];
+  if (tmdbId) {
+    const seasonNumbers = await tmdbTvSeasons(tmdbId).catch(() => []);
+    seasons = await Promise.all(seasonNumbers.map(async (seasonNumber) => {
+      const eps = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
+      return {
+        seasonNumber,
+        episodes: eps.map((e) => {
+          const key = episodeKey(seasonNumber, e.episodeNumber);
+          const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
+          const monEp = key ? monitorEpisodeByKey.get(key) : null;
+          return {
+            seasonNumber,
+            episodeNumber: e.episodeNumber,
+            title: e.title || monEp?.title || jfEp?.name || `Episode ${e.episodeNumber}`,
+            airDate: e.airDate,
+            hasFile: Boolean(monEp?.importedPath) || monEp?.status === "downloaded" || (key ? importedKeys.has(key) || Boolean(jfEp) : false),
+            quality: null,
+            size: null,
+            jellyfinId: jfEp?.id ?? null,
+            played: Boolean(jfEp?.played),
+          };
+        }),
+        fileCount: eps.filter((e) => {
+          const key = episodeKey(seasonNumber, e.episodeNumber);
+          const monEp = key ? monitorEpisodeByKey.get(key) : null;
+          return Boolean(monEp?.importedPath) || monEp?.status === "downloaded" || (key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false);
+        }).length,
+        totalCount: eps.length,
+        monitored: seasonMonitored.get(seasonNumber) ?? monitor?.monitored ?? false,
+      };
+    }));
+  }
+  if (seasons.length === 0 && jfDetail?.seasons?.length) {
+    seasons = jfDetail.seasons.map((s) => ({
+      seasonNumber: s.seasonNumber,
+      episodes: s.episodes.map((e) => ({
+        seasonNumber: s.seasonNumber,
+        episodeNumber: e.episodeNumber ?? 0,
+        title: e.name,
+        airDate: null,
+        hasFile: true,
+        quality: null,
+        size: null,
+        jellyfinId: e.id,
+        played: e.played,
+      })),
+      fileCount: s.episodes.length,
+      totalCount: s.episodes.length,
+      monitored: seasonMonitored.get(s.seasonNumber) ?? monitor?.monitored ?? false,
+    }));
+  }
+  if (seasons.length === 0 && monitorEpisodes.length > 0) {
     const grouped = new Map<number, (typeof monitorEpisodes)[number][]>();
     for (const ep of monitorEpisodes) {
       if (!grouped.has(ep.seasonNumber)) grouped.set(ep.seasonNumber, []);
@@ -496,37 +540,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
         return Boolean(e.importedPath) || e.status === "downloaded" || (key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false);
       }).length,
       totalCount: eps.length,
-      monitored: seasonMonitored.get(seasonNumber) ?? monitor.monitored,
-    }));
-  }
-  if (seasons.length === 0 && tmdbId) {
-    const seasonNumbers = await tmdbTvSeasons(tmdbId).catch(() => []);
-    seasons = await Promise.all(seasonNumbers.map(async (seasonNumber) => {
-      const eps = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
-      return {
-        seasonNumber,
-        episodes: eps.map((e) => {
-          const key = episodeKey(seasonNumber, e.episodeNumber);
-          const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
-          return {
-            seasonNumber,
-            episodeNumber: e.episodeNumber,
-            title: e.title,
-            airDate: e.airDate,
-            hasFile: key ? importedKeys.has(key) || Boolean(jfEp) : false,
-            quality: null,
-            size: null,
-            jellyfinId: jfEp?.id ?? null,
-            played: Boolean(jfEp?.played),
-          };
-        }),
-        fileCount: eps.filter((e) => {
-          const key = episodeKey(seasonNumber, e.episodeNumber);
-          return key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false;
-        }).length,
-        totalCount: eps.length,
-        monitored: seasonMonitored.get(seasonNumber) ?? monitor?.monitored ?? false,
-      };
+      monitored: seasonMonitored.get(seasonNumber) ?? monitor?.monitored ?? false,
     }));
   }
 

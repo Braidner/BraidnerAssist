@@ -15,10 +15,11 @@ import {
   organizeTorrent,
   type SearchResult,
   type PickFile,
+  type ReleaseOption,
   type TorrentPreview,
   type ContentTorrent,
 } from "../../../lib/api.ts";
-import { fmtSize, ProgressBar } from "./mediaShared.tsx";
+import { fmtSize, ProgressBar, TorrentCard } from "./mediaShared.tsx";
 import { useToast } from "../../../components/ui/Toast.tsx";
 import { cn } from "../../../lib/cn.ts";
 import { media } from "./mediaStyles.ts";
@@ -78,6 +79,30 @@ function torrentSeasonLabel(torrent: ContentTorrent): string | null {
   return null;
 }
 
+function contentTorrentRelease(torrent: ContentTorrent): ReleaseOption {
+  const wanted = torrent.files.filter((f) => f.wanted);
+  const totalSize = torrent.files.reduce((sum, f) => sum + f.length, 0);
+  const season = torrentSeasonLabel(torrent);
+  return {
+    guid: torrent.infohash,
+    title: torrent.selectedTitle ?? torrent.title,
+    quality: season ?? undefined,
+    size: totalSize,
+    seeders: null,
+    indexer: torrent.selectedIndexer ?? "torrent",
+    trackerName: torrent.selectedIndexer ?? "torrent",
+    details: {
+      provider: torrent.selectedIndexer ?? "torrent",
+      rawUrl: torrent.magnet ?? "",
+      title: torrent.selectedTitle ?? torrent.title,
+      technical: {
+        size: fmtSize(totalSize),
+        fileCount: wanted.length || torrent.files.length,
+      },
+    },
+  };
+}
+
 function TorrentProgressCard({
   torrent,
   selected,
@@ -96,145 +121,117 @@ function TorrentProgressCard({
   onOrganize: () => void;
 }) {
   const pct = contentTorrentProgress(torrent);
-  const wanted = torrent.files.filter((f) => f.wanted);
-  const totalSize = torrent.files.reduce((sum, f) => sum + f.length, 0);
-  const doneCount = wanted.filter((f) => (f.progress ?? 0) >= 1).length;
-  const season = torrentSeasonLabel(torrent);
   const downloaded = pct >= 100;
+  const popup = (
+    <div
+      className={cn(
+        "pointer-events-auto absolute top-0 z-40 hidden w-[min(560px,calc(100vw-56px))] rounded-[16px] bg-raise p-3 shadow-[0_22px_70px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.08] group-hover:block group-focus-within:block max-mob:left-0 max-mob:right-auto max-mob:top-full",
+        align === "right" ? "right-full mr-3" : "left-full ml-3",
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="font-ui text-label font-extrabold uppercase tracking-section text-muted">Серии и файлы</span>
+        <span className="font-mono text-2xs text-muted">{torrent.files.length} файл.</span>
+      </div>
+      <div className="max-h-[380px] overflow-auto pr-1">
+        {groupBySeasonFiles(torrent.files).map((g) => (
+          <div key={g.key} className="mb-2 rounded-xl bg-surface/80 p-2">
+            <div className="mb-1.5 font-ui text-body font-bold text-ink">{g.label}</div>
+            <div className="flex flex-col gap-1">
+              {g.files.map((f) => {
+                const label =
+                  f.seasonNumber != null && f.episodeNumber != null
+                    ? `S${f.seasonNumber}E${f.episodeNumber}`
+                    : (f.path.split("/").pop() ?? f.path);
+                const filePct = Math.round((f.progress ?? 0) * 100);
+                return (
+                  <label
+                    key={f.fileIndex}
+                    className="pointer-events-auto flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/[0.04]"
+                  >
+                    {f.wanted ? (
+                      <span className="grid size-5 flex-none place-items-center rounded bg-accent/15 text-accent">
+                        {filePct >= 100 ? <Check size={12} /> : <Download size={12} />}
+                      </span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        className={media.checkbox}
+                        checked={selected.has(f.fileIndex)}
+                        onChange={() => onToggle(f.fileIndex)}
+                        title="Докачать"
+                      />
+                    )}
+                    <span className="w-[52px] flex-none font-mono text-2xs text-muted">{label}</span>
+                    <span className="w-[62px] flex-none font-mono text-2xs text-muted">{fmtSize(f.length)}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted" title={f.path}>
+                      {f.path.split("/").pop()}
+                    </span>
+                    {f.wanted ? (
+                      <span className="flex w-[96px] flex-none items-center gap-1.5">
+                        <ProgressBar pct={filePct} />
+                        <span className="w-7 text-right font-mono text-2xs text-muted">{filePct}%</span>
+                      </span>
+                    ) : (
+                      <span className="w-[96px] flex-none text-right font-mono text-2xs text-muted">не качается</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <article className="group relative w-[220px] flex-none scroll-ml-5 max-mob:w-[calc(100vw-40px)]">
-      <div className="media-hover-card h-[330px] w-full overflow-visible">
-        <div className="flex h-full flex-col rounded-[10px] bg-raise p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="grid size-11 place-items-center rounded-full bg-white/[0.08] text-accent">
-              {pct >= 100 ? <Check size={19} /> : <Download size={19} />}
-            </div>
-            {season && (
-              <span className="rounded-full bg-accent/14 px-2.5 py-1 font-mono text-2xs font-bold text-accent">
-                {season}
-              </span>
-            )}
+    <TorrentCard
+      release={contentTorrentRelease(torrent)}
+      busy={false}
+      done={downloaded}
+      disabled
+      onGrab={() => {}}
+      actionSlot={
+        downloaded ? (
+          <button
+            type="button"
+            className={cn(media.button.accentIconSm, "size-[34px]")}
+            disabled={busy === "org" + torrent.infohash}
+            onClick={onOrganize}
+            title="Разложить"
+          >
+            <FolderInput size={15} />
+          </button>
+        ) : (
+          <div className="grid size-[34px] place-items-center rounded-full bg-white/[0.16] font-mono text-[9px] font-bold text-white/80">
+            {pct}
           </div>
-
-          <div className="mt-5 min-h-0">
-            <div className="line-clamp-5 break-words font-ui text-[13px] font-bold leading-[1.2] text-white" title={torrent.selectedTitle ?? torrent.title}>
-              {torrent.selectedTitle ?? torrent.title}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {torrent.selectedIndexer && (
-                <span className="rounded-full bg-white/[0.08] px-2 py-1 font-mono text-2xs text-white/60">
-                  {torrent.selectedIndexer}
-                </span>
-              )}
-              <span className="rounded-full bg-white/[0.08] px-2 py-1 font-mono text-2xs text-white/60">
-                {wanted.length || torrent.files.length} файл.
-              </span>
-              <span className="rounded-full bg-white/[0.08] px-2 py-1 font-mono text-2xs text-white/60">
-                {fmtSize(totalSize)}
-              </span>
-              {wanted.length > 0 && (
-                <span className="rounded-full bg-ok/12 px-2 py-1 font-mono text-2xs text-ok">
-                  {doneCount}/{wanted.length}
-                </span>
-              )}
-            </div>
-            <div className="mt-4 flex items-center gap-2">
-              <ProgressBar pct={pct} />
-              <span className="w-9 text-right font-mono text-2xs font-bold text-white/70">{pct}%</span>
-            </div>
-          </div>
-
-          <div className="mt-auto flex items-center gap-2">
-            {downloaded ? (
-              <button
-                type="button"
-                className={cn(media.button.accentSm, "flex-1 justify-center")}
-                disabled={busy === "org" + torrent.infohash}
-                onClick={onOrganize}
-              >
-                <FolderInput size={14} />
-                {busy === "org" + torrent.infohash ? "…" : "Разложить"}
-              </button>
-            ) : (
-              <div className="flex-1 font-mono text-2xs text-muted">Качается</div>
-            )}
-            {selected.size > 0 && (
-              <button
-                type="button"
-                className={cn(media.button.accentIconSm, "size-9")}
-                disabled={busy === torrent.infohash}
-                onClick={onMore}
-                title={`Докачать выбранное: ${selected.size}`}
-              >
-                {busy === torrent.infohash ? "…" : <Plus size={15} />}
-              </button>
-            )}
-          </div>
+        )
+      }
+      extraMeta={
+        <div className="mt-1.5 flex items-center gap-2">
+          <ProgressBar pct={pct} />
+          <span className="w-8 text-right font-mono text-[10px] font-bold text-white/62">{pct}%</span>
         </div>
-      </div>
-
-      <div
-        className={cn(
-          "pointer-events-auto absolute top-0 z-40 hidden w-[min(560px,calc(100vw-56px))] rounded-[16px] bg-raise p-3 shadow-[0_22px_70px_rgba(0,0,0,0.5)] ring-1 ring-white/[0.08] group-hover:block group-focus-within:block max-mob:left-0 max-mob:right-auto max-mob:top-full",
-          align === "right" ? "right-full mr-3" : "left-full ml-3",
-        )}
-      >
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="font-ui text-label font-extrabold uppercase tracking-section text-muted">Серии и файлы</span>
-          <span className="font-mono text-2xs text-muted">{torrent.files.length} файл.</span>
-        </div>
-        <div className="max-h-[380px] overflow-auto pr-1">
-          {groupBySeasonFiles(torrent.files).map((g) => (
-            <div key={g.key} className="mb-2 rounded-xl bg-surface/80 p-2">
-              <div className="mb-1.5 font-ui text-body font-bold text-ink">{g.label}</div>
-              <div className="flex flex-col gap-1">
-                {g.files.map((f) => {
-                  const label =
-                    f.seasonNumber != null && f.episodeNumber != null
-                      ? `S${f.seasonNumber}E${f.episodeNumber}`
-                      : (f.path.split("/").pop() ?? f.path);
-                  const filePct = Math.round((f.progress ?? 0) * 100);
-                  return (
-                    <label
-                      key={f.fileIndex}
-                      className="pointer-events-auto flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/[0.04]"
-                    >
-                      {f.wanted ? (
-                        <span className="grid size-5 flex-none place-items-center rounded bg-accent/15 text-accent">
-                          {filePct >= 100 ? <Check size={12} /> : <Download size={12} />}
-                        </span>
-                      ) : (
-                        <input
-                          type="checkbox"
-                          className={media.checkbox}
-                          checked={selected.has(f.fileIndex)}
-                          onChange={() => onToggle(f.fileIndex)}
-                          title="Докачать"
-                        />
-                      )}
-                      <span className="w-[52px] flex-none font-mono text-2xs text-muted">{label}</span>
-                      <span className="w-[62px] flex-none font-mono text-2xs text-muted">{fmtSize(f.length)}</span>
-                      <span className="min-w-0 flex-1 truncate font-mono text-2xs text-muted" title={f.path}>
-                        {f.path.split("/").pop()}
-                      </span>
-                      {f.wanted ? (
-                        <span className="flex w-[96px] flex-none items-center gap-1.5">
-                          <ProgressBar pct={filePct} />
-                          <span className="w-7 text-right font-mono text-2xs text-muted">{filePct}%</span>
-                        </span>
-                      ) : (
-                        <span className="w-[96px] flex-none text-right font-mono text-2xs text-muted">не качается</span>
-                      )}
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </article>
+      }
+      overlaySlot={
+        <>
+          {popup}
+          {selected.size > 0 && (
+            <button
+              type="button"
+              className={cn(media.button.accentIconSm, "absolute bottom-2.5 right-2.5 z-30 size-[34px]")}
+              disabled={busy === torrent.infohash}
+              onClick={onMore}
+              title={`Докачать выбранное: ${selected.size}`}
+            >
+              {busy === torrent.infohash ? "…" : <Plus size={15} />}
+            </button>
+          )}
+        </>
+      }
+    />
   );
 }
 

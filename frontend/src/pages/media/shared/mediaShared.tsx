@@ -2,7 +2,7 @@
 // детальными страницами фильма/сериала: HLS-плеер, release picker, ручной
 // импорт застрявших раздач, форматтеры размеров/скорости/ETA.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Hls from "hls.js";
 import { Check, Download } from "lucide-react";
 import {
@@ -365,12 +365,15 @@ export function useVideoPlayer(url: string | null, direct = false) {
 
 // ── Интерактивный выбор раздачи (Jackett Torznab + native scoring) ─────
 // Показывает релизы с постером, качеством, озвучкой, сидами и отправкой в qB.
-function TorrentCard({
+export function TorrentCard({
   release,
   busy,
   done,
   disabled,
   download,
+  actionSlot,
+  overlaySlot,
+  extraMeta,
   onGrab,
 }: {
   release: ReleaseOption;
@@ -378,6 +381,9 @@ function TorrentCard({
   done: boolean;
   disabled: boolean;
   download?: DownloadItem | null;
+  actionSlot?: ReactNode;
+  overlaySlot?: ReactNode;
+  extraMeta?: ReactNode;
   onGrab: () => void;
 }) {
   const details = release.details;
@@ -408,7 +414,7 @@ function TorrentCard({
   return (
     <article
       className={cn(
-        "media-hover-card w-[220px] flex-none scroll-ml-5 max-mob:w-[calc(100vw-40px)]",
+        "group media-hover-card relative w-[220px] flex-none scroll-ml-5 max-mob:w-[calc(100vw-40px)]",
       )}
     >
       <div
@@ -467,14 +473,17 @@ function TorrentCard({
             <span className="min-w-0 truncate font-mono text-[11.5px] font-semibold text-white/70">
               {tech?.size ?? fmtSize(release.size)}
             </span>
-            <DownloadProgressButton
-              busy={busy}
-              done={isComplete}
-              progress={progress}
-              disabled={disabled || Boolean(download)}
-              onClick={onGrab}
-            />
+            {actionSlot ?? (
+              <DownloadProgressButton
+                busy={busy}
+                done={isComplete}
+                progress={progress}
+                disabled={disabled || Boolean(download)}
+                onClick={onGrab}
+              />
+            )}
           </div>
+          {extraMeta}
           {download && (
             <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] text-white/58">
               <span className="truncate">{download.state}</span>
@@ -492,6 +501,7 @@ function TorrentCard({
           </div>
         )}
       </div>
+      {overlaySlot}
     </article>
   );
 }

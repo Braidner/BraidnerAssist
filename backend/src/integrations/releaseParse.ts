@@ -3,7 +3,11 @@ export interface ParsedRelease {
   codec: string | null;
   source: string | null;
   group: string | null;
+  releaseGroup: string | null;
+  studioHint: string | null;
   languages: string[];
+  voice: "dub" | "mvo" | "dvo" | "avo" | "sub" | "original" | "unknown";
+  voiceLabel: string | null;
   hdr: string | null;
   season: number | null;
   episodes: number[];
@@ -44,19 +48,38 @@ export function parseReleaseTitle(title: string, bannedWords: string[] = []): Pa
     null;
 
   const languages = uniq([
-    ...(/\b(?:rus|ru|russian|дубляж|дуб|профессиональный|многоголос)\b/i.test(raw) ? ["ru"] : []),
+    ...(/\b(?:rus|ru|russian|dub|mvo|dvo|avo|дубляж|дуб|профессиональный|многоголос|двухголос|авторский|авторская)\b/i.test(raw) ? ["ru"] : []),
     ...(/\b(?:eng|en|english|original)\b/i.test(raw) ? ["en"] : []),
     ...(/\b(?:ukr|ua|ukrainian)\b/i.test(raw) ? ["uk"] : []),
     ...(/\b(?:jpn|japanese)\b/i.test(raw) ? ["ja"] : []),
   ]);
 
+  const voice =
+    /\b(?:sub|subs|subtitles|субтитры|сабы)\b/i.test(raw) ? "sub" :
+    /\b(?:original|оригинал|orig)\b/i.test(raw) ? "original" :
+    /\b(?:avo|авторский|авторская|одноголос)\b/i.test(raw) ? "avo" :
+    /\b(?:dvo|двухголос)\b/i.test(raw) ? "dvo" :
+    /\b(?:mvo|многоголос|многоголосый|многоголосая)\b/i.test(raw) ? "mvo" :
+    /\b(?:dub|dubbed|дубляж|дублированный|дублированная|проф(?:ессиональный)?\.?)\b/i.test(raw) ? "dub" :
+    "unknown";
+  const voiceLabel =
+    voice === "dub" ? "Дубляж" :
+    voice === "mvo" ? "Многоголосая" :
+    voice === "dvo" ? "Двухголосая" :
+    voice === "avo" ? "Авторская" :
+    voice === "sub" ? "Субтитры" :
+    voice === "original" ? "Оригинал" :
+    null;
+
   const seasonMatch = raw.match(/\bS(\d{1,2})(?:[ ._-]?E(\d{1,3}))?/i) ?? raw.match(/\bseason[ ._-]?(\d{1,2})\b/i);
   const season = seasonMatch ? Number(seasonMatch[1]) : null;
   const episodes = seasonMatch?.[2] ? [Number(seasonMatch[2])] : [];
 
-  const groupMatch = raw.match(/[-–]\s*([A-Za-z0-9][A-Za-z0-9._-]{1,24})\s*$/);
+  const groupMatch = raw.match(/(?:\s[-–]\s*|\[)([A-Za-z0-9][A-Za-z0-9._-]{1,24})\]?\s*$/);
   const group = groupMatch?.[1] ?? null;
+  const studioMatch = raw.match(/\b(?:lostfilm|newstudio|hdrezka|amediateka|кубик(?:и)?\s+в\s+кубе|jaskier|alexfilm|coldfilm)\b/i);
+  const studioHint = studioMatch?.[0] ?? null;
   const bannedHits = bannedWords.filter((w) => w && lower.includes(w.toLowerCase()));
 
-  return { resolution, codec, source, group, languages, hdr, season, episodes, bannedHits };
+  return { resolution, codec, source, group, releaseGroup: group, studioHint, languages, voice, voiceLabel, hdr, season, episodes, bannedHits };
 }

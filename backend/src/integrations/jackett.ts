@@ -44,6 +44,41 @@ const torznabAttr = (xml: string, name: string): string | null => {
   return m ? decodeXml(m[1]) : null;
 };
 
+const first = (...values: Array<string | null | undefined>): string | null => {
+  for (const value of values) {
+    const trimmed = String(value ?? "").trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+};
+
+const num = (...values: Array<string | null | undefined>): number | null => {
+  const value = first(...values);
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const cleanDescription = (value: string | null): string | null => {
+  if (!value) return null;
+  const text = value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || null;
+};
+
+const safeHttpUrl = (value: string | null): string | null => {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+};
+
 function itemBlocks(xml: string): string[] {
   return [...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((m) => m[0]);
 }
@@ -75,17 +110,46 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
     const guid = tag(it, "guid") ?? `${indexer}-${i}-${title}`;
     const enclosureUrl = attr(it, "enclosure", "url");
     const link = tag(it, "link");
+    const comments = tag(it, "comments");
     const magnet = torznabAttr(it, "magneturl");
-    const size = Number(torznabAttr(it, "size") ?? attr(it, "enclosure", "length") ?? tag(it, "size") ?? 0);
-    const seeders = Number(torznabAttr(it, "seeders") ?? torznabAttr(it, "seed") ?? 0);
-    const category = torznabAttr(it, "category") ?? tag(it, "category");
+    const size = num(torznabAttr(it, "size"), attr(it, "enclosure", "length"), tag(it, "size")) ?? 0;
+    const seeders = num(torznabAttr(it, "seeders"), torznabAttr(it, "seed")) ?? 0;
+    const leechers = num(torznabAttr(it, "leechers"), torznabAttr(it, "leeches"), torznabAttr(it, "leech"));
+    const peers = num(torznabAttr(it, "peers"));
+    const grabs = num(torznabAttr(it, "grabs"), torznabAttr(it, "downloads"));
+    const category = first(torznabAttr(it, "category"), tag(it, "category"));
+    const trackerName = first(torznabAttr(it, "jackettindexer"), torznabAttr(it, "tracker"), torznabAttr(it, "site"), indexer) ?? indexer;
+    const posterRemote = safeHttpUrl(first(
+      torznabAttr(it, "poster"),
+      torznabAttr(it, "cover"),
+      torznabAttr(it, "banner"),
+      torznabAttr(it, "image"),
+      attr(it, "media:thumbnail", "url"),
+      attr(it, "media:content", "url"),
+      tag(it, "image"),
+    ));
+    const published = first(tag(it, "pubDate"), tag(it, "published"), tag(it, "dc:date"));
+    const publishDate = published ? new Date(published) : null;
     return {
       guid,
+      indexerId: indexer,
       title,
-      size: Number.isFinite(size) ? size : 0,
-      seeders: Number.isFinite(seeders) ? seeders : 0,
-      indexer: torznabAttr(it, "jackettindexer") ?? indexer,
+      size,
+      seeders,
+      leechers,
+      peers,
+      grabs,
+      indexer: trackerName,
+      trackerName,
+      trackerId: indexer,
       url: magnet ?? enclosureUrl ?? link,
+      detailUrl: safeHttpUrl(first(comments, link)),
+      publishDate: publishDate && Number.isFinite(publishDate.getTime()) ? publishDate.toISOString() : published,
+      description: cleanDescription(tag(it, "description")),
+      posterRemote,
+      imdb: first(torznabAttr(it, "imdb"), tag(it, "imdb")),
+      tmdb: first(torznabAttr(it, "tmdb"), tag(it, "tmdb")),
+      infoHash: first(torznabAttr(it, "infohash"), torznabAttr(it, "info_hash")),
       category,
     };
   });
@@ -110,7 +174,17 @@ export async function jackettSearch(
     if (!dedup.has(key)) dedup.set(key, { ...r, query });
   }
   return [...dedup.values()]
-    .map((r) => ({ ...r, ...scoreRelease({ ...r, query, kind: opts.kind === "manual" ? undefined : opts.kind, profile }) }))
+    .map((r) => {
+      const scored = scoreRelease({ ...r, query, kind: opts.kind === "manual" ? undefined : opts.kind, profile });
+      return {
+        ...r,
+        ...scored,
+        voice: scored.parsed.voice,
+        voiceLabel: scored.parsed.voiceLabel,
+        releaseGroup: scored.parsed.releaseGroup,
+        studioHint: scored.parsed.studioHint,
+      };
+    })
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0))
     .slice(0, 50);
 }

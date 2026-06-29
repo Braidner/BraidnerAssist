@@ -193,6 +193,7 @@ export async function nativeReleaseSearch(kind: MediaKind, id: number, seasonNum
     : null;
   const releases = await jackettSearchMany(queries, { kind, profileName });
   for (const r of releases) {
+    releaseCache.set(cacheKey(kind, r.guid, r.indexerId ?? r.trackerId ?? r.indexer), { at: Date.now(), item: { ...r, type: kind, tmdbId, tvdbId, titleHint: title } });
     releaseCache.set(cacheKey(kind, r.guid, r.indexer), { at: Date.now(), item: { ...r, type: kind, tmdbId, tvdbId, titleHint: title } });
   }
   await Promise.all(releases.slice(0, 20).map((r) =>

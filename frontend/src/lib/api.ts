@@ -1352,7 +1352,23 @@ export interface ReleaseOption {
   languages?: string[];
   size: number;
   seeders: number | null;
+  leechers?: number | null;
+  peers?: number | null;
+  grabs?: number | null;
   indexer: string;
+  trackerName?: string;
+  trackerId?: number | string;
+  detailUrl?: string | null;
+  publishDate?: string | null;
+  description?: string | null;
+  posterRemote?: string | null;
+  imdb?: string | null;
+  tmdb?: string | null;
+  infoHash?: string | null;
+  voice?: "dub" | "mvo" | "dvo" | "avo" | "sub" | "original" | "unknown";
+  voiceLabel?: string | null;
+  releaseGroup?: string | null;
+  studioHint?: string | null;
   protocol?: string;
   rejected?: boolean;
   rejections?: string[];
@@ -1365,6 +1381,10 @@ export interface ReleaseOption {
     codec?: string | null;
     source?: string | null;
     languages?: string[];
+    voice?: "dub" | "mvo" | "dvo" | "avo" | "sub" | "original" | "unknown";
+    voiceLabel?: string | null;
+    releaseGroup?: string | null;
+    studioHint?: string | null;
     hdr?: string | null;
   };
 }

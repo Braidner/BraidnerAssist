@@ -133,16 +133,33 @@ export interface MoviePageDetail {
 
 export interface SearchResult {
   guid: string;
+  indexerId?: number | string;
   title: string;
   size: number;
   seeders: number;
+  leechers?: number | null;
+  peers?: number | null;
+  grabs?: number | null;
   indexer: string;
+  trackerName?: string;
+  trackerId?: number | string;
   url: string | null; // magnet или .torrent — то, что отдаём в qBittorrent
+  detailUrl?: string | null;
+  publishDate?: string | null;
+  description?: string | null;
+  posterRemote?: string | null;
+  imdb?: string | null;
+  tmdb?: string | null;
+  infoHash?: string | null;
   category?: string | null;
   query?: string;
   score?: number;
   scoreReasons?: string[];
   warnings?: string[];
+  voice?: "dub" | "mvo" | "dvo" | "avo" | "sub" | "original" | "unknown";
+  voiceLabel?: string | null;
+  releaseGroup?: string | null;
+  studioHint?: string | null;
   parsed?: unknown;
 }
 

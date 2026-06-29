@@ -64,6 +64,41 @@ function keepCacheFresh(): void {
   for (const [k, v] of releaseCache) if (now - v.at > CACHE_TTL) releaseCache.delete(k);
 }
 
+function selectedReleaseJson(item: SearchResult): string {
+  return JSON.stringify({
+    guid: item.guid,
+    indexerId: item.indexerId,
+    title: item.title,
+    query: item.query,
+    size: item.size,
+    seeders: item.seeders,
+    leechers: item.leechers,
+    peers: item.peers,
+    grabs: item.grabs,
+    indexer: item.indexer,
+    trackerName: item.trackerName,
+    trackerId: item.trackerId,
+    url: item.url,
+    detailUrl: item.detailUrl,
+    publishDate: item.publishDate,
+    description: item.description,
+    posterRemote: item.posterRemote,
+    imdb: item.imdb,
+    tmdb: item.tmdb,
+    infoHash: item.infoHash,
+    category: item.category,
+    voice: item.voice,
+    voiceLabel: item.voiceLabel,
+    releaseGroup: item.releaseGroup,
+    studioHint: item.studioHint,
+    details: item.details,
+    score: item.score,
+    scoreReasons: item.scoreReasons,
+    warnings: item.warnings,
+    parsed: item.parsed,
+  });
+}
+
 async function monitorFor(kind: MediaKind, id: number) {
   if (kind === "series") {
     const byTmdb = await prisma.mediaMonitor.findUnique({ where: { kind_tmdbId: { kind, tmdbId: id } } });
@@ -250,7 +285,7 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
     if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
     await prisma.mediaReleaseDecision.updateMany({
       where: { kind: item.type, guid },
-      data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedAt: new Date() },
+      data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedReleaseJson: selectedReleaseJson(item), selectedAt: new Date() },
     }).catch(() => {});
     return { ok: true, ...res };
   }
@@ -276,7 +311,7 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
   if (monitor) await prisma.mediaMonitor.update({ where: { id: monitor.id }, data: { lastGrabAt: new Date() } }).catch(() => {});
   await prisma.mediaReleaseDecision.updateMany({
     where: { kind: item.type, guid },
-    data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedAt: new Date() },
+    data: { selected: true, selectedInfohash: res.infohash.toLowerCase(), selectedReleaseJson: selectedReleaseJson(item), selectedAt: new Date() },
   }).catch(() => {});
   return { ok: true, ...res };
 }

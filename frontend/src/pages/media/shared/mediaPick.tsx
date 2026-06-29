@@ -83,6 +83,24 @@ function contentTorrentRelease(torrent: ContentTorrent): ReleaseOption {
   const wanted = torrent.files.filter((f) => f.wanted);
   const totalSize = torrent.files.reduce((sum, f) => sum + f.length, 0);
   const season = torrentSeasonLabel(torrent);
+  if (torrent.selectedRelease) {
+    return {
+      ...torrent.selectedRelease,
+      guid: torrent.infohash,
+      quality: torrent.selectedRelease.quality ?? season ?? undefined,
+      size: torrent.selectedRelease.size || totalSize,
+      details: torrent.selectedRelease.details
+        ? {
+            ...torrent.selectedRelease.details,
+            technical: {
+              ...torrent.selectedRelease.details.technical,
+              size: torrent.selectedRelease.details.technical?.size ?? fmtSize(totalSize),
+              fileCount: torrent.selectedRelease.details.technical?.fileCount ?? (wanted.length || torrent.files.length),
+            },
+          }
+        : undefined,
+    };
+  }
   return {
     guid: torrent.infohash,
     title: torrent.selectedTitle ?? torrent.title,

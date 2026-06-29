@@ -5,7 +5,7 @@
 
 import { prisma } from "../db/client.js";
 import { torrserverFiles } from "./torrserver.js";
-import { qbAction, qbAddRaw, qbApplySelection, qbFiles, qbSetFilePrio } from "./media.js";
+import { qbAction, qbAddRaw, qbApplySelection, qbFiles, qbSetFilePrio, type SearchResult } from "./media.js";
 import { parseEpisode, isVideoFile } from "./episodeParse.js";
 
 export type ContentType = "movie" | "series";
@@ -235,11 +235,21 @@ export interface ContentTorrent {
   infohash: string;
   title: string;
   magnet: string | null;
+  selectedRelease: SearchResult | null;
   selectedTitle: string | null;
   selectedIndexer: string | null;
   selectedSeasonNumber: number | null;
   selectedAt: string | null;
   files: ContentTorrentFile[];
+}
+
+function parseSelectedRelease(value?: string | null): SearchResult | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as SearchResult;
+  } catch {
+    return null;
+  }
 }
 
 // Торренты, привязанные к тайтлу (для карточки «Уже качается из этого торрента»).
@@ -275,6 +285,7 @@ export async function listContentTorrents(key: ContentKey): Promise<ContentTorre
   const out: ContentTorrent[] = [];
   for (const t of torrents) {
     const decision = decisionByHash.get(t.infohash);
+    const selectedRelease = parseSelectedRelease(decision?.selectedReleaseJson);
     let prog = new Map<number, number>();
     try {
       const qf = await qbFiles(t.infohash);
@@ -286,6 +297,7 @@ export async function listContentTorrents(key: ContentKey): Promise<ContentTorre
       infohash: t.infohash,
       title: t.title,
       magnet: t.magnet,
+      selectedRelease,
       selectedTitle: decision?.title ?? null,
       selectedIndexer: decision?.indexer ?? null,
       selectedSeasonNumber: decision?.seasonNumber ?? null,

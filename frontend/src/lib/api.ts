@@ -1656,6 +1656,7 @@ export interface ContentTorrent {
   infohash: string;
   title: string;
   magnet: string | null;
+  selectedRelease: ReleaseOption | null;
   selectedTitle: string | null;
   selectedIndexer: string | null;
   selectedSeasonNumber: number | null;

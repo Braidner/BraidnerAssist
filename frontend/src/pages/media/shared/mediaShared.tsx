@@ -518,7 +518,6 @@ export function ReleasePicker({
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
-  const [done, setDone] = useState<Record<string, boolean>>({});
   const [grabbedHashes, setGrabbedHashes] = useState<Record<string, string>>({});
   const toast = useToast();
 
@@ -526,7 +525,6 @@ export function ReleasePicker({
     let alive = true;
     setReleases(null);
     setError(null);
-    setDone({});
     setGrabbedHashes({});
     searchReleaseOptions(params).then((r) => {
       if (!alive) return;
@@ -551,7 +549,6 @@ export function ReleasePicker({
       indexerId: r.indexerId ?? r.indexer,
     });
     if (res.ok) {
-      setDone((p) => ({ ...p, [r.guid]: true }));
       if (res.infohash) setGrabbedHashes((p) => ({ ...p, [r.guid]: res.infohash! }));
     }
     return res;
@@ -564,6 +561,8 @@ export function ReleasePicker({
     if (res.ok) {
       toast.success("Раздача отправлена на загрузку");
       onGrabbed?.();
+      window.setTimeout(() => onGrabbed?.(), 2_000);
+      window.setTimeout(() => onGrabbed?.(), 5_000);
     } else toast.error(res.error ?? "Не удалось отправить раздачу");
   };
 
@@ -583,13 +582,16 @@ export function ReleasePicker({
     >
       {releases.map((r) => {
         const download = findReleaseDownload(downloads, grabbedHashes[r.guid]);
+        const grabbed = Boolean(grabbedHashes[r.guid]);
+        const pending = grabbed && !download;
+        const complete = Boolean(download && download.progress >= 100);
         return (
           <TorrentCard
             key={r.guid}
             release={r}
-            busy={busyGuid === r.guid}
-            done={Boolean(done[r.guid])}
-            disabled={busyGuid === r.guid || Boolean(done[r.guid])}
+            busy={busyGuid === r.guid || pending}
+            done={complete}
+            disabled={busyGuid === r.guid || grabbed}
             download={download}
             onGrab={() => onGrab(r)}
           />

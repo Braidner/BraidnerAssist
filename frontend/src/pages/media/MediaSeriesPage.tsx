@@ -516,7 +516,10 @@ export function MediaSeriesPage({
               <ReleasePicker
                 params={{ type: "series", id: tvdbId }}
                 downloads={media.downloads}
-                onGrabbed={onMediaUpdate}
+                onGrabbed={() => {
+                  onMediaUpdate();
+                  setPickReload((n) => n + 1);
+                }}
               />
             </div>
           )}
@@ -639,7 +642,10 @@ export function MediaSeriesPage({
                           seasonNumber: s.seasonNumber,
                         }}
                         downloads={media.downloads}
-                        onGrabbed={onMediaUpdate}
+                        onGrabbed={() => {
+                          onMediaUpdate();
+                          setPickReload((n) => n + 1);
+                        }}
                       />
                     )}
 

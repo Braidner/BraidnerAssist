@@ -213,6 +213,7 @@ model MediaReleaseDecision {
   selected    Boolean      @default(false)
   seasonNumber Int?
   selectedInfohash String?
+  selectedReleaseJson String?
   selectedAt   DateTime?
   createdAt   DateTime     @default(now())
 

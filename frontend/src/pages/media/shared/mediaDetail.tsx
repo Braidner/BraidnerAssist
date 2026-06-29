@@ -78,7 +78,7 @@ export function DetailBody({
   return (
     <div
       className={cn(
-        " px-[52px] pb-20 max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]",
+        " px-[52px] max-mob:px-5 max-mob:pt-7 max-mob:pb-[60px]",
         className,
       )}
       style={{ animation: "detIn 0.38s 0.12s cubic-bezier(.22,.61,.36,1) both" }}

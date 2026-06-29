@@ -344,274 +344,275 @@ export function MediaSeriesPage({
     : undefined;
 
   return (
-    <div className={ms.page}>
-      {importItem && (
-        <ImportDrawer
-          item={importItem}
-          type="series"
-          onClose={() => setImportItem(null)}
-          onDone={() => {
-            setImportItem(null);
-            onMediaUpdate();
-            fetchDetail().then(setD);
+    <div>
+      <div className={ms.page}>
+        {importItem && (
+          <ImportDrawer
+            item={importItem}
+            type="series"
+            onClose={() => setImportItem(null)}
+            onDone={() => {
+              setImportItem(null);
+              onMediaUpdate();
+              fetchDetail().then(setD);
+            }}
+          />
+        )}
+
+        <DetailHero
+          kindLabel="СЕРИАЛ"
+          title={det.title}
+          jellyfinId={det.jellyfinId}
+          backdropSrc={backdropSrc}
+          posterSrc={posterSrc}
+          player={player}
+          year={det.year}
+          runtimeLabel={det.runtime ? `${det.runtime} мин / эп.` : null}
+          rating={det.rating}
+          genres={det.genres}
+          previousItem={previousItem}
+          nextItem={nextItem}
+          onBack={goBack}
+          onQueueClick={() => setShowAllPicker((v) => !v)}
+          onPlayQueueItem={(item) => play(item.jellyfinId, item.title)}
+          onClosePlayer={() => {
+            setPlayer(null);
+            setActiveEpisodeId(null);
           }}
         />
-      )}
 
-      <DetailHero
-        kindLabel="СЕРИАЛ"
-        title={det.title}
-        jellyfinId={det.jellyfinId}
-        backdropSrc={backdropSrc}
-        posterSrc={posterSrc}
-        player={player}
-        year={det.year}
-        runtimeLabel={det.runtime ? `${det.runtime} мин / эп.` : null}
-        rating={det.rating}
-        genres={det.genres}
-        previousItem={previousItem}
-        nextItem={nextItem}
-        onBack={goBack}
-        onQueueClick={() => setShowAllPicker((v) => !v)}
-        onPlayQueueItem={(item) => play(item.jellyfinId, item.title)}
-        onClosePlayer={() => {
-          setPlayer(null);
-          setActiveEpisodeId(null);
-        }}
-      />
-
-      <DetailBody className="pt-[38px]">
-        {det.overview && (
-          <p className="max-w-[860px] font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
-            {det.overview}
-          </p>
-        )}
-
-        <DetailStatusBadges
-          status={det.status}
-          inMonitor={det.inMonitor}
-          monitorName="native monitor"
-          provider={det.network}
-        />
-
-        {/* Actions */}
-        <div className="flex flex-wrap gap-3 mb-7">
-          {watchTarget && (
-            <button
-              className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-              disabled={busy === watchTarget.jellyfinId}
-              title={watchTarget.title}
-              onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <polygon points="6,3 21,12 6,21" />
-              </svg>
-              {busy === watchTarget.jellyfinId ? "…" : watchLabel}
-            </button>
+        <DetailBody className="pt-[38px]">
+          {det.overview && (
+            <p className="max-w-[860px] font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
+              {det.overview}
+            </p>
           )}
-          {!det.inMonitor && tvdbId != null && (
-            <button
-              className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-              disabled={act === "add"}
-              onClick={addToLib}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <polygon points="6,3 21,12 6,21" />
-              </svg>
-              {act === "add" ? "…" : "В библиотеку"}
-            </button>
-          )}
-          {det.inMonitor && tvdbId != null && (
-            <>
+
+          <DetailStatusBadges
+            status={det.status}
+            inMonitor={det.inMonitor}
+            monitorName="native monitor"
+            provider={det.network}
+          />
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-3 mb-7">
+            {watchTarget && (
               <button
-                className={cn(
-                  ms.button.sm,
-                  det.monitored && ms.button.accentSm,
-                )}
-                disabled={act === "mon"}
-                title={
-                  det.monitored
-                    ? "Снять весь сериал с мониторинга"
-                    : "Мониторить весь сериал"
-                }
-                onClick={() => toggleMonitor(!det.monitored)}
+                className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                disabled={busy === watchTarget.jellyfinId}
+                title={watchTarget.title}
+                onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
               >
-                {act === "mon"
-                  ? "…"
-                  : det.monitored
-                    ? "★ Мониторится"
-                    : "☆ Мониторить"}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <polygon points="6,3 21,12 6,21" />
+                </svg>
+                {busy === watchTarget.jellyfinId ? "…" : watchLabel}
               </button>
+            )}
+            {!det.inMonitor && tvdbId != null && (
+              <button
+                className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                disabled={act === "add"}
+                onClick={addToLib}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <polygon points="6,3 21,12 6,21" />
+                </svg>
+                {act === "add" ? "…" : "В библиотеку"}
+              </button>
+            )}
+            {det.inMonitor && tvdbId != null && (
+              <>
+                <button
+                  className={cn(
+                    ms.button.sm,
+                    det.monitored && ms.button.accentSm,
+                  )}
+                  disabled={act === "mon"}
+                  title={
+                    det.monitored
+                      ? "Снять весь сериал с мониторинга"
+                      : "Мониторить весь сериал"
+                  }
+                  onClick={() => toggleMonitor(!det.monitored)}
+                >
+                  {act === "mon"
+                    ? "…"
+                    : det.monitored
+                      ? "★ Мониторится"
+                      : "☆ Мониторить"}
+                </button>
+                <button
+                  className={ms.button.sm}
+                  disabled={act === "find"}
+                  title="Найти все недостающие серии"
+                  onClick={() => findSeason()}
+                >
+                  {act === "find" ? "…" : "⬇ Найти недостающие"}
+                </button>
+              </>
+            )}
+            {tvdbId != null && (
               <button
                 className={ms.button.sm}
-                disabled={act === "find"}
-                title="Найти все недостающие серии"
-                onClick={() => findSeason()}
+                title="Поиск всех раздач сериала (включая мультисезонные паки)"
+                onClick={() => setShowAllPicker((v) => !v)}
               >
-                {act === "find" ? "…" : "⬇ Найти недостающие"}
+                {showAllPicker ? "Скрыть раздачи" : "🔍 Все раздачи"}
               </button>
-            </>
-          )}
-          {tvdbId != null && (
-            <button
-              className={ms.button.sm}
-              title="Поиск всех раздач сериала (включая мультисезонные паки)"
-              onClick={() => setShowAllPicker((v) => !v)}
-            >
-              {showAllPicker ? "Скрыть раздачи" : "🔍 Все раздачи"}
-            </button>
-          )}
-          <StuckImportButtons
-            items={stuck}
-            label="⚠ Импорт застрявшей раздачи"
-            onSelect={setImportItem}
-          />
-        </div>
-
-        {/* Качается из торрента (Media v2) — прогресс по сериям + докачать ещё */}
-        <ContentTorrents
-          contentType="series"
-          tvdbId={tvdbId}
-          reloadKey={pickReload}
-        />
-
-        {/* Пофайловый выбор серий из торрента (Media v2) */}
-        <div style={{ marginTop: 16 }}>
-          <button
-            className={cn(ms.button.sm, "mb-2")}
-            onClick={() => setShowPick((v) => !v)}
-          >
-            {showPick
-              ? "Скрыть серии из торрента"
-              : "🔍 Скачать по сериям (торрент)"}
-          </button>
-          {showPick && (
-            <TorrentFilePicker
-              contentType="series"
-              tvdbId={tvdbId}
-              title={det.title}
-              onGrabbed={() => setPickReload((n) => n + 1)}
-            />
-          )}
-        </div>
-
-        {showAllPicker && tvdbId != null && (
-          <div style={{ marginTop: 16 }}>
-            <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ВСЕ РАЗДАЧИ</div>
-            <div className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0" style={{ marginBottom: 8 }}>
-              Включая мультисезонные паки. После загрузки пака разложи серии
-              кнопкой «Импорт» в Загрузках.
-            </div>
-            <ReleasePicker
-              params={{ type: "series", id: tvdbId }}
-              onGrabbed={onMediaUpdate}
+            )}
+            <StuckImportButtons
+              items={stuck}
+              label="⚠ Импорт застрявшей раздачи"
+              onSelect={setImportItem}
             />
           </div>
-        )}
 
-        {/* Seasons accordion */}
-        {det.seasons.length === 0 ? (
-          <div className={cn(ms.empty, "mt-6")}>Эпизоды не найдены.</div>
-        ) : (
-          <div className="mb-10" style={{ marginTop: 24 }}>
-            <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">СЕЗОНЫ</div>
-            {det.seasons.map((s) => {
-              const isOpen = openSeason === s.seasonNumber;
-              const pickerOn = pickerSeason === s.seasonNumber;
-              const label =
-                s.seasonNumber === 0
-                  ? "Спецвыпуски"
-                  : `Сезон ${s.seasonNumber}`;
-              const pct =
-                s.totalCount > 0
-                  ? Math.round((s.fileCount / s.totalCount) * 100)
-                  : 0;
-              return (
-                <div key={s.seasonNumber} className="border border-white/[0.07] rounded-[11px] mb-2 overflow-hidden bg-white/[0.02]">
-                  <button
-                    className="w-full flex items-center gap-3 px-[18px] py-[15px] border-none cursor-pointer bg-transparent font-ui text-lead-lg font-bold text-ink text-left transition-colors hover:bg-white/[0.04]"
-                    onClick={() =>
-                      setOpenSeason(isOpen ? null : s.seasonNumber)
-                    }
-                  >
-                    <span>{label}</span>
-                    <span className="text-data text-muted lmono">
+          {/* Качается из торрента (Media v2) — прогресс по сериям + докачать ещё */}
+          <ContentTorrents
+            contentType="series"
+            tvdbId={tvdbId}
+            reloadKey={pickReload}
+          />
+
+          {/* Пофайловый выбор серий из торрента (Media v2) */}
+          <div style={{ marginTop: 16 }}>
+            <button
+              className={cn(ms.button.sm, "mb-2")}
+              onClick={() => setShowPick((v) => !v)}
+            >
+              {showPick
+                ? "Скрыть серии из торрента"
+                : "🔍 Скачать по сериям (торрент)"}
+            </button>
+            {showPick && (
+              <TorrentFilePicker
+                contentType="series"
+                tvdbId={tvdbId}
+                title={det.title}
+                onGrabbed={() => setPickReload((n) => n + 1)}
+              />
+            )}
+          </div>
+
+          {showAllPicker && tvdbId != null && (
+            <div style={{ marginTop: 16 }}>
+              <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ВСЕ РАЗДАЧИ</div>
+              <div className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0" style={{ marginBottom: 8 }}>
+                Включая мультисезонные паки. После загрузки пака разложи серии
+                кнопкой «Импорт» в Загрузках.
+              </div>
+              <ReleasePicker
+                params={{ type: "series", id: tvdbId }}
+                onGrabbed={onMediaUpdate}
+              />
+            </div>
+          )}
+
+          {/* Seasons accordion */}
+          {det.seasons.length === 0 ? (
+            <div className={cn(ms.empty, "mt-6")}>Эпизоды не найдены.</div>
+          ) : (
+            <div className="mb-10" style={{ marginTop: 24 }}>
+              <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">СЕЗОНЫ</div>
+              {det.seasons.map((s) => {
+                const isOpen = openSeason === s.seasonNumber;
+                const pickerOn = pickerSeason === s.seasonNumber;
+                const label =
+                  s.seasonNumber === 0
+                    ? "Спецвыпуски"
+                    : `Сезон ${s.seasonNumber}`;
+                const pct =
+                  s.totalCount > 0
+                    ? Math.round((s.fileCount / s.totalCount) * 100)
+                    : 0;
+                return (
+                  <div key={s.seasonNumber} className="border border-white/[0.07] rounded-[11px] mb-2 overflow-hidden bg-white/[0.02]">
+                    <button
+                      className="w-full flex items-center gap-3 px-[18px] py-[15px] border-none cursor-pointer bg-transparent font-ui text-lead-lg font-bold text-ink text-left transition-colors hover:bg-white/[0.04]"
+                      onClick={() =>
+                        setOpenSeason(isOpen ? null : s.seasonNumber)
+                      }
+                    >
+                      <span>{label}</span>
+                      <span className="text-data text-muted lmono">
                       <ProgressBar pct={pct} />
                       <span style={{ marginLeft: 6 }}>
                         {s.fileCount}/{s.totalCount} эп.
                       </span>
                     </span>
-                    {/* Season action buttons */}
-                    {det.inMonitor && tvdbId != null && (
-                      <>
-                        <button
-                          className={cn(
-                            ms.button.iconSm,
-                            s.monitored && ms.button.accentIconSm,
-                          )}
-                          disabled={act === "mon" + s.seasonNumber}
-                          title={
-                            s.monitored
-                              ? "Снять сезон с мониторинга"
-                              : "Мониторить сезон"
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMonitor(!s.monitored, s.seasonNumber);
-                          }}
-                        >
-                          {act === "mon" + s.seasonNumber
-                            ? "…"
-                            : s.monitored
-                              ? "★"
-                              : "☆"}
-                        </button>
-                        <button
-                          className={ms.button.sm}
-                          disabled={act === "find" + s.seasonNumber}
-                          title="Найти весь сезон (force search)"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            findSeason(s.seasonNumber);
-                          }}
-                        >
-                          {act === "find" + s.seasonNumber ? "…" : "⬇ Сезон"}
-                        </button>
-                      </>
-                    )}
-                    <button
-                      className={ms.button.sm}
-                      disabled={tvdbId == null}
-                      title={
-                        tvdbId == null
-                          ? "Нет tvdbId"
-                          : "Выбрать раздачу для сезона"
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPickerSeason(pickerOn ? null : s.seasonNumber);
-                      }}
-                    >
-                      🔍 Раздача
-                    </button>
-                    <span
-                      className="ml-auto text-muted flex transition-transform duration-[220ms] [cubic-bezier(0.22,0.61,0.36,1)]"
-                      style={{
-                        transform: isOpen ? "rotate(180deg)" : "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                    >
+                      {/* Season action buttons */}
+                      {det.inMonitor && tvdbId != null && (
+                        <>
+                          <button
+                            className={cn(
+                              ms.button.iconSm,
+                              s.monitored && ms.button.accentIconSm,
+                            )}
+                            disabled={act === "mon" + s.seasonNumber}
+                            title={
+                              s.monitored
+                                ? "Снять сезон с мониторинга"
+                                : "Мониторить сезон"
+                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleMonitor(!s.monitored, s.seasonNumber);
+                            }}
+                          >
+                            {act === "mon" + s.seasonNumber
+                              ? "…"
+                              : s.monitored
+                                ? "★"
+                                : "☆"}
+                          </button>
+                          <button
+                            className={ms.button.sm}
+                            disabled={act === "find" + s.seasonNumber}
+                            title="Найти весь сезон (force search)"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              findSeason(s.seasonNumber);
+                            }}
+                          >
+                            {act === "find" + s.seasonNumber ? "…" : "⬇ Сезон"}
+                          </button>
+                        </>
+                      )}
+                      <button
+                        className={ms.button.sm}
+                        disabled={tvdbId == null}
+                        title={
+                          tvdbId == null
+                            ? "Нет tvdbId"
+                            : "Выбрать раздачу для сезона"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPickerSeason(pickerOn ? null : s.seasonNumber);
+                        }}
+                      >
+                        🔍 Раздача
+                      </button>
+                      <span
+                        className="ml-auto text-muted flex transition-transform duration-[220ms] [cubic-bezier(0.22,0.61,0.36,1)]"
+                        style={{
+                          transform: isOpen ? "rotate(180deg)" : "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                        }}
+                      >
                       <svg
                         width="16"
                         height="16"
@@ -627,121 +628,123 @@ export function MediaSeriesPage({
                         />
                       </svg>
                     </span>
-                  </button>
+                    </button>
 
-                  {pickerOn && tvdbId != null && (
-                    <ReleasePicker
-                      params={{
-                        type: "series",
-                        id: tvdbId,
-                        seasonNumber: s.seasonNumber,
-                      }}
-                      onGrabbed={onMediaUpdate}
-                    />
-                  )}
-
-                  <div
-                    className={cn(
-                      "overflow-hidden transition-[max-height] duration-300 [cubic-bezier(0.22,0.61,0.36,1)]",
-                      isOpen ? "max-h-[800px]" : "max-h-0",
+                    {pickerOn && tvdbId != null && (
+                      <ReleasePicker
+                        params={{
+                          type: "series",
+                          id: tvdbId,
+                          seasonNumber: s.seasonNumber,
+                        }}
+                        onGrabbed={onMediaUpdate}
+                      />
                     )}
-                  >
-                    <div className="border-t border-white/[0.05]">
-                      {s.episodes.map((ep) => {
-                        const missed = !ep.hasFile && isAired(ep.airDate);
-                        return (
-                          <div
-                            key={`${ep.seasonNumber}-${ep.episodeNumber}`}
-                            className={cn(
-                              "flex items-center gap-3.5 px-[18px] py-[13px] border-b border-white/[0.04] last:border-b-0 transition-colors hover:bg-white/[0.03]",
-                              ep.played ? "media-ep-played" : "",
-                            )}
-                          >
-                            {ep.jellyfinId ? (
-                              <img
-                                className="media-ep-thumb"
-                                src={jellyfinPosterUrl(ep.jellyfinId)}
-                                alt=""
-                                loading="lazy"
-                                onError={(e) => {
-                                  (
-                                    e.currentTarget as HTMLImageElement
-                                  ).style.visibility = "hidden";
-                                }}
-                              />
-                            ) : (
-                              <span className="media-ep-thumb media-ep-thumb-ph" />
-                            )}
-                            <span className="text-data text-muted w-[22px] flex-none lmono">
+
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-[max-height] duration-300 [cubic-bezier(0.22,0.61,0.36,1)]",
+                        isOpen ? "max-h-[800px]" : "max-h-0",
+                      )}
+                    >
+                      <div className="border-t border-white/[0.05]">
+                        {s.episodes.map((ep) => {
+                          const missed = !ep.hasFile && isAired(ep.airDate);
+                          return (
+                            <div
+                              key={`${ep.seasonNumber}-${ep.episodeNumber}`}
+                              className={cn(
+                                "flex items-center gap-3.5 px-[18px] py-[13px] border-b border-white/[0.04] last:border-b-0 transition-colors hover:bg-white/[0.03]",
+                                ep.played ? "media-ep-played" : "",
+                              )}
+                            >
+                              {ep.jellyfinId ? (
+                                <img
+                                  className="media-ep-thumb"
+                                  src={jellyfinPosterUrl(ep.jellyfinId)}
+                                  alt=""
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    (
+                                      e.currentTarget as HTMLImageElement
+                                    ).style.visibility = "hidden";
+                                  }}
+                                />
+                              ) : (
+                                <span className="media-ep-thumb media-ep-thumb-ph" />
+                              )}
+                              <span className="text-data text-muted w-[22px] flex-none lmono">
                               {String(ep.episodeNumber ?? 0).padStart(2, "0")}
                             </span>
-                            <span className="flex-1 text-row text-ink" title={ep.title}>
+                              <span className="flex-1 text-row text-ink" title={ep.title}>
                               {ep.title}
                             </span>
-                            {ep.hasFile ? (
-                              <span className={ms.badge}>
+                              {ep.hasFile ? (
+                                <span className={ms.badge}>
                                 {ep.quality ?? "есть"}
-                                {ep.size ? ` · ${fmtSize(ep.size)}` : ""}
+                                  {ep.size ? ` · ${fmtSize(ep.size)}` : ""}
                               </span>
-                            ) : missed ? (
-                              <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-[#e06666]">
+                              ) : missed ? (
+                                <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-[#e06666]">
                                 пропущено
                               </span>
-                            ) : (
-                              <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-muted">
+                              ) : (
+                                <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-muted">
                                 нет файла
                               </span>
-                            )}
-                            <span
-                              className="text-data text-muted flex-none lmono"
-                              title={fmtAir(ep.airDate)}
-                            >
+                              )}
+                              <span
+                                className="text-data text-muted flex-none lmono"
+                                title={fmtAir(ep.airDate)}
+                              >
                               {relAir(ep.airDate)}
                             </span>
-                            <button
-                              className="w-8 h-8 rounded-full flex-none grid place-items-center border border-white/[0.14] bg-white/[0.05] text-ink-soft cursor-pointer transition-all hover:bg-[var(--epa,var(--accent))] hover:text-white hover:border-transparent"
-                              title={
-                                ep.jellyfinId
-                                  ? "Воспроизвести"
-                                  : "Файл недоступен"
-                              }
-                              disabled={
-                                !ep.jellyfinId || busy === ep.jellyfinId
-                              }
-                              onClick={() =>
-                                ep.jellyfinId &&
-                                play(
-                                  ep.jellyfinId,
-                                  `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
-                                )
-                              }
-                            >
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
+                              <button
+                                className="w-8 h-8 rounded-full flex-none grid place-items-center border border-white/[0.14] bg-white/[0.05] text-ink-soft cursor-pointer transition-all hover:bg-[var(--epa,var(--accent))] hover:text-white hover:border-transparent"
+                                title={
+                                  ep.jellyfinId
+                                    ? "Воспроизвести"
+                                    : "Файл недоступен"
+                                }
+                                disabled={
+                                  !ep.jellyfinId || busy === ep.jellyfinId
+                                }
+                                onClick={() =>
+                                  ep.jellyfinId &&
+                                  play(
+                                    ep.jellyfinId,
+                                    `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
+                                  )
+                                }
                               >
-                                <polygon points="6,3 21,12 6,21" />
-                              </svg>
-                            </button>
-                          </div>
-                        );
-                      })}
+                                <svg
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="currentColor"
+                                >
+                                  <polygon points="6,3 21,12 6,21" />
+                                </svg>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
 
-        {tmdbSimilar.length > 0 ? (
-          <CardRail label="ПОХОЖИЕ" cards={tmdbRailCards(tmdbSimilar, openTmdb)} />
-        ) : (
-          <SimilarRail items={similarItems} />
-        )}
-      </DetailBody>
+        </DetailBody>
+      </div>
+
+      {tmdbSimilar.length > 0 ? (
+        <CardRail label="ПОХОЖИЕ" cards={tmdbRailCards(tmdbSimilar, openTmdb)} />
+      ) : (
+        <SimilarRail items={similarItems} />
+      )}
     </div>
   );
 }

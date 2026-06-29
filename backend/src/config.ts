@@ -90,24 +90,12 @@ export const config = {
     },
   },
 
-  // Медиа-стек: Jellyfin (что играет) + qBittorrent + Jackett/TorrServer/TMDB.
-  // Sonarr/Radarr/Prowlarr остаются временным rollback-слоем на время миграции.
+  // Медиа-стек: Jellyfin (каталог/плеер) + qBittorrent + Jackett/TorrServer/TMDB.
   // Каждый источник опционален; панель "configured" если задан хотя бы один.
   media: {
-    backend: env("MEDIA_BACKEND") ?? "dual", // arr | native | dual
     jellyfin: {
       url: env("JELLYFIN_URL"),
       apiKey: env("JELLYFIN_API_KEY"),
-      get configured() { return Boolean(this.url && this.apiKey); },
-    },
-    sonarr: {
-      url: env("SONARR_URL"),
-      apiKey: env("SONARR_API_KEY"),
-      get configured() { return Boolean(this.url && this.apiKey); },
-    },
-    radarr: {
-      url: env("RADARR_URL"),
-      apiKey: env("RADARR_API_KEY"),
       get configured() { return Boolean(this.url && this.apiKey); },
     },
     qbittorrent: {
@@ -115,11 +103,6 @@ export const config = {
       username: env("QBITTORRENT_USER"),
       password: env("QBITTORRENT_PASSWORD"),
       get configured() { return Boolean(this.url && this.username && this.password); },
-    },
-    prowlarr: {
-      url: env("PROWLARR_URL"),
-      apiKey: env("PROWLARR_API_KEY"),
-      get configured() { return Boolean(this.url && this.apiKey); },
     },
     jackett: {
       url: env("JACKETT_URL"),
@@ -143,11 +126,8 @@ export const config = {
     get configured() {
       return (
         this.jellyfin.configured ||
-        this.sonarr.configured ||
-        this.radarr.configured ||
         this.qbittorrent.configured ||
         this.jackett.configured ||
-        this.prowlarr.configured ||
         this.torrserver.configured ||
         this.tmdb.configured
       );

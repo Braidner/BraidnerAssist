@@ -467,15 +467,16 @@ export function autoSelectFiles(
 // предвыбран один файл на серию (дедуп копий с разной озвучкой), «Импорт».
 export function ImportDrawer({
   item,
+  type,
   onClose,
   onDone,
 }: {
   item: DownloadItem;
+  type: "movie" | "series";
   onClose: () => void;
   onDone: () => void;
 }) {
-  const kind: "movie" | "series" =
-    item.source === "radarr" ? "movie" : "series";
+  const kind = type;
   const downloadId = item.downloadId ?? item.hash;
   const [files, setFiles] = useState<ManualImportFile[] | null>(null);
   const [sel, setSel] = useState<Set<number>>(new Set());

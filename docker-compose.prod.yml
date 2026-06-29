@@ -31,8 +31,8 @@ services:
     # из контейнера. В .env задать HERMES_URL=http://host.docker.internal:8642.
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Подключаемся к сети homelab-стека (Jellyfin/Sonarr/Radarr/qBittorrent/Prowlarr/
-    # TorrServer), чтобы ходить к ним напрямую по имени контейнера, а не только через
+    # Подключаемся к сети homelab-стека (Jellyfin/Jackett/qBittorrent/TorrServer),
+    # чтобы ходить к ним напрямую по имени контейнера, а не только через
     # host.docker.internal. Внешняя сеть создаётся homelab-compose (имя проекта stack).
     networks:
       - default

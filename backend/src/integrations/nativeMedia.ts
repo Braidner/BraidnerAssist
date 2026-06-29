@@ -418,7 +418,7 @@ export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPage
     posterRemote: detail.poster,
     backdropRemote: detail.backdrop,
     tvdbId,
-    inArr: Boolean(monitor),
+    inMonitor: Boolean(monitor),
     monitored: monitor?.monitored ?? false,
     seasons,
   };
@@ -445,7 +445,7 @@ export async function nativeMovieDiscoverDetail(tmdbId: number): Promise<MoviePa
     posterRemote: detail.poster,
     backdropRemote: detail.backdrop,
     tmdbId,
-    inArr: Boolean(monitor),
+    inMonitor: Boolean(monitor),
     monitored: monitor?.monitored ?? false,
     hasFile: Boolean(file),
     quality: null,

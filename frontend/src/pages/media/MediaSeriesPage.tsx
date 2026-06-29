@@ -322,7 +322,6 @@ export function MediaSeriesPage({
         .filter(
           (x) =>
             x.importPending &&
-            x.source === "sonarr" &&
             norm(x.title).includes(norm(det.title)),
         )
         .map((x) => [x.downloadId ?? x.hash, x]),
@@ -349,6 +348,7 @@ export function MediaSeriesPage({
       {importItem && (
         <ImportDrawer
           item={importItem}
+          type="series"
           onClose={() => setImportItem(null)}
           onDone={() => {
             setImportItem(null);
@@ -389,8 +389,8 @@ export function MediaSeriesPage({
 
         <DetailStatusBadges
           status={det.status}
-          inArr={det.inArr}
-          arrName="native monitor"
+          inMonitor={det.inMonitor}
+          monitorName="native monitor"
           provider={det.network}
         />
 
@@ -414,7 +414,7 @@ export function MediaSeriesPage({
               {busy === watchTarget.jellyfinId ? "…" : watchLabel}
             </button>
           )}
-          {!det.inArr && tvdbId != null && (
+          {!det.inMonitor && tvdbId != null && (
             <button
               className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
               disabled={act === "add"}
@@ -431,7 +431,7 @@ export function MediaSeriesPage({
               {act === "add" ? "…" : "В библиотеку"}
             </button>
           )}
-          {det.inArr && tvdbId != null && (
+          {det.inMonitor && tvdbId != null && (
             <>
               <button
                 className={cn(
@@ -552,7 +552,7 @@ export function MediaSeriesPage({
                       </span>
                     </span>
                     {/* Season action buttons */}
-                    {det.inArr && tvdbId != null && (
+                    {det.inMonitor && tvdbId != null && (
                       <>
                         <button
                           className={cn(

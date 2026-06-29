@@ -29,7 +29,7 @@ import {
   type DownloadItem,
   type LibraryItem,
   type SearchResult,
-  type ArrLookupItem,
+  type MediaLookupItem,
   type TorrServerStream,
   type ResumeItem,
   type TmdbItem,
@@ -65,7 +65,7 @@ function AddTorrentDrawer({
   open: boolean;
   onClose: () => void;
   onAdd: (url: string, key: string) => Promise<void>;
-  onAddTitle: (item: ArrLookupItem, key: string) => Promise<boolean>;
+  onAddTitle: (item: MediaLookupItem, key: string) => Promise<boolean>;
   onGrabbed: () => void;
   onWatchNow: (url: string, title: string, key: string) => Promise<void>;
   torrserver: boolean;
@@ -73,7 +73,7 @@ function AddTorrentDrawer({
 }) {
   const [kind, setKind] = useState<"movie" | "series">("movie");
   const [titleQuery, setTitleQuery] = useState("");
-  const [titleResults, setTitleResults] = useState<ArrLookupItem[]>([]);
+  const [titleResults, setTitleResults] = useState<MediaLookupItem[]>([]);
   const [lookingUp, setLookingUp] = useState(false);
   const [addedIds, setAddedIds] = useState<Record<number, boolean>>({});
   const [pickerFor, setPickerFor] = useState<number | null>(null);
@@ -497,7 +497,7 @@ export function MediaPage({
 
   // Discovery search state (TMDB or *arr)
   const [dq, setDq] = useState("");
-  const [dres, setDres] = useState<ArrLookupItem[]>([]);
+  const [dres, setDres] = useState<MediaLookupItem[]>([]);
   const [tmRes, setTmRes] = useState<TmdbItem[]>([]);
   const [dsearching, setDsearching] = useState(false);
   useEffect(() => {
@@ -599,7 +599,7 @@ export function MediaPage({
   };
 
   const onAddTitle = async (
-    item: ArrLookupItem,
+    item: MediaLookupItem,
     key: string,
   ): Promise<boolean> => {
     setBusy(key);
@@ -614,7 +614,7 @@ export function MediaPage({
 
   const onAddTmdb = async (it: TmdbItem) => {
     if (it.kind === "movie") {
-      const item: ArrLookupItem = {
+      const item: MediaLookupItem = {
         kind: "movie",
         id: it.tmdbId,
         title: it.title,
@@ -633,7 +633,7 @@ export function MediaPage({
       toast.error("Не удалось определить tvdbId сериала — можно открыть карточку и выбрать релиз вручную");
       return;
     }
-    const item: ArrLookupItem = {
+    const item: MediaLookupItem = {
       kind: "series",
       id: tvdb,
       title: it.title,
@@ -676,7 +676,7 @@ export function MediaPage({
     onMediaUpdate();
   };
 
-  const openDiscover = (it: ArrLookupItem) =>
+  const openDiscover = (it: MediaLookupItem) =>
     nav(
       `/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`,
       { state: returnState() },
@@ -704,7 +704,7 @@ export function MediaPage({
             <Placeholder
               icon="pulse"
               title="Медиа"
-              phase="Медиа-стек не настроен (JELLYFIN/SONARR/RADARR/QBITTORRENT/PROWLARR)"
+              phase="Медиа-стек не настроен (JELLYFIN/QBITTORRENT/JACKETT/TMDB)"
             />
           </div>
         </div>
@@ -736,6 +736,7 @@ export function MediaPage({
       {importFor && (
         <ImportDrawer
           item={importFor}
+          type={importFor.contentType ?? "series"}
           onClose={() => setImportFor(null)}
           onDone={() => {
             setImportFor(null);

@@ -19,8 +19,8 @@ posterRouter.get("/", async (req, res) => {
     let upstream: globalThis.Response;
 
     if (tmdb) {
-      // SSRF-guard: разрешены только источники афиш *arr — TMDB (Radarr/фильмы) и
-      // TheTVDB (Sonarr/сериалы). Прочее режем. Тащим как есть (full-size): прежний
+      // SSRF-guard: разрешены только источники афиш native media — TMDB и
+      // TheTVDB. Прочее режем. Тащим как есть (full-size): прежний
       // даунсайз до w92 был обходом сломанного Path-MTU на egress хоста (oversized
       // пакеты BunnyCDN чёрнодырились после ~16КБ); после смены egress-маршрута баг
       // ушёл — full-size грузится мгновенно (TMDB original ~0.7МБ за <1с).

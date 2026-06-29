@@ -22,8 +22,6 @@ import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 
 const SOURCE_LABEL: Record<DownloadItem["source"], string> = {
-  sonarr: "Legacy TV",
-  radarr: "Legacy Movie",
   qbittorrent: "qBittorrent",
 };
 

@@ -217,7 +217,6 @@ export function MediaMoviePage({
         .filter(
           (x) =>
             x.importPending &&
-            x.source === "radarr" &&
             norm(x.title).includes(norm(det.title)),
         )
         .map((x) => [x.downloadId ?? x.hash, x]),
@@ -234,6 +233,7 @@ export function MediaMoviePage({
       {importItem && (
         <ImportDrawer
           item={importItem}
+          type="movie"
           onClose={() => setImportItem(null)}
           onDone={() => {
             setImportItem(null);
@@ -268,8 +268,8 @@ export function MediaMoviePage({
 
         <DetailStatusBadges
           status={det.status}
-          inArr={det.inArr}
-          arrName="native monitor"
+          inMonitor={det.inMonitor}
+          monitorName="native monitor"
           provider={det.studio}
           file={{
             hasFile: det.hasFile,
@@ -324,7 +324,7 @@ export function MediaMoviePage({
               )}
             </div>
           )}
-          {!det.inArr && !det.hasFile && det.tmdbId != null && (
+          {!det.inMonitor && !det.hasFile && det.tmdbId != null && (
             <button
               className={ms.button.accentSm}
               disabled={act === "add"}
@@ -334,7 +334,7 @@ export function MediaMoviePage({
               {act === "add" ? "…" : "➕ В библиотеку"}
             </button>
           )}
-          {det.inArr && det.tmdbId != null && (
+          {det.inMonitor && det.tmdbId != null && (
             <>
               <button
                 className={cn(

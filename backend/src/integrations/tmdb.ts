@@ -159,7 +159,7 @@ export async function tmdbPopular(kind: "movie" | "series"): Promise<TmdbItem[]>
   return mapList(await tmdbGet(path), kind === "movie" ? "movie" : "tv");
 }
 
-// tmdbId сериала → tvdbId (нужен для карточки сериала / Sonarr). null если нет.
+// tmdbId сериала → tvdbId (нужен для карточки сериала / поиска релизов). null если нет.
 export async function tmdbTvToTvdb(tmdbId: number): Promise<number | null> {
   const data = await tmdbGet(`/tv/${tmdbId}/external_ids`);
   const tvdb = Number(data?.tvdb_id);
@@ -260,7 +260,7 @@ export async function tmdbTvSeasons(tmdbId: number): Promise<number[]> {
     .sort((a: number, b: number) => a - b);
 }
 
-// tvdbId (Sonarr/Jellyfin) → TMDB tv id. ВАЖНО: TMDB tv id ≠ tvdbId.
+// tvdbId (Jellyfin/native monitor) → TMDB tv id. ВАЖНО: TMDB tv id ≠ tvdbId.
 export async function tmdbFindByTvdb(tvdbId: number): Promise<number | null> {
   const data = await tmdbGet(`/find/${tvdbId}`, { external_source: "tvdb_id" });
   const tv = Array.isArray(data?.tv_results) ? data.tv_results : [];

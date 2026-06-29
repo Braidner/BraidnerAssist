@@ -8,7 +8,7 @@ import {
     posterUrl,
     backdropUrl,
     jellyfinPosterUrl,
-    type ArrLookupItem,
+    type MediaLookupItem,
     type TmdbItem,
     type LibraryItem,
     type DiscoverHome,
@@ -23,7 +23,7 @@ interface MediaDiscoverTabProps {
     tmdb: boolean;
     dq: string;
     setDq: (v: string) => void;
-    dres: ArrLookupItem[];
+    dres: MediaLookupItem[];
     tmRes: TmdbItem[];
     dsearching: boolean;
     home: DiscoverHome;
@@ -31,7 +31,7 @@ interface MediaDiscoverTabProps {
     homeLoading: boolean;
     busy: string | null;
     onRefresh: () => void;
-    onOpenDiscover: (it: ArrLookupItem) => void;
+    onOpenDiscover: (it: MediaLookupItem) => void;
     onOpenTmdb: (it: TmdbItem) => void;
     onAddTmdb: (it: TmdbItem) => void;
     onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void;

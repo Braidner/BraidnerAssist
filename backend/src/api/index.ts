@@ -16,9 +16,6 @@ import {
   getSeriesDetail,
   getSeriesPageDetail,
   getMoviePageDetail,
-  getSeriesDiscoverDetail,
-  getMovieDiscoverDetail,
-  arrLookupAll,
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
@@ -26,15 +23,6 @@ import {
   jellyfinPlayTo,
   qbAdd,
   qbAction,
-  arrLookup,
-  arrAdd,
-  arrReleaseSearch,
-  arrReleaseGrab,
-  manualImportCandidates,
-  manualImportExecute,
-  getCalendar,
-  arrTriggerSearch,
-  arrSetMonitored,
   getContinueWatching,
   unifiedSearch,
 } from "../integrations/media.js";
@@ -90,8 +78,6 @@ import {
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
-
-const useNativeMedia = () => config.media.backend !== "arr";
 
 // Request logger — captures slow/failed requests into the in-memory ring buffer.
 apiRouter.use((req, _res, next) => {
@@ -381,7 +367,7 @@ apiRouter.get("/media/series/:id", async (req, res) => {
   }
 });
 
-// Детальная страница сериала: Sonarr + Jellyfin (метаданные, все эпизоды, файлы).
+// Детальная страница сериала: native monitor + Jellyfin playback state.
 apiRouter.get("/media/detail/series/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
@@ -391,7 +377,7 @@ apiRouter.get("/media/detail/series/:id", async (req, res) => {
   }
 });
 
-// Детальная страница фильма: Radarr + Jellyfin.
+// Детальная страница фильма: native monitor + Jellyfin playback state.
 apiRouter.get("/media/detail/movie/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
@@ -403,16 +389,13 @@ apiRouter.get("/media/detail/movie/:id", async (req, res) => {
 
 // Discovery: объединённый поиск тайтлов (фильмы + сериалы) для виджета поиска.
 apiRouter.get("/media/discover/search", async (req, res) => {
-  if (useNativeMedia() && !config.media.tmdb.configured) {
-    return res.status(503).json({ configured: false });
-  }
-  if (!useNativeMedia() && !config.media.sonarr.configured && !config.media.radarr.configured) {
+  if (!config.media.tmdb.configured) {
     return res.status(503).json({ configured: false });
   }
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.status(400).json({ error: "q required" });
   try {
-    res.json(useNativeMedia() ? await nativeLookupAll(q) : await arrLookupAll(q));
+    res.json(await nativeLookupAll(q));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -420,12 +403,11 @@ apiRouter.get("/media/discover/search", async (req, res) => {
 
 // Discovery: детальная страница сериала по tvdbId (тайтл может быть ещё не в библиотеке).
 apiRouter.get("/media/discover/detail/series/:id", async (req, res) => {
-  if (useNativeMedia() && !config.media.tmdb.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !config.media.sonarr.configured) return res.status(503).json({ configured: false });
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const tvdbId = Number(req.params.id);
   if (!Number.isFinite(tvdbId) || tvdbId <= 0) return res.status(400).json({ error: "id required" });
   try {
-    res.json(useNativeMedia() ? await nativeSeriesDiscoverDetail(tvdbId) : await getSeriesDiscoverDetail(tvdbId));
+    res.json(await nativeSeriesDiscoverDetail(tvdbId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -433,12 +415,11 @@ apiRouter.get("/media/discover/detail/series/:id", async (req, res) => {
 
 // Discovery: детальная страница фильма по tmdbId.
 apiRouter.get("/media/discover/detail/movie/:id", async (req, res) => {
-  if (useNativeMedia() && !config.media.tmdb.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !config.media.radarr.configured) return res.status(503).json({ configured: false });
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const tmdbId = Number(req.params.id);
   if (!Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "id required" });
   try {
-    res.json(useNativeMedia() ? await nativeMovieDiscoverDetail(tmdbId) : await getMovieDiscoverDetail(tmdbId));
+    res.json(await nativeMovieDiscoverDetail(tmdbId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -465,10 +446,9 @@ apiRouter.post("/media/scan", async (_req, res) => {
   }
 });
 
-// Поиск релизов через Jackett Torznab (native) или legacy Prowlarr fallback.
+// Поиск релизов через Jackett Torznab.
 apiRouter.get("/media/search", async (req, res) => {
-  if (useNativeMedia() && !config.media.jackett.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !config.media.prowlarr.configured) return res.status(503).json({ configured: false });
+  if (!config.media.jackett.configured) return res.status(503).json({ configured: false });
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.status(400).json({ error: "q required" });
   try {
@@ -478,31 +458,27 @@ apiRouter.get("/media/search", async (req, res) => {
   }
 });
 
-// Поиск тайтла в TMDB native или Radarr/Sonarr fallback для добавления в библиотеку.
+// Поиск тайтла в TMDB для добавления в native monitor.
 apiRouter.get("/media/lookup", async (req, res) => {
   const kind = String(req.query.type ?? "") === "series" ? "series" : "movie";
-  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
-  if (useNativeMedia() && !config.media.tmdb.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.status(400).json({ error: "q required" });
   try {
-    res.json(useNativeMedia() ? await nativeLookup(kind, q) : await arrLookup(kind, q));
+    res.json(await nativeLookup(kind, q));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
 });
 
-// Добавить тайтл в native monitor или Radarr/Sonarr fallback.
+// Добавить тайтл в native monitor.
 apiRouter.post("/media/add", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
-  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
-  if (useNativeMedia() && !config.media.tmdb.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const id = Number(req.body?.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   try {
-    res.json({ ok: true, ...(useNativeMedia() ? await nativeAdd(kind, id) : await arrAdd(kind, id)) });
+    res.json({ ok: true, ...(await nativeAdd(kind, id)) });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -511,14 +487,12 @@ apiRouter.post("/media/add", async (req, res) => {
 // Интерактивный поиск релизов (выбор раздачи с озвучкой/качеством).
 apiRouter.post("/media/release/search", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
-  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
-  if (useNativeMedia() && !config.media.jackett.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
+  if (!config.media.jackett.configured) return res.status(503).json({ configured: false });
   const id = Number(req.body?.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
   try {
-    res.json(useNativeMedia() ? await nativeReleaseSearch(kind, id, seasonNumber) : await arrReleaseSearch(kind, id, seasonNumber));
+    res.json(await nativeReleaseSearch(kind, id, seasonNumber));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -527,18 +501,12 @@ apiRouter.post("/media/release/search", async (req, res) => {
 // Форс-граб выбранного релиза (guid + indexerId из результатов поиска).
 apiRouter.post("/media/release/grab", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
-  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
-  if (useNativeMedia() && !config.media.jackett.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
+  if (!config.media.jackett.configured) return res.status(503).json({ configured: false });
   const guid = String(req.body?.guid ?? "").trim();
-  const indexerId = useNativeMedia() ? String(req.body?.indexerId ?? req.body?.indexer ?? "").trim() : Number(req.body?.indexerId);
-  if (!guid || (useNativeMedia() ? !indexerId : !Number.isFinite(indexerId))) return res.status(400).json({ error: "guid and indexerId required" });
+  const indexerId = String(req.body?.indexerId ?? req.body?.indexer ?? "").trim();
+  if (!guid || !indexerId) return res.status(400).json({ error: "guid and indexerId required" });
   try {
-    if (useNativeMedia()) res.json(await nativeGrabRelease(kind, guid, indexerId));
-    else {
-      await arrReleaseGrab(kind, guid, indexerId as number);
-      res.json({ ok: true });
-    }
+    res.json(await nativeGrabRelease(kind, guid, indexerId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -547,12 +515,10 @@ apiRouter.post("/media/release/grab", async (req, res) => {
 // Кандидаты для ручного импорта застрявшей раздачи (по downloadId = qB-хеш).
 apiRouter.post("/media/import/candidates", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "movie" ? "movie" : "series";
-  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
   const downloadId = String(req.body?.downloadId ?? "").trim();
   if (!downloadId) return res.status(400).json({ error: "downloadId required" });
   try {
-    res.json(useNativeMedia() ? await nativeImportCandidates(kind, downloadId) : await manualImportCandidates(kind, downloadId));
+    res.json(await nativeImportCandidates(kind, downloadId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -561,16 +527,11 @@ apiRouter.post("/media/import/candidates", async (req, res) => {
 // Импорт выбранных файлов (ManualImport — в обход реджекта «not in grabbed release»).
 apiRouter.post("/media/import/execute", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "movie" ? "movie" : "series";
-  const cfg = kind === "movie" ? config.media.radarr : config.media.sonarr;
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
   const downloadId = String(req.body?.downloadId ?? "").trim();
   const fileIds = Array.isArray(req.body?.fileIds) ? req.body.fileIds.map(Number).filter(Number.isFinite) : [];
-  if (!downloadId || (!useNativeMedia() && fileIds.length === 0)) return res.status(400).json({ error: "downloadId and fileIds required" });
-  const importMode = req.body?.importMode === "move" ? "move" : "copy";
+  if (!downloadId) return res.status(400).json({ error: "downloadId required" });
   try {
-    const imported = useNativeMedia()
-      ? await nativeImportRelease(kind, downloadId, fileIds.length ? fileIds : undefined)
-      : await manualImportExecute(kind, downloadId, fileIds, importMode);
+    const imported = await nativeImportRelease(kind, downloadId, fileIds.length ? fileIds : undefined);
     res.json({ ok: true, imported });
   } catch (e) {
     res.status(502).json({ error: String(e) });
@@ -951,7 +912,7 @@ apiRouter.get("/media/continue", async (_req, res) => {
   }
 });
 
-// Единый поиск: библиотека + discover (*arr lookup) + релизы (Prowlarr).
+// Единый поиск: библиотека; discovery/release search идут отдельными native routes.
 apiRouter.get("/media/unified", async (req, res) => {
   if (!config.media.configured) return res.status(503).json({ configured: false });
   const q = String(req.query.q ?? "").trim();
@@ -965,15 +926,12 @@ apiRouter.get("/media/unified", async (req, res) => {
 
 // ── Расписание / monitor / поиск сезона (удобный пайплайн сериалов) ──────
 apiRouter.get("/media/calendar", async (req, res) => {
-  if (useNativeMedia() && !config.media.tmdb.configured) {
-    return res.status(503).json({ configured: false });
-  }
-  if (!useNativeMedia() && !config.media.sonarr.configured && !config.media.radarr.configured) {
+  if (!config.media.tmdb.configured) {
     return res.status(503).json({ configured: false });
   }
   const days = Math.min(Math.max(Number(req.query.days ?? 14) || 14, 1), 60);
   try {
-    res.json(useNativeMedia() ? await nativeCalendar(days) : await getCalendar(days));
+    res.json(await nativeCalendar(days));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -982,15 +940,12 @@ apiRouter.get("/media/calendar", async (req, res) => {
 // Запустить поиск: весь сезон / недостающие серии / фильм. id = внешний (tvdbId/tmdbId).
 apiRouter.post("/media/season/search", async (req, res) => {
   const type = req.body?.type === "movie" ? "movie" : "series";
-  const cfg = type === "movie" ? config.media.radarr : config.media.sonarr;
-  if (useNativeMedia() && !config.media.jackett.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
+  if (!config.media.jackett.configured) return res.status(503).json({ configured: false });
   const id = Number(req.body?.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
   try {
-    if (useNativeMedia()) await nativeReleaseSearch(type, id, seasonNumber);
-    else await arrTriggerSearch(type, id, seasonNumber);
+    await nativeReleaseSearch(type, id, seasonNumber);
     res.json({ ok: true });
   } catch (e) {
     res.status(502).json({ error: String(e) });
@@ -1000,16 +955,13 @@ apiRouter.post("/media/season/search", async (req, res) => {
 // Monitor toggle: сезон сериала / весь сериал / фильм.
 apiRouter.post("/media/monitor", async (req, res) => {
   const type = req.body?.type === "movie" ? "movie" : "series";
-  const cfg = type === "movie" ? config.media.radarr : config.media.sonarr;
-  if (useNativeMedia() && !config.media.tmdb.configured) return res.status(503).json({ configured: false });
-  if (!useNativeMedia() && !cfg.configured) return res.status(503).json({ configured: false });
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const id = Number(req.body?.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   const monitored = Boolean(req.body?.monitored);
   const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
   try {
-    if (useNativeMedia()) await nativeSetMonitored(type, id, monitored, seasonNumber);
-    else await arrSetMonitored(type, id, monitored, seasonNumber);
+    await nativeSetMonitored(type, id, monitored, seasonNumber);
     res.json({ ok: true, monitored });
   } catch (e) {
     res.status(502).json({ error: String(e) });

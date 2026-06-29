@@ -89,14 +89,14 @@ export function DetailBody({
 
 export function DetailStatusBadges({
   status,
-  inArr,
-  arrName: _arrName,
+  inMonitor,
+  monitorName: _monitorName,
   provider,
   file,
 }: {
   status?: string | null;
-  inArr: boolean;
-  arrName: string;
+  inMonitor: boolean;
+  monitorName: string;
   provider?: string | null;
   file?: {
     hasFile: boolean;
@@ -107,7 +107,7 @@ export function DetailStatusBadges({
   return (
     <div className="mb-3 flex flex-wrap gap-1.5">
       {status && <span className={ms.badge}>{status}</span>}
-      {!inArr && (
+      {!inMonitor && (
         <span className={ms.reject} title="Нет в native monitor — данные из Jellyfin/TMDB">
           вне monitor
         </span>

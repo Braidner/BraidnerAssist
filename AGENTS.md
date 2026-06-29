@@ -118,9 +118,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     (`integrations/jackett.ts`, `JACKETT_URL`/`JACKETT_API_KEY`/`JACKETT_INDEXERS`) →
     native release parser/scoring (`releaseParse.ts`/`releaseScore.ts`) → qBittorrent
     category `mc-native` → native importer (`mediaImporter.ts`, `organizeTorrent`) →
-    `/media/movies|tv` → Jellyfin scan/playback/watch-state. Старые `arr*` функции в
-    `integrations/media.ts` оставлены только как rollback/fallback при `MEDIA_BACKEND=arr`;
-    новые маршруты и Hermes MCP смотрят в native-слой (`integrations/nativeMedia.ts`).
+    `/media/movies|tv` → Jellyfin scan/playback/watch-state. Sonarr/Radarr/Prowlarr
+    удалены из production-кода; все REST routes и Hermes MCP смотрят в native-слой
+    (`integrations/nativeMedia.ts`).
     Мёртвые import-list ручки `/media/recommendations` и `/media/discovery/hero` удалены.
     `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
     Native API: `GET /media/quality-profiles`, `GET /media/jackett/health`, `GET /media/repair`,
@@ -130,22 +130,19 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     и hardlink/copy organizer. Hermes MCP: `add_movie`/`add_series`, `search_releases`/
     `grab_release`, `list_import_candidates`/`import_release`, `list_jackett_indexers`,
     `test_jackett_search`, `list_media_monitor`, `search_missing_media`, `retry_media_import`,
-    `explain_release_choice`. Ниже в этом разделе встречаются исторические описания Batch v3–v7
-    про Sonarr/Radarr/Prowlarr; считать их legacy context, а не целевым текущим поведением.
+    `explain_release_choice`.
     `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
     **Встроенный плеер**: библиотека Jellyfin (`GET /media/library`) → клик → HTML5 video
     с HLS (`hls.js`); путь воспроизведения форсит HLS-транскод (пустые DirectPlayProfiles в
     DeviceProfile, `GET /media/play/:id`). **Группировка библиотеки**: `GET /media/library` отдаёт
     сгруппированный каталог — плитки `Series` (с `tvdbId`/`childCount`) и `Movie` (раздельные запросы
     Jellyfin `/Items?IncludeItemTypes=Series|Movie`, без плоских эпизодов), сериалы идут первыми.
-    **Детальные страницы** (Sonarr/Radarr-style): клик по плитке ведёт на отдельную роутовую страницу
+    **Детальные страницы**: клик по плитке ведёт на отдельную роутовую страницу
     `/media/series/:id` (`MediaSeriesPage`) или `/media/movie/:id` (`MediaMoviePage`), `:id` = Jellyfin item id
     (React Router v6, BrowserRouter + nginx SPA-fallback). Данные — merge `GET /media/detail/{series|movie}/:id`
-    (`getSeriesPageDetail`/`getMoviePageDetail`): метаданные и статус файлов из Sonarr/Radarr (read-only резолвер
-    `arrFindByExternalId` по tvdb/tmdb — ничего НЕ добавляет), played-статус и плеер из Jellyfin. Сериал
-    показывает ВСЕ эпизоды (вкл. отсутствующие) с датой выхода, «скачано/нет», качеством и размером (Sonarr
-    `/api/v3/episode?includeEpisodeFile=true`); фильм — статус файла (качество/размер или «отсутствует»). Если
-    тайтла нет в *arr → `inArr:false`, страница деградирует до данных Jellyfin. На странице: cinematic hero-player:
+    (`getSeriesPageDetail`/`getMoviePageDetail`): локальные `MediaMonitor`-метаданные/TMDB + Jellyfin
+    playback state. Для discovery-страниц без Jellyfin item id используются native detail routes по
+    `tmdbId`/`tvdbId`; флаг присутствия в локальном monitor — `inMonitor`. На странице: cinematic hero-player:
     клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), без дополнительного затемнения после
     старта. Из медиабиблиотеки кнопка «Смотреть» и ряд «Продолжить просмотр» открывают detail-route с query
     `?autoplay=1&play=<jellyfinId>&title=...`; старый модальный плеер для resume удалён. Если браузер блокирует
@@ -174,43 +171,19 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     инжектом токена). Решает таймаут постеров: у клиентов нет IPv6-egress до BunnyCDN (TMDB
     отдаёт AAAA), а бэкенд ходит по IPv4. Фронт: `posterUrl()`/`jellyfinPosterUrl()` в дравере
     lookup и в сетке библиотеки (битые/отсутствующие постеры прячутся `onError`).
-    **Правильный пайплайн в медиатеку** (основной путь добавления): `GET /media/lookup?type=movie|series&q=`
-    ищет тайтл в Radarr/Sonarr (`/api/v3/{movie|series}/lookup`, постер/год/overview/added),
-    `POST /media/add {type,id}` (`arrAdd`) добавляет тайтл с первым root folder + quality profile,
-    `monitored:true`, и запускает поиск релиза (`searchForMovie`/`searchForMissingEpisodes`). Дальше
-    Radarr/Sonarr сами грабят через qBittorrent (категория `radarr`/`sonarr`), импортируют (hardlink
-    + rename) в `/data/movies`|`/data/tv` и триггерят скан Jellyfin. В дравере `/media` это верхняя
-    секция (сегмент Фильм/Сериал → поиск → постер/«Добавить»); ручной magnet + сырой Prowlarr-поиск —
-    в свёрнутой секции «Вручную».
-    **Выбор раздачи (release picker)**: интерактивный поиск релизов Sonarr/Radarr `/api/v3/release`
-    (`POST /media/release/search {type,id,seasonNumber?}` → `arrReleaseSearch`) — выдаёт торренты с
-    качеством, языками/озвучкой, размером, сидами и причинами отклонения (`rejected`/`rejections`).
-    `id` = `tmdbId` (movie) / `tvdbId` (series); если тайтла нет в *arr, он добавляется monitored без
-    авто-поиска (`arrEnsureAdded(..., false)`) ради internal id. Полные raw-записи кешируются по `guid`
-    (10 мин). Force-grab `POST /media/release/grab {type,guid,indexerId}` (`arrReleaseGrab`) переотправляет
-    полный объект (надёжнее guid+indexerId; *arr может вернуть 5xx «Failed to connect to qBittorrent», но
-    торрент реально добавлен → 5xx считаем успехом, бросаем только на 4xx). Грабит даже отклонённые релизы
-    (multi-season паки и т.п.) — это и есть способ дотащить зависший сезон. Фронт: `ReleasePicker` (плашки
-    качества/языка/отклонения) доступен на детальной странице сериала на каждый сезон («🔍 Раздача»), на странице
-    фильма (карточка «Раздачи»), и в дравере
-    «Добавить» на результат поиска («Выбрать раздачу», для сериала — поле сезона).
-    **Ручной импорт застрявших раздач (multi-season паки и т.п.)**: после force-grab пака через
-    поиск по одному сезону Sonarr помечает раздачу как «релиз сезона N» и **отклоняет авто-импорт**
-    серий вне него («Episode 2x01 was not found in the grabbed release») — пак скачан, но не разложен.
-    Очередь (`arrQueue`) теперь отдаёт `importPending`/`importMessage` (по `trackedDownloadState`
-    `importPending|importBlocked` + statusMessages). `POST /media/import/candidates {type,downloadId}`
-    (`manualImportCandidates` → Sonarr/Radarr `GET /api/v3/manualimport?downloadId=`) отдаёт файлы с
-    распарсенными сериями/сезоном, качеством, озвучкой и причинами реджекта; сырые записи кешируются по
-    `downloadId` (10 мин). `POST /media/import/execute {type,downloadId,fileIds[],importMode?}`
-    (`manualImportExecute` → `POST /api/v3/command {name:"ManualImport"}`) импортирует выбранные файлы
-    **в обход реджекта** — как кнопка «Import» в UI Sonarr; `importMode:"copy"` (дефолт) сохраняет
-    сидирование. `autoSelectImportFileIds` берёт по одному лучшему файлу на серию/фильм (дедуп копий —
-    в паке бывает две копии сезона с разной озвучкой). Фронт: застрявшие раздачи в карточке Загрузки
-    помечены «⚠ не импортировано» + кнопка «Импорт» → `ImportDrawer` (файлы по сезонам, флажки,
-    предвыбран один файл на серию). `downloadId` = qB-хеш (`DownloadItem.downloadId`).
-    **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent, общий
-    с Prowlarr grab), `POST /media/torrent/:hash/:action` (whitelist pause|resume|delete), `GET /media/search`
-    (Prowlarr), `POST /media/scan` (`/Library/Refresh`).
+    **Правильный пайплайн в медиатеку**: `GET /media/lookup?type=movie|series&q=` ищет тайтл в TMDB,
+    `POST /media/add {type,id}` создаёт/обновляет `MediaMonitor`, `POST /media/release/search`
+    ищет релизы через Jackett Torznab, `POST /media/release/grab` отправляет выбранный релиз в
+    qBittorrent с категорией `mc-native`, а native importer раскладывает файлы в `MEDIA_MOVIES_DIR`/
+    `MEDIA_TV_DIR` и запускает Jellyfin scan. Фронт: `ReleasePicker` доступен на детальной странице
+    сериала на каждый сезон, на странице фильма и в дравере добавления.
+    **Ручной импорт застрявших раздач**: qBittorrent-загрузки, известные native pipeline и ожидающие
+    раскладки, помечаются `importPending`; `POST /media/import/candidates {type,downloadId}` отдаёт
+    локально распарсенные файлы, `POST /media/import/execute {type,downloadId,fileIds[]}` импортирует
+    выбранные файлы через native organizer. `downloadId` = qB-хеш (`DownloadItem.downloadId`).
+    **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent),
+    `POST /media/torrent/:hash/:action` (pause|resume|delete), `GET /media/search` (Jackett),
+    `POST /media/scan` (`/Library/Refresh`).
     **Играть на устройство** (Jellyfin remote control): `GET /media/devices` отдаёт сессии с
     `SupportsRemoteControl` (устройства с открытым приложением Jellyfin — напр. Sber TV), `POST /media/play-to
     {sessionId,itemId}` шлёт `PlayNow` в `/Sessions/{id}/Playing`. Фронт: на плитке библиотеки контрол «📺»

@@ -622,13 +622,14 @@ export interface NowPlaying {
 export interface DownloadItem {
   hash: string;
   title: string;
-  source: "sonarr" | "radarr" | "qbittorrent";
+  source: "qbittorrent";
   progress: number;
   state: string;
   dlspeed?: number;
   eta?: number | null;
   seeds?: number;
   size?: number;
+  contentType?: "movie" | "series";
   downloadId?: string;
   importPending?: boolean;
   importMessage?: string;
@@ -1126,7 +1127,7 @@ export async function getSeriesDetail(
   }
 }
 
-// ── Детальные страницы (Sonarr/Radarr + Jellyfin) ──────────────────────
+// ── Детальные страницы (native monitor + Jellyfin) ──────────────────────
 export interface DetailEpisode {
   seasonNumber: number;
   episodeNumber: number;
@@ -1158,7 +1159,7 @@ export interface SeriesPageDetail {
   posterRemote: string | null;
   backdropRemote: string | null;
   tvdbId: number | null;
-  inArr: boolean;
+  inMonitor: boolean;
   monitored: boolean;
   seasons: DetailSeason[];
 }
@@ -1175,7 +1176,7 @@ export interface MoviePageDetail {
   posterRemote: string | null;
   backdropRemote: string | null;
   tmdbId: number | null;
-  inArr: boolean;
+  inMonitor: boolean;
   monitored: boolean;
   hasFile: boolean;
   quality: string | null;
@@ -1212,13 +1213,13 @@ export async function getMoviePageDetail(
 
 // ── Discovery: поиск тайтлов (фильмы + сериалы) + детальные страницы по внешнему id ──
 // Карточки работают и для тайтлов, которых ещё нет в библиотеке (id = tvdbId/tmdbId).
-export async function discoverSearch(q: string): Promise<ArrLookupItem[]> {
+export async function discoverSearch(q: string): Promise<MediaLookupItem[]> {
   try {
     const res = await apiFetch(
       `/api/media/discover/search?q=${encodeURIComponent(q)}`,
     );
     if (!res.ok) return [];
-    return (await res.json()) as ArrLookupItem[];
+    return (await res.json()) as MediaLookupItem[];
   } catch {
     return [];
   }
@@ -1328,7 +1329,7 @@ export async function getContinueWatching(): Promise<ResumeItem[]> {
 
 export interface UnifiedSearchResult {
   inLibrary: LibraryItem[];
-  discover: ArrLookupItem[];
+  discover: MediaLookupItem[];
   releases: SearchResult[];
 }
 export async function unifiedSearch(q: string): Promise<UnifiedSearchResult> {
@@ -1689,8 +1690,8 @@ export async function getContentTorrents(p: {
   }
 }
 
-// Поиск/добавление через Radarr (movie) / Sonarr (series) — правильный пайплайн.
-export interface ArrLookupItem {
+// Поиск/добавление через native monitor (TMDB + Jackett + qBittorrent).
+export interface MediaLookupItem {
   kind: "movie" | "series";
   id: number;
   title: string;
@@ -1703,13 +1704,13 @@ export interface ArrLookupItem {
 export async function lookupTitle(
   type: "movie" | "series",
   q: string,
-): Promise<ArrLookupItem[]> {
+): Promise<MediaLookupItem[]> {
   try {
     const res = await apiFetch(
       `/api/media/lookup?type=${type}&q=${encodeURIComponent(q)}`,
     );
     if (!res.ok) return [];
-    return (await res.json()) as ArrLookupItem[];
+    return (await res.json()) as MediaLookupItem[];
   } catch {
     return [];
   }

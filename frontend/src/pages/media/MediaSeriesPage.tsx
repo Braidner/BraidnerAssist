@@ -366,6 +366,7 @@ export function MediaSeriesPage({
           backdropSrc={backdropSrc}
           posterSrc={posterSrc}
           player={player}
+          overview={det.overview}
           year={det.year}
           runtimeLabel={det.runtime ? `${det.runtime} мин / эп.` : null}
           rating={det.rating}
@@ -382,12 +383,6 @@ export function MediaSeriesPage({
         />
 
         <DetailBody className="pt-[38px]">
-          {det.overview && (
-            <p className="max-w-[860px] font-ui text-lead leading-[1.75] text-white/[0.58] m-0 mb-[30px]">
-              {det.overview}
-            </p>
-          )}
-
           <DetailStatusBadges
             status={det.status}
             inMonitor={det.inMonitor}

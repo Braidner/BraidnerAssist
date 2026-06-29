@@ -162,6 +162,7 @@ export function DetailHero({
   backdropSrc,
   posterSrc,
   player,
+  overview,
   year,
   runtimeLabel,
   rating,
@@ -179,6 +180,7 @@ export function DetailHero({
   backdropSrc?: string;
   posterSrc?: string;
   player: DetailPlayer;
+  overview?: string | null;
   year?: number | string | null;
   runtimeLabel?: string | null;
   rating?: number | null;
@@ -216,8 +218,10 @@ export function DetailHero({
   const revealControls = useCallback(() => {
     setControlsVisible(true);
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-    controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 2800);
-  }, []);
+    if (vidPlaying) {
+      controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 2800);
+    }
+  }, [vidPlaying]);
 
   const stopPlayer = useCallback(() => {
     onClosePlayer();
@@ -288,12 +292,29 @@ export function DetailHero({
   }, [flashSeekFeedback, player, revealControls, seekBy, stopPlayer, togglePlay]);
 
   useEffect(() => {
-    if (player) revealControls();
+    if (!player) {
+      setControlsVisible(true);
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      return;
+    }
+
+    setControlsVisible(true);
+    if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    if (vidPlaying) {
+      controlsTimerRef.current = setTimeout(() => setControlsVisible(false), 2800);
+    }
+
     return () => {
       if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
-      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
     };
-  }, [player, revealControls]);
+  }, [player, vidPlaying]);
+
+  useEffect(() => (
+    () => {
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+    }
+  ), []);
 
   return (
     <div
@@ -411,6 +432,19 @@ export function DetailHero({
               </>
             )}
           </div>
+          {overview && (
+            <p
+              className="m-0 mb-4 max-w-[720px] font-ui text-lead leading-[1.58] text-white/[0.68] line-clamp-3 transition-all duration-700 ease-out max-mob:text-body max-mob:leading-[1.5] max-mob:line-clamp-2"
+              style={{
+                maxHeight: player ? 0 : 132,
+                opacity: player ? 0 : 1,
+                transform: player ? "translateY(18px)" : "translateY(0)",
+                overflow: "hidden",
+              }}
+            >
+              {overview}
+            </p>
+          )}
           {genres && genres.length > 0 && (
             <div className="flex flex-wrap gap-[7px]">
               {genres.slice(0, 4).map((g) => (
@@ -424,7 +458,7 @@ export function DetailHero({
           className="flex-none max-mob:hidden"
           style={{
             opacity: player ? 0.82 : 1,
-            transform: player ? "translateY(-6px) scale(0.92)" : "none",
+            transform: player ? "translateY(-40px) scale(0.9)" : "none",
             transition: "opacity 1s ease, transform 1s cubic-bezier(.22,.61,.36,1)",
           }}
         >

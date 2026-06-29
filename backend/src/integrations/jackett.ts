@@ -83,16 +83,27 @@ const safeHttpUrl = (value: string | null): string | null => {
 const providerName = (provider: string): string =>
   provider === "kinozal" ? "Kinozal" : provider;
 
-const detailUrlFrom = (...values: Array<string | null | undefined>): string | null => {
+const detailUrlFrom = (trackerName: string, ...values: Array<string | null | undefined>): string | null => {
+  const isKinozal = /kinozal/i.test(trackerName);
   for (const value of values) {
     const raw = String(value ?? "");
     const kinozal = raw.match(/https?:\/\/(?:www\.)?kinozal\.tv\/details\.php\?id=\d+/i)?.[0]
       ?? raw.match(/\/\/(?:www\.)?kinozal\.tv\/details\.php\?id=\d+/i)?.[0];
-    const normalized = safeHttpUrl(kinozal ?? raw);
+    const relativeKinozal = isKinozal ? raw.match(/\/details\.php\?id=\d+/i)?.[0] : null;
+    const normalized = safeHttpUrl(kinozal ?? (relativeKinozal ? `https://kinozal.tv${relativeKinozal}` : raw));
     if (normalized && /kinozal\.tv\/details\.php\?id=\d+/i.test(normalized)) return normalized;
   }
   return null;
 };
+
+const releaseDedupKey = (release: SearchResult): string =>
+  (
+    release.detailUrl ??
+    release.infoHash ??
+    release.url ??
+    release.guid ??
+    release.title
+  ).toLowerCase();
 
 async function enrichDetails(releases: SearchResult[]): Promise<SearchResult[]> {
   return Promise.all(releases.map(async (release) => {
@@ -179,7 +190,7 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
       trackerName,
       trackerId: indexer,
       url: magnet ?? enclosureUrl ?? link,
-      detailUrl: detailUrlFrom(comments, guid, link, enclosureUrl),
+      detailUrl: detailUrlFrom(trackerName, comments, guid, link, enclosureUrl),
       publishDate: publishDate && Number.isFinite(publishDate.getTime()) ? publishDate.toISOString() : published,
       description: cleanDescription(tag(it, "description")),
       posterRemote,
@@ -206,7 +217,7 @@ export async function jackettSearch(
   const releases = batches.flatMap((b) => (b.status === "fulfilled" ? b.value : []));
   const dedup = new Map<string, SearchResult>();
   for (const r of releases) {
-    const key = (r.url ?? r.guid ?? r.title).toLowerCase();
+    const key = releaseDedupKey(r);
     if (!dedup.has(key)) dedup.set(key, { ...r, query });
   }
   const scored = [...dedup.values()]
@@ -248,7 +259,7 @@ export async function jackettSearchMany(
     if (batch.status !== "fulfilled") continue;
     const results = batch.value;
     for (const r of results) {
-      const key = (r.url ?? r.guid ?? r.title).toLowerCase();
+      const key = releaseDedupKey(r);
       const prev = dedup.get(key);
       if (!prev || (r.score ?? 0) > (prev.score ?? 0)) dedup.set(key, r);
     }

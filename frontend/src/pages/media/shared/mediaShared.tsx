@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { Check, Download } from "lucide-react";
 import {
   searchReleaseOptions,
   grabRelease,
@@ -58,17 +59,6 @@ export function fmtEta(eta?: number | null): string {
   return `${m}м`;
 }
 
-function fmtReleaseDate(value?: string | null): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
 function releaseTracker(r: ReleaseOption): string {
   if ((r.trackerName === "all" || r.indexer === "all") && r.details?.provider) {
     return r.details.provider === "kinozal" ? "Kinozal" : r.details.provider;
@@ -80,24 +70,87 @@ function releaseVoice(r: ReleaseOption): string | null {
   return r.voiceLabel ?? r.parsed?.voiceLabel ?? null;
 }
 
-function releaseGroup(r: ReleaseOption): string | null {
-  return r.releaseGroup ?? r.parsed?.releaseGroup ?? null;
-}
-
 function titleParts(title: string): string[] {
   return title.split(/\s+\/\s+/).map((part) => part.trim()).filter(Boolean);
 }
 
-function torrentTagClass(kind: "tracker" | "voice" | "quality" | "source" | "lang" | "score" | "codec" | "warn"): string {
-  const base = "whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-2xs";
-  if (kind === "tracker") return cn(base, "bg-info/15 text-info");
-  if (kind === "voice") return cn(base, "bg-warn/15 text-warn");
-  if (kind === "quality") return cn(base, "bg-ok/15 text-ok");
-  if (kind === "source") return cn(base, "bg-white/[0.08] text-ink");
-  if (kind === "lang") return cn(base, "bg-[#6b8cff]/15 text-[#8fa6ff]");
-  if (kind === "score") return cn(base, "bg-accent/15 text-accent");
-  if (kind === "codec") return cn(base, "bg-[#9b7cff]/15 text-[#b7a3ff]");
-  return cn(base, "bg-bad/15 text-bad");
+function voiceTagClass(): string {
+  return "whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-2xs text-warn";
+}
+
+function DownloadProgressButton({
+  busy,
+  done,
+  disabled,
+  onClick,
+}: {
+  busy: boolean;
+  done: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!busy) {
+      setProgress(done ? 1 : 0);
+      return;
+    }
+    let raf = 0;
+    const started = Date.now();
+    const tick = () => {
+      const elapsed = Date.now() - started;
+      setProgress(Math.min(0.92, elapsed / 2600));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [busy, done]);
+
+  const radius = 11;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - progress);
+
+  return (
+    <button
+      type="button"
+      aria-label={done ? "Раздача в очереди" : "Скачать раздачу"}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "relative grid size-[34px] flex-none place-items-center overflow-hidden rounded-full border-0 p-0 text-white transition-[background,opacity,color,transform]",
+        busy ? "cursor-default bg-transparent text-accent opacity-100" : "bg-white/[0.16] opacity-60 hover:bg-accent hover:opacity-100",
+        done && "bg-ok/20 text-ok opacity-100",
+        !busy && !done && "hover:scale-105",
+      )}
+    >
+      {busy ? (
+        <svg
+          width="34"
+          height="34"
+          viewBox="0 0 34 34"
+          fill="none"
+          className="absolute inset-0 -rotate-90"
+        >
+          <circle cx="17" cy="17" r={radius} stroke="currentColor" strokeWidth="2" strokeOpacity="0.2" />
+          <circle
+            cx="17"
+            cy="17"
+            r={radius}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+          />
+        </svg>
+      ) : done ? (
+        <Check size={16} strokeWidth={2.2} />
+      ) : (
+        <Download size={16} strokeWidth={2.2} />
+      )}
+    </button>
+  );
 }
 
 async function playVideo(video: HTMLVideoElement) {
@@ -289,61 +342,55 @@ export function useVideoPlayer(url: string | null, direct = false) {
 }
 
 // ── Интерактивный выбор раздачи (Jackett Torznab + native scoring) ─────
-// Показывает релизы с качеством/озвучкой/сидами и объяснением score.
+// Показывает релизы с постером, качеством, озвучкой, сидами и отправкой в qB.
 function TorrentCard({
   release,
-  expanded,
   busy,
   done,
   disabled,
-  onToggleDetails,
   onGrab,
 }: {
   release: ReleaseOption;
-  expanded: boolean;
   busy: boolean;
   done: boolean;
   disabled: boolean;
-  onToggleDetails: () => void;
   onGrab: () => void;
 }) {
   const details = release.details;
   const voice = releaseVoice(release);
-  const group = releaseGroup(release);
-  const studio = release.studioHint ?? release.parsed?.studioHint ?? null;
   const tracker = releaseTracker(release);
   const poster = details?.posterRemote ?? release.posterRemote;
   const posterSrc = posterUrl(poster);
-  const summary = details?.summary ?? release.description;
   const tech = details?.technical;
   const stats = details?.stats;
   const seeders = stats?.seeders ?? release.seeders ?? 0;
-  const leechers = stats?.leechers ?? release.leechers;
-  const completed = stats?.completed ?? release.grabs;
   const quality = tech?.quality ?? release.quality ?? (release.parsed?.resolution ? `${release.parsed.resolution}p` : null);
-  const source = release.parsed?.source;
   const title = details?.title ?? release.title;
   const titleLines = titleParts(title);
-  const date = tech?.uploadedAt ?? (release.publishDate ? fmtReleaseDate(release.publishDate) : null);
   const voiceTags = tech?.voiceCodes?.length ? tech.voiceCodes : voice ? [voice] : [];
-  const detailChips = [
-    tracker && `tracker: ${tracker}`,
-    release.trackerId != null && `id: ${release.trackerId}`,
-    release.category && `cat: ${release.category}`,
-    release.query && `q: ${release.query}`,
-    release.infoHash && `hash: ${release.infoHash}`,
-    tech?.fileCount != null && `files: ${tech.fileCount}`,
-  ].filter((value): value is string => Boolean(value));
+  const titleContent = (
+    <div className="space-y-0.5 text-[11.5px] font-bold leading-[1.18] text-white [font-family:Syne,var(--font-ui)]" title={title}>
+      {(titleLines.length ? titleLines : [title]).map((line, index) => (
+        <div key={`${line}-${index}`} className="break-words">
+          {line}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <article
       className={cn(
-        "flex w-[420px] flex-none gap-3 rounded-[12px] border border-hair bg-raise p-3 max-mob:w-[calc(100vw-40px)]",
-        release.rejected && "border-bad/40",
+        "media-hover-card w-[220px] flex-none scroll-ml-5 max-mob:w-[calc(100vw-40px)]",
       )}
     >
-      <div className="relative h-[178px] w-[118px] flex-none overflow-hidden rounded-[9px] bg-groove">
-        <div className="grid h-full w-full place-items-center px-2 text-center font-mono text-2xs text-muted">
+      <div
+        className={cn(
+          "group relative aspect-[2/3.25] overflow-hidden rounded-[10px] bg-raise",
+          release.rejected && "ring-1 ring-bad/40",
+        )}
+      >
+        <div className="absolute inset-0 grid place-items-center px-2 text-center font-mono text-2xs tracking-[0.1em] text-muted">
           NO ART
         </div>
         {posterSrc && (
@@ -357,121 +404,53 @@ function TorrentCard({
             }}
           />
         )}
-      </div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_38%,rgba(0,0,0,0.34)_72%,rgba(0,0,0,0.78)_100%),linear-gradient(to_top,rgba(0,0,0,0.97)_0%,rgba(0,0,0,0.7)_48%,rgba(0,0,0,0.16)_76%,rgba(0,0,0,0.18)_100%)]" />
 
-      <div className="min-w-0 flex-1">
-        <div className="space-y-0.5 text-cell font-semibold leading-[1.18] text-ink [font-family:var(--font-ui)]" title={title}>
-          {titleLines.length ? titleLines.slice(0, 3).map((part) => (
-            <div key={part} className="truncate">{part}</div>
-          )) : title}
-        </div>
-
-        <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-2xs text-muted">
-          <span className={torrentTagClass("tracker")}>{tracker}</span>
-          {voiceTags.map((tag) => <span key={tag} className={torrentTagClass("voice")}>{tag}</span>)}
-          {group && <span className={torrentTagClass("source")}>{group}</span>}
-          {studio && <span className={torrentTagClass("source")}>{studio}</span>}
-        </div>
-
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 font-mono text-label text-muted">
-          {quality && <span className={torrentTagClass("quality")}>{quality}</span>}
-          {source && <span className={torrentTagClass("source")}>{source}</span>}
-          {release.parsed?.codec && <span className={torrentTagClass("codec")}>{release.parsed.codec}</span>}
-          {release.parsed?.hdr && <span className={torrentTagClass("codec")}>{release.parsed.hdr}</span>}
-          {(release.languages ?? release.parsed?.languages ?? []).map((l) => (
-            <span key={l} className={torrentTagClass("lang")}>
-              {l}
-            </span>
-          ))}
-          {release.score != null && (
-            <span className={release.score < 0 ? torrentTagClass("warn") : torrentTagClass("score")}>
-              score {release.score}
+        <div className="absolute left-2.5 top-2.5 flex max-w-[72%] flex-col items-start gap-1">
+          <span className="whitespace-nowrap rounded bg-black/80 px-2 py-1 font-mono text-2xs font-bold text-white/90 shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
+            {tracker}
+          </span>
+          {quality && (
+            <span className="max-w-full truncate rounded bg-black/70 px-2 py-1 font-mono text-2xs font-semibold text-white/65 backdrop-blur-md">
+              {quality}
             </span>
           )}
         </div>
-
-        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-label text-muted">
-          <span>{tech?.size ?? fmtSize(release.size)}</span>
-          <span className={media.okText}>{seeders} seed</span>
-          {leechers != null && <span>{leechers} leech</span>}
-          {completed != null && <span>{completed} done</span>}
-          {date && <span>{date}</span>}
+        <div className="absolute right-2.5 top-2.5 rounded bg-black/60 px-2 py-1 font-mono text-2xs font-bold text-accent backdrop-blur-md">
+          {seeders} сид
         </div>
 
-        {summary && (
-          <div className="mt-2 line-clamp-2 text-label leading-[1.35] text-muted">
-            {summary}
-          </div>
-        )}
+        <div className="absolute inset-x-0 bottom-0 p-2.5">
+          {release.detailUrl ? (
+            <a
+              href={release.detailUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block transition-opacity hover:opacity-80"
+            >
+              {titleContent}
+            </a>
+          ) : titleContent}
 
-        {(release.scoreReasons?.length ?? 0) > 0 && (
-          <div className="mt-2 line-clamp-1 font-mono text-label text-muted">
-            {release.scoreReasons?.slice(0, 3).join(" · ")}
+          <div className="mt-2 flex flex-wrap gap-1">
+            {voiceTags.slice(0, 3).map((tag) => <span key={tag} className={voiceTagClass()}>{tag}</span>)}
           </div>
-        )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className={cn(media.button.sm, "bg-surface")} type="button" onClick={onToggleDetails}>
-            {expanded ? "Скрыть" : "Детали"}
-          </button>
-          <button
-            className={media.button.accentSm}
-            disabled={disabled}
-            onClick={onGrab}
-          >
-            {done ? "✓ В очереди" : busy ? "…" : "Скачать"}
-          </button>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate font-mono text-[11.5px] font-semibold text-white/70">
+              {tech?.size ?? fmtSize(release.size)}
+            </span>
+            <DownloadProgressButton
+              busy={busy}
+              done={done}
+              disabled={disabled}
+              onClick={onGrab}
+            />
+          </div>
         </div>
+      </div>
 
-        {expanded && (
-          <div className="mt-3 border-t border-hair pt-3">
-            {detailChips.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 font-mono text-label text-muted">
-                {detailChips.map((chip) => (
-                  <span key={chip} className={torrentTagClass("source")}>
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            )}
-            {(tech?.video || tech?.audio || tech?.translation || tech?.duration || details?.ratings?.imdb || details?.ratings?.kinopoisk) && (
-              <div className="mt-2 grid gap-1 font-mono text-label text-muted">
-                {tech?.video && <span>video: {tech.video}</span>}
-                {tech?.audio && <span>audio: {tech.audio}</span>}
-                {tech?.translation && <span>voice: {tech.translation}</span>}
-                {(tech?.voiceLabels?.length ?? 0) > 0 && <span>voice tags: {tech?.voiceLabels?.join(", ")}</span>}
-                {tech?.duration && <span>time: {tech.duration}</span>}
-                {details?.ratings?.imdb && <span>IMDb: {details.ratings.imdb}</span>}
-                {details?.ratings?.kinopoisk && <span>Кинопоиск: {details.ratings.kinopoisk}</span>}
-              </div>
-            )}
-            {((release.warnings?.length ?? 0) > 0 || (release.rejections?.length ?? 0) > 0) && (
-              <div className="mt-2 grid gap-1 font-mono text-label">
-                {(release.warnings ?? []).map((warning) => (
-                  <span key={`warning-${warning}`} className={media.reject}>
-                    warning: {warning}
-                  </span>
-                ))}
-                {(release.rejections ?? []).map((rejection) => (
-                  <span key={`rejection-${rejection}`} className={media.reject}>
-                    reject: {rejection}
-                  </span>
-                ))}
-              </div>
-            )}
-            {release.detailUrl && (
-              <a
-                className="mt-2 inline-flex font-mono text-label text-accent"
-                href={release.detailUrl}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Открыть страницу трекера
-              </a>
-            )}
-          </div>
-        )}
-
+      <div className="min-h-0">
         {done && /multi-season/i.test((release.rejections ?? []).join(" ")) && (
           <div className={cn(media.reject, "mt-2 whitespace-normal text-label")}>
             Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках.
@@ -493,7 +472,6 @@ export function ReleasePicker({
   const [error, setError] = useState<string | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toast = useToast();
 
   useEffect(() => {
@@ -501,10 +479,13 @@ export function ReleasePicker({
     setReleases(null);
     setError(null);
     setDone({});
-    setExpanded(new Set());
     searchReleaseOptions(params).then((r) => {
       if (!alive) return;
-      setReleases(r.items);
+      setReleases([...r.items].sort((a, b) => {
+        const ak = releaseTracker(a).toLowerCase() === "kinozal" ? 0 : 1;
+        const bk = releaseTracker(b).toLowerCase() === "kinozal" ? 0 : 1;
+        return ak - bk;
+      }));
       setError(r.error);
     });
     return () => {
@@ -534,13 +515,6 @@ export function ReleasePicker({
     } else toast.error(res.error ?? "Не удалось отправить раздачу");
   };
 
-  const toggleDetails = (guid: string) =>
-    setExpanded((p) => {
-      const n = new Set(p);
-      n.has(guid) ? n.delete(guid) : n.add(guid);
-      return n;
-    });
-
   if (releases === null)
     return <div className={cn(media.empty, "mt-2.5")}>Ищем раздачи…</div>;
   if (error)
@@ -559,11 +533,9 @@ export function ReleasePicker({
         <TorrentCard
           key={r.guid}
           release={r}
-          expanded={expanded.has(r.guid)}
           busy={busyGuid === r.guid}
           done={Boolean(done[r.guid])}
           disabled={busyGuid === r.guid || done[r.guid]}
-          onToggleDetails={() => toggleDetails(r.guid)}
           onGrab={() => onGrab(r)}
         />
       ))}

@@ -1,4 +1,4 @@
-// Library tab for MediaPage: hero, continue-watching row, poster grid, filters.
+// Library tab for MediaPage: hero, library actions, and poster rails.
 
 import {useEffect, useRef, useState} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
@@ -18,20 +18,14 @@ import {useToast} from "../../components/ui/Toast.tsx";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {MediaHero} from "./shared/MediaHero.tsx";
+import {ContinueWatchingCard, MediaPosterCard, MediaRail} from "./shared/mediaRails.tsx";
 
 interface MediaLibraryTabProps {
     library: LibraryItem[];
     setLibrary: (l: LibraryItem[]) => void;
     libReady: boolean;
     resume: ResumeItem[];
-    fType: "all" | "Series" | "Movie";
-    setFType: (v: "all" | "Series" | "Movie") => void;
-    onlyUnwatched: boolean;
-    setOnlyUnwatched: (v: boolean | ((prev: boolean) => boolean)) => void;
-    sortBy: "name" | "year";
-    shownLibrary: LibraryItem[];
     onPlayResume: (it: ResumeItem) => void;
-    busy: string | null;
 }
 
 interface LibraryHeroProps {
@@ -58,14 +52,7 @@ export function MediaLibraryTab({
                                     setLibrary,
                                     libReady,
                                     resume,
-                                    fType,
-                                    setFType,
-                                    onlyUnwatched,
-                                    setOnlyUnwatched,
-                                    sortBy: _sortBy,
-                                    shownLibrary,
                                     onPlayResume,
-                                    busy: _busy,
                                 }: MediaLibraryTabProps) {
     const nav = useNavigate();
     const location = useLocation();
@@ -89,10 +76,14 @@ export function MediaLibraryTab({
             },
         );
 
+    const sortedLibrary = [...library].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    const movieItems = sortedLibrary.filter((it) => it.type === "Movie");
+    const seriesItems = sortedLibrary.filter((it) => it.type === "Series");
+
     // Pick hero once when library loads; re-pick if library changes significantly
     const heroRef = useRef<LibraryItem | null>(null);
-    if (heroRef.current === null && shownLibrary.length > 0) {
-        heroRef.current = getRandomItem(shownLibrary);
+    if (heroRef.current === null && sortedLibrary.length > 0) {
+        heroRef.current = getRandomItem(sortedLibrary);
     }
     const heroItem = heroRef.current;
 
@@ -100,59 +91,11 @@ export function MediaLibraryTab({
         <div id="libraryContainer" className={ms.libPage}>
             <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail}/>
 
-            {/* Continue watching row */}
-            {resume.length > 0 && (
-                <div className={ms.section}>
-                    <div className={cn(ms.sectionHead, ms.railHeaderInset)}>
-                        <span className={ms.sectionTitle}>ПРОДОЛЖИТЬ ПРОСМОТР</span>
-                        <span className={ms.countBadge}>{resume.length}</span>
-                    </div>
-                    <div className={cn(ms.hTrack, ms.railInset)}>
-                        {resume.map((it) => {
-                            const COLORS = ["#cc3300","#0077dd","#00aaee","#8833ff","#ffaa00","#00b8ae"];
-                            const accent = COLORS[it.title.charCodeAt(0) % COLORS.length];
-                            return (
-                                <div key={it.id} className={cn(ms.watchCard, "group")} onClick={() => onPlayResume(it)}>
-                                    <div className={ms.watchThumb}>
-                                        <div className="absolute inset-0">
-                                            <img
-                                                src={jellyfinPosterUrl(it.id)}
-                                                alt=""
-                                                style={{width: "100%", height: "100%", objectFit: "cover"}}
-                                                onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
-                                            />
-                                        </div>
-                                        <div className={ms.watchVignette}/>
-                                        <div className={ms.watchPlayLayer}>
-                                            <div className={ms.roundPlay}>
-                                                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                                                    <polygon points="6,3 21,12 6,21"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <div className={ms.watchProg}>
-                                            <div className="h-full" style={{width: it.positionPct + "%", background: accent}}/>
-                                        </div>
-                                    </div>
-                                    <div className={ms.watchInfo}>
-                                        <div className={ms.watchTitle}>{it.title}</div>
-                                        <div className={ms.watchMeta}>
-                                            {it.kind === "episode" && <span className="text-white/40">эпизод · </span>}
-                                            <span style={{color: accent}}>{Math.round(it.positionPct)}% просмотрено</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* Library poster grid */}
+            {/* Library actions */}
             <div className={ms.section}>
                 <div className={cn(ms.sectionHead, ms.railHeaderInset)}>
                     <span className={ms.sectionTitle}>БИБЛИОТЕКА</span>
-                    <span className={ms.countBadge}>{shownLibrary.length}</span>
+                    <span className={ms.countBadge}>{library.length}</span>
                     <button
                         className={ms.scanButton}
                         onClick={() =>
@@ -170,83 +113,63 @@ export function MediaLibraryTab({
                         Сканировать
                     </button>
                 </div>
-
-                <div className={cn(ms.filterTabs, ms.railHeaderInset)}>
-                    {[
-                        {label: "Все", val: "all" as const},
-                        {label: "Сериалы", val: "Series" as const},
-                        {label: "Фильмы", val: "Movie" as const},
-                    ].map((f) => (
-                        <button
-                            key={f.val}
-                            className={cn(ms.filterTab, fType === f.val && ms.filterTabOn)}
-                            onClick={() => setFType(f.val)}
-                        >
-                            {f.label}
-                        </button>
-                    ))}
-                    <button
-                        className={cn(ms.filterTab, onlyUnwatched && ms.filterTabOn)}
-                        onClick={() => setOnlyUnwatched((v) => !v)}
-                    >
-                        Не просмотрено
-                    </button>
-                </div>
-
-                {!libReady ? (
-                    <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
-                        {Array.from({length: 8}).map((_, i) => (
-                            <div key={i} style={{flex: "0 0 auto", width: 160, aspectRatio: "2/3", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)"}}/>
-                        ))}
-                    </div>
-                ) : shownLibrary.length === 0 ? (
-                    <div className={ms.railHeaderInset} style={{paddingTop: 24, paddingBottom: 24, color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
-                        {library.length === 0 ? "Библиотека пуста или ещё не отсканирована." : "Ничего не подходит под фильтр."}
-                    </div>
-                ) : (
-                    <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
-                        {shownLibrary.map((it) => {
-                            const isSeries = it.type === "Series";
-                            return (
-                                <div key={it.id} className={cn(ms.posterCard, "group")} onClick={() => openDetail(it)}>
-                                    <div className={ms.posterArt}>
-                                        <img
-                                            src={jellyfinPosterUrl(it.id)}
-                                            alt=""
-                                            loading="lazy"
-                                            style={{position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover"}}
-                                            onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
-                                        />
-                                        <div style={{position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)", zIndex: 0}}/>
-                                        {isSeries && it.childCount ? (
-                                            <span className={ms.posterBadge}>{it.childCount} сез.</span>
-                                        ) : null}
-                                        <div className={cn(ms.posterOverlay, "z-5")}>
-                                            <div className={ms.roundPlay}>
-                                                <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                                                    <polygon points="6,3 21,12 6,21"/>
-                                                </svg>
-                                            </div>
-                                            {it.unplayed > 0 && (
-                                                <div className={ms.posterGenres}>{it.unplayed} не просмотрено</div>
-                                            )}
-                                        </div>
-                                        {it.played && (
-                                            <span className={cn(ms.posterBadge, "left-2.25 right-auto bg-accent text-black")} style={{top: 9}}>✓</span>
-                                        )}
-                                    </div>
-                                    <div className={ms.posterInfo}>
-                                        <div className={ms.posterTitle}>{it.name}</div>
-                                        <div className={ms.posterSub}>
-                                            {isSeries ? "сериал" : "фильм"}{it.year ? ` · ${it.year}` : ""}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
             </div>
+
+            {resume.length > 0 && (
+                <MediaRail title="ПРОДОЛЖИТЬ ПРОСМОТР" countLabel={String(resume.length)} className={ms.section}>
+                    {resume.map((it) => (
+                        <ContinueWatchingCard
+                            key={it.id}
+                            item={it}
+                            imageUrl={jellyfinPosterUrl(it.id)}
+                            onClick={() => onPlayResume(it)}
+                        />
+                    ))}
+                </MediaRail>
+            )}
+
+            {!libReady ? (
+                <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
+                    {Array.from({length: 8}).map((_, i) => (
+                        <div key={i} style={{flex: "0 0 auto", width: 160, aspectRatio: "2/3", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)"}}/>
+                    ))}
+                </div>
+            ) : library.length === 0 ? (
+                <div className={ms.railHeaderInset} style={{paddingTop: 24, paddingBottom: 24, color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
+                    Библиотека пуста или ещё не отсканирована.
+                </div>
+            ) : (
+                <>
+                    {movieItems.length > 0 && (
+                        <MediaRail title="ФИЛЬМЫ" count={movieItems.length} className={ms.section}>
+                            {movieItems.map((it) => (
+                                <MediaPosterCard
+                                    key={it.id}
+                                    title={it.name}
+                                    subtitle={`фильм${it.year ? ` · ${it.year}` : ""}`}
+                                    imageUrl={jellyfinPosterUrl(it.id)}
+                                    onClick={() => openDetail(it)}
+                                />
+                            ))}
+                        </MediaRail>
+                    )}
+
+                    {seriesItems.length > 0 && (
+                        <MediaRail title="СЕРИАЛЫ" count={seriesItems.length} className={ms.section}>
+                            {seriesItems.map((it) => (
+                                <MediaPosterCard
+                                    key={it.id}
+                                    title={it.name}
+                                    subtitle={`сериал${it.year ? ` · ${it.year}` : ""}`}
+                                    imageUrl={jellyfinPosterUrl(it.id)}
+                                    seasonCount={it.childCount}
+                                    onClick={() => openDetail(it)}
+                                />
+                            ))}
+                        </MediaRail>
+                    )}
+                </>
+            )}
         </div>
     );
 }

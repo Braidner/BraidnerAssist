@@ -17,6 +17,7 @@ import {
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {MediaHero} from "./shared/MediaHero.tsx";
+import {MediaPosterCard, MediaRail} from "./shared/mediaRails.tsx";
 
 interface MediaDiscoverTabProps {
     library: LibraryItem[];
@@ -46,106 +47,9 @@ function ShuffleIcon({size = 15}: {size?: number}) {
     );
 }
 
-/* ─── Poster card for discover sections ─── */
-interface DiscPosterCardProps {
-    title: string;
-    year?: number | null;
-    sub?: string;
-    imgUrl?: string | null;
-    seasonCount?: number | null;
-    rating?: number | null;
-    rank?: number;
-    onClick: () => void;
-    addBtn?: {label: string; disabled?: boolean; onClick: (e: React.MouseEvent) => void};
-    actions?: {label: string; title?: string; onClick: (e: React.MouseEvent) => void}[];
-}
-
-function DiscPosterCard({title, year, sub, imgUrl, seasonCount, rating, rank, onClick, addBtn, actions}: DiscPosterCardProps) {
-    return (
-        <div className={cn(ms.posterCard, "group")} onClick={onClick} style={{cursor: "pointer"}}>
-            <div className={ms.posterArt}>
-                {imgUrl ? (
-                    <img
-                        src={imgUrl}
-                        alt=""
-                        loading="lazy"
-                        style={{position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover"}}
-                        onError={(e) => {(e.currentTarget as HTMLImageElement).style.display = "none";}}
-                    />
-                ) : null}
-                <div style={{position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 55%)", zIndex: 0}}/>
-                {seasonCount ? <span className={ms.posterBadge}>{seasonCount} сез.</span> : null}
-                {rank != null ? <span className={ms.posterRankBadge}>{rank}</span> : null}
-                <div className={cn(ms.posterOverlay, "z-5")}>
-                    <div className={ms.roundPlay}>
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="6,3 21,12 6,21"/>
-                        </svg>
-                    </div>
-                    {rating != null && (
-                        <div className={ms.posterGenres} style={{display: "flex", alignItems: "center", gap: 3}}>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="#ffd700"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                            {rating.toFixed(1)}
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className={ms.posterInfo}>
-                <div className={ms.posterTitle}>{title}</div>
-                <div className={ms.posterSub}>
-                    {sub ?? ""}{year ? (sub ? ` · ${year}` : `${year}`) : ""}
-                </div>
-            </div>
-            {addBtn && (
-                <button
-                    className={cn(ms.button.accentSm, "mt-1.5 w-full")}
-                    disabled={addBtn.disabled}
-                    onClick={addBtn.onClick}
-                >
-                    {addBtn.disabled ? "…" : addBtn.label}
-                </button>
-            )}
-            {actions?.length ? (
-                <div className="mt-1.5 grid grid-cols-2 gap-1">
-                    {actions.map((a) => (
-                        <button key={a.label} className={cn(ms.button.sm, "h-7 px-1 text-[10px]")} title={a.title ?? a.label} onClick={a.onClick}>
-                            {a.label}
-                        </button>
-                    ))}
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
-/* ─── Section with horizontal poster track ─── */
-function DiscSection({label, count, children, onLabelClick}: {
-    label: string;
-    count: number;
-    children: React.ReactNode;
-    onLabelClick?: () => void;
-}) {
-    return (
-        <div className={ms.discSection}>
-            <div className={cn(ms.discSecHead, ms.railHeaderInset)}>
-                {onLabelClick ? (
-                    <button className={cn(ms.discSecLabel, ms.discSecLink)} onClick={onLabelClick}>
-                        {label}
-                    </button>
-                ) : (
-                    <span className={ms.discSecLabel}>{label}</span>
-                )}
-                <div className={ms.discSecLine}/>
-                <span className={ms.discSecCount}>{count} тайтлов</span>
-            </div>
-            <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>{children}</div>
-        </div>
-    );
-}
-
 /* ─── TMDB rail (reusable for home rails + because-you-watched) ─── */
-function TmdbRail({rail, onOpenTmdb, onAddTmdb, onPreference, ranked}: {
-    rail: DiscoverRail; onOpenTmdb: (it: TmdbItem) => void; onAddTmdb: (it: TmdbItem) => void;
+function TmdbRail({rail, onOpenTmdb, onPreference, ranked}: {
+    rail: DiscoverRail; onOpenTmdb: (it: TmdbItem) => void;
     onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void; ranked?: boolean;
 }) {
     const nav = useNavigate();
@@ -154,30 +58,25 @@ function TmdbRail({rail, onOpenTmdb, onAddTmdb, onPreference, ranked}: {
     const genreId = rail.key.startsWith("g") ? Number(rail.key.slice(1)) : null;
     const canOpenGenre = rail.kind !== "mixed" && genreId != null && Number.isFinite(genreId);
     return (
-        <DiscSection
-            label={rail.label.toUpperCase()}
+        <MediaRail
+            title={rail.label.toUpperCase()}
             count={items.length}
-            onLabelClick={canOpenGenre ? () => nav(`/media/discover/genre/${rail.kind}/${genreId}`) : undefined}
+            onTitleClick={canOpenGenre ? () => nav(`/media/discover/genre/${rail.kind}/${genreId}`) : undefined}
         >
             {items.map((it, i) => (
-                <DiscPosterCard
+                <MediaPosterCard
                     key={it.kind + it.tmdbId}
                     title={it.title}
-                    year={it.year}
-                    sub={it.kind === "movie" ? "фильм" : "сериал"}
-                    imgUrl={it.poster ? posterUrl(it.poster) : null}
+                    subtitle={`${it.kind === "movie" ? "фильм" : "сериал"}${it.year ? ` · ${it.year}` : ""}`}
+                    imageUrl={it.poster ? posterUrl(it.poster) : null}
                     rating={it.rating}
                     rank={ranked ? i + 1 : undefined}
                     onClick={() => onOpenTmdb(it)}
-                    actions={[
-                        {label: "В список", onClick: (e) => { e.stopPropagation(); onPreference(it, "watchlist"); }},
-                        {label: "Добавить", onClick: (e) => { e.stopPropagation(); onAddTmdb(it); }},
-                        {label: "Скрыть", onClick: (e) => { e.stopPropagation(); onPreference(it, "hidden"); }},
-                        {label: "Не интересно", onClick: (e) => { e.stopPropagation(); onPreference(it, "disliked"); }},
-                    ]}
+                    onHide={() => onPreference(it, "hidden")}
+                    onWatchlist={() => onPreference(it, "watchlist")}
                 />
             ))}
-        </DiscSection>
+        </MediaRail>
     );
 }
 
@@ -333,34 +232,36 @@ export function MediaDiscoverTab({
             {/* TMDB discovery rails (trending / top / fresh / genres) */}
             {home.rails.map((rail) => (
                 <TmdbRail key={rail.key} rail={rail}
-                    onOpenTmdb={onOpenTmdb} onAddTmdb={onAddTmdb} onPreference={onPreference}
+                    onOpenTmdb={onOpenTmdb} onPreference={onPreference}
                     ranked={rail.key === "top" || rail.key === "trending"}/>
             ))}
 
             {/* Because you watched (personalized) */}
             {because.map((rail) => (
                 <TmdbRail key={rail.key} rail={rail} onOpenTmdb={onOpenTmdb}
-                    onAddTmdb={onAddTmdb} onPreference={onPreference}/>
+                    onPreference={onPreference}/>
             ))}
 
             {/* Library rails */}
             {seriesItems.length > 0 && (
-                <DiscSection label="СЕРИАЛЫ В БИБЛИОТЕКЕ" count={seriesItems.length}>
+                <MediaRail title="СЕРИАЛЫ В БИБЛИОТЕКЕ" count={seriesItems.length}>
                     {seriesItems.map((it) => (
-                        <DiscPosterCard key={it.id} title={it.name} year={it.year} sub="сериал"
-                            imgUrl={jellyfinPosterUrl(it.id)} seasonCount={it.childCount}
+                        <MediaPosterCard key={it.id} title={it.name}
+                            subtitle={`сериал${it.year ? ` · ${it.year}` : ""}`}
+                            imageUrl={jellyfinPosterUrl(it.id)} seasonCount={it.childCount}
                             onClick={() => nav(`/media/series/${it.id}`, {state: returnState()})}/>
                     ))}
-                </DiscSection>
+                </MediaRail>
             )}
             {movieItems.length > 0 && (
-                <DiscSection label="ФИЛЬМЫ В БИБЛИОТЕКЕ" count={movieItems.length}>
+                <MediaRail title="ФИЛЬМЫ В БИБЛИОТЕКЕ" count={movieItems.length}>
                     {movieItems.map((it) => (
-                        <DiscPosterCard key={it.id} title={it.name} year={it.year} sub="фильм"
-                            imgUrl={jellyfinPosterUrl(it.id)}
+                        <MediaPosterCard key={it.id} title={it.name}
+                            subtitle={`фильм${it.year ? ` · ${it.year}` : ""}`}
+                            imageUrl={jellyfinPosterUrl(it.id)}
                             onClick={() => nav(`/media/movie/${it.id}`, {state: returnState()})}/>
                     ))}
-                </DiscSection>
+                </MediaRail>
             )}
 
             {/* Empty state */}

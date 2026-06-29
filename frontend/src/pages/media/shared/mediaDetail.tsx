@@ -11,6 +11,7 @@ import {
 } from "@/lib/api.ts";
 import { cn } from "@/lib/cn.ts";
 import { media as ms } from "./mediaStyles.ts";
+import { MediaPosterCard, MediaRail } from "./mediaRails.tsx";
 import { fmtSize, useVideoPlayer } from "./mediaShared.tsx";
 
 export type DetailPlayer = { url: string; title: string } | null;
@@ -588,6 +589,7 @@ export interface RailCard {
   year: number | null;
   poster: string | undefined;
   seasonCount?: number | null;
+  rating?: number | null;
   onClick: () => void;
 }
 
@@ -603,6 +605,7 @@ export function libraryRailCards(
     year: item.year,
     poster: jellyfinPosterUrl(item.id),
     seasonCount: item.childCount,
+    rating: null,
     onClick: () => onOpen(item),
   }));
 }
@@ -618,6 +621,7 @@ export function tmdbRailCards(
     sub: item.kind === "movie" ? "фильм" : "сериал",
     year: item.year,
     poster: posterUrl(item.poster),
+    rating: item.rating,
     onClick: () => onOpen(item),
   }));
 }
@@ -626,48 +630,19 @@ export function tmdbRailCards(
 export function CardRail({ label, cards }: { label: string; cards: RailCard[] }) {
   if (cards.length === 0) return null;
   return (
-    <div className="mt-8">
-      <div className={cn("mb-4 font-ui text-label font-extrabold uppercase tracking-section text-muted", ms.railHeaderInset)}>{label}</div>
-      <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
-        {cards.map((c) => (
-          <div key={c.key} className={cn(ms.posterCard, "group")} onClick={c.onClick}>
-            <div className={ms.posterArt}>
-              <div className="absolute inset-0 z-0 bg-[#09090d]" />
-              {c.poster ? (
-                <img
-                  src={c.poster}
-                  alt=""
-                  loading="lazy"
-                  className="absolute inset-0 z-[1] size-full object-cover"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ) : null}
-              {c.seasonCount ? (
-                <span className={ms.posterBadge} style={{ position: "relative", zIndex: 2 }}>
-                  {c.seasonCount} сез.
-                </span>
-              ) : null}
-              <div className={cn(ms.posterOverlay, "bg-[linear-gradient(to_top,rgba(0,0,0,0.72),transparent_58%)]")}>
-                <div className={ms.roundPlay}>
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="6,3 21,12 6,21" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className={ms.posterInfo}>
-              <div className={ms.posterTitle}>{c.title}</div>
-              <div className={ms.posterSub}>
-                {c.sub}
-                {c.year ? ` · ${c.year}` : ""}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <MediaRail title={label} className="mt-8">
+      {cards.map((c) => (
+        <MediaPosterCard
+          key={c.key}
+          title={c.title}
+          subtitle={`${c.sub}${c.year ? ` · ${c.year}` : ""}`}
+          imageUrl={c.poster}
+          seasonCount={c.seasonCount}
+          rating={c.rating}
+          onClick={c.onClick}
+        />
+      ))}
+    </MediaRail>
   );
 }
 

@@ -118,6 +118,12 @@ export const media = {
     "absolute right-2 top-2 z-[2] rounded-full bg-black/70 px-2 py-1 text-2xs font-semibold text-white",
   posterOverlay:
     "media-card-overlay absolute inset-0 z-[3] flex items-end justify-end p-2 opacity-0 transition-opacity duration-700 ease-out",
+  posterTopActions:
+    "absolute left-2 right-2 top-2 z-[4] flex items-center justify-between opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-100 group-focus-within:opacity-100",
+  posterActionButton:
+    "grid size-8 cursor-pointer place-items-center rounded-full border border-white/15 bg-black/55 text-white/80 backdrop-blur-md transition-all hover:bg-white/90 hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+  posterRating:
+    "absolute bottom-2 left-2 z-[4] flex items-center gap-1 rounded bg-black/65 px-2 py-1 text-2xs font-semibold text-white",
   posterGenres:
     "absolute bottom-2 left-2 rounded bg-black/65 px-2 py-1 text-2xs text-white",
   posterInfo: "mt-2",

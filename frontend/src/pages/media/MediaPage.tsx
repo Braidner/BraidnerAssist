@@ -451,9 +451,6 @@ export function MediaPage({
   const [tsStreams, setTsStreams] = useState<TorrServerStream[]>([]);
   const [magnet, setMagnet] = useState("");
   const [libReady, setLibReady] = useState(false);
-  const [fType, setFType] = useState<"all" | "Series" | "Movie">("all");
-  const [onlyUnwatched, setOnlyUnwatched] = useState(false);
-  const [sortBy, _setSortBy] = useState<"name" | "year">("name");
 
   // Library data
   useEffect(() => {
@@ -463,15 +460,6 @@ export function MediaPage({
         setLibReady(true);
       });
   }, [media.configured]);
-
-  const shownLibrary = library
-    .filter((it) => (fType === "all" ? true : it.type === fType))
-    .filter((it) => (!onlyUnwatched ? true : !it.played))
-    .sort((a, b) =>
-      sortBy === "year"
-        ? (b.year ?? 0) - (a.year ?? 0)
-        : a.name.localeCompare(b.name, "ru"),
-    );
 
   // Discovery home (LAMPA/ZONA-style rails: hero + genres + rails + because-you-watched)
   const [discoverHome, setDiscoverHome] = useState<DiscoverHome>({
@@ -752,14 +740,7 @@ export function MediaPage({
           setLibrary={setLibrary}
           libReady={libReady}
           resume={resume}
-          fType={fType}
-          setFType={setFType}
-          onlyUnwatched={onlyUnwatched}
-          setOnlyUnwatched={setOnlyUnwatched}
-          sortBy={sortBy}
-          shownLibrary={shownLibrary}
           onPlayResume={playResume}
-          busy={busy}
         />
       )}
 

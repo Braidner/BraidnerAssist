@@ -479,13 +479,6 @@ export function MediaSeriesPage({
             />
           </div>
 
-          {/* Качается из торрента (Media v2) — прогресс по сериям + докачать ещё */}
-          <ContentTorrents
-            contentType="series"
-            tvdbId={tvdbId}
-            reloadKey={pickReload}
-          />
-
           {/* Пофайловый выбор серий из торрента (Media v2) */}
           <div style={{ marginTop: 16 }}>
             <button
@@ -753,6 +746,13 @@ export function MediaSeriesPage({
       ) : (
         <SimilarRail items={similarItems} />
       )}
+
+      {/* Качается из торрента (Media v2) — прогресс по сериям + докачать ещё */}
+      <ContentTorrents
+        contentType="series"
+        tvdbId={tvdbId}
+        reloadKey={pickReload}
+      />
     </div>
   );
 }

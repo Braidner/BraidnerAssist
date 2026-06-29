@@ -401,13 +401,6 @@ export function MediaMoviePage({
 						)}
 					</div>
 
-					{/* Качается из торрента (Media v2) */}
-					<ContentTorrents
-						contentType="movie"
-						tmdbId={det.tmdbId}
-						reloadKey={pickReload}
-					/>
-
 					{/* Пофайловый выбор файла из торрента (Media v2) */}
 					<div style={{marginTop: 16}}>
 						<button
@@ -441,6 +434,12 @@ export function MediaMoviePage({
 			) : (
 				<SimilarRail items={similarItems}/>
 			)}
+			{/* Качается из торрента (Media v2) */}
+			<ContentTorrents
+				contentType="movie"
+				tmdbId={det.tmdbId}
+				reloadKey={pickReload}
+			/>
 		</div>
 	);
 }

@@ -573,6 +573,7 @@ export function ReleasePicker({
   if (releases.length === 0)
     return <div className={cn(media.empty, "mt-2.5")}>Раздачи не найдены.</div>;
 
+
   return (
     <MediaRail
       title="Релизы"

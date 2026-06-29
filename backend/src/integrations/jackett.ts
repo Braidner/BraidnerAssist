@@ -165,7 +165,7 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
   url.searchParams.set("t", "search");
   url.searchParams.set("q", query);
   url.searchParams.set("cat", categoryFor(opts.kind));
-  const res = await fetch(url, { signal: AbortSignal.timeout(18_000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(50_000) });
   if (!res.ok) throw new Error(`Jackett ${indexer} ${res.status}`);
   const xml = await res.text();
   return itemBlocks(xml).map((it, i) => {
@@ -226,6 +226,7 @@ export async function jackettSearch(
   query: string,
   opts: { kind?: "movie" | "series" | "manual"; profileName?: string | null; profile?: ReleaseQualityProfile } = {},
 ): Promise<SearchResult[]> {
+
   const cfg = config.media.jackett;
   if (!cfg.configured || !query.trim()) return [];
   const profile = opts.profile ?? await getQualityProfile(opts.profileName);

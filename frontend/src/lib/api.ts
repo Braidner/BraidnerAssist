@@ -1080,6 +1080,7 @@ export interface LibraryItem {
   name: string;
   type: "Movie" | "Series";
   year: number | null;
+  rating: number | null;
   tmdbId: number | null;
   tvdbId: number | null;
   childCount: number | null;

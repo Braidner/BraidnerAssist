@@ -47,6 +47,7 @@ export interface LibraryItem {
   name: string;
   type: "Movie" | "Series";
   year: number | null;
+  rating: number | null;
   tmdbId: number | null; // внешний id для сверки discovery с библиотекой
   tvdbId: number | null; // series only — внешний id для поиска релизов
   childCount: number | null; // series only — число сезонов
@@ -206,6 +207,7 @@ interface JfItem {
   Type?: string;
   SeriesName?: string;
   ProductionYear?: number;
+  CommunityRating?: number;
   ProviderIds?: Record<string, string>;
   ChildCount?: number;
   UserData?: { Played?: boolean; UnplayedItemCount?: number };
@@ -261,7 +263,7 @@ export async function getLibrary(): Promise<LibraryItem[]> {
     url.searchParams.set("IncludeItemTypes", type);
     url.searchParams.set("SortBy", "SortName");
     url.searchParams.set("SortOrder", "Ascending");
-    url.searchParams.set("Fields", "ProductionYear,ProviderIds,ChildCount");
+    url.searchParams.set("Fields", "ProductionYear,ProviderIds,ChildCount,CommunityRating");
     if (userId) url.searchParams.set("userId", userId);
     const res = await fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(8_000) });
     if (!res.ok) throw new Error(`Jellyfin /Items(${type}) responded ${res.status}`);
@@ -281,6 +283,7 @@ export async function getLibrary(): Promise<LibraryItem[]> {
         name: localizedName,
         type,
         year: it.ProductionYear ?? null,
+        rating: it.CommunityRating ?? null,
         tmdbId,
         tvdbId,
         childCount: type === "Series" ? it.ChildCount ?? null : null,

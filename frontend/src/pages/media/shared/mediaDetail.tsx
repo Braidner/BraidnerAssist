@@ -605,7 +605,7 @@ export function libraryRailCards(
     year: item.year,
     poster: jellyfinPosterUrl(item.id),
     seasonCount: item.childCount,
-    rating: null,
+    rating: item.rating,
     onClick: () => onOpen(item),
   }));
 }

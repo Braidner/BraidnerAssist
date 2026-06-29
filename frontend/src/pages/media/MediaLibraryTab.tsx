@@ -32,6 +32,7 @@ interface LibraryHeroProps {
     heroItem: LibraryItem | null;
     resume: ResumeItem[];
     openDetail: (it: LibraryItem, autoplay?: boolean) => void;
+    scan: () => void;
 }
 
 type HeroDetail = MoviePageDetail | SeriesPageDetail | null;
@@ -87,33 +88,18 @@ export function MediaLibraryTab({
     }
     const heroItem = heroRef.current;
 
+    const scan = () => {
+        refreshJellyfin().then(() =>
+          getMediaLibrary().then((l) => {
+              setLibrary(l);
+              toast.success("Скан библиотеки запущен");
+          }),
+        )
+    }
+
     return (
         <div id="libraryContainer" className={ms.libPage}>
-            <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail}/>
-
-            {/* Library actions */}
-            <div className={ms.section}>
-                <div className={cn(ms.sectionHead, ms.railHeaderInset)}>
-                    <span className={ms.sectionTitle}>БИБЛИОТЕКА</span>
-                    <span className={ms.countBadge}>{library.length}</span>
-                    <button
-                        className={ms.scanButton}
-                        onClick={() =>
-                            refreshJellyfin().then(() =>
-                                getMediaLibrary().then((l) => {
-                                    setLibrary(l);
-                                    toast.success("Скан библиотеки запущен");
-                                }),
-                            )
-                        }
-                    >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                            <path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M3 12h18"/>
-                        </svg>
-                        Сканировать
-                    </button>
-                </div>
-            </div>
+            <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail} scan={scan}/>
 
             {resume.length > 0 && (
                 <MediaRail title="ПРОДОЛЖИТЬ ПРОСМОТР" countLabel={String(resume.length)} className={ms.section}>
@@ -148,6 +134,7 @@ export function MediaLibraryTab({
                                     title={it.name}
                                     subtitle={`фильм${it.year ? ` · ${it.year}` : ""}`}
                                     imageUrl={jellyfinPosterUrl(it.id)}
+                                    rating={it.rating}
                                     onClick={() => openDetail(it)}
                                 />
                             ))}
@@ -163,6 +150,7 @@ export function MediaLibraryTab({
                                     subtitle={`сериал${it.year ? ` · ${it.year}` : ""}`}
                                     imageUrl={jellyfinPosterUrl(it.id)}
                                     seasonCount={it.childCount}
+                                    rating={it.rating}
                                     onClick={() => openDetail(it)}
                                 />
                             ))}
@@ -175,7 +163,7 @@ export function MediaLibraryTab({
 }
 
 
-function LibraryHero({heroItem, resume, openDetail}: LibraryHeroProps) {
+function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
     const [heroDetail, setHeroDetail] = useState<HeroDetail>(null);
 
     useEffect(() => {
@@ -241,6 +229,15 @@ function LibraryHero({heroItem, resume, openDetail}: LibraryHeroProps) {
                             <path d="M12 8h.01M11 12h1v4h1"/>
                         </svg>
                         Подробнее
+                    </button>
+                    <button
+                      className={ms.heroGhostBtn}
+                      onClick={(e) => { e.stopPropagation(); scan(); }}
+                    >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                            <path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M3 12h18"/>
+                        </svg>
+                        Сканировать
                     </button>
                 </>
             }

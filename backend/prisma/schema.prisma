@@ -216,6 +216,20 @@ model MediaReleaseDecision {
   @@index([kind, tmdbId, createdAt])
 }
 
+model MediaReleaseDetailCache {
+  id        String   @id @default(cuid())
+  provider  String
+  url       String   @unique
+  payload   String   @default("{}") // JSON payload from tracker detail parser
+  lastError String?
+  fetchedAt DateTime @default(now())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([provider, expiresAt])
+}
+
 model MediaImportEvent {
   id        String        @id @default(cuid())
   monitorId String?

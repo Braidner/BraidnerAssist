@@ -160,6 +160,7 @@ export interface SearchResult {
   voiceLabel?: string | null;
   releaseGroup?: string | null;
   studioHint?: string | null;
+  details?: import("./releaseDetails.js").ReleaseDetails | null;
   parsed?: unknown;
 }
 

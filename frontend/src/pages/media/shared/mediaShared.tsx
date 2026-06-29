@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/Toast.tsx";
 import { cn } from "@/lib/utils.ts";
 import { ui } from "@/lib/ui.ts";
 import { media } from "./mediaStyles.ts";
+import { MediaRail } from "./mediaRails.tsx";
 
 export function ProgressBar({ pct }: { pct: number }) {
   const color = pct >= 100 ? "var(--ok)" : "var(--accent)";
@@ -269,6 +270,192 @@ export function useVideoPlayer(url: string | null, direct = false) {
 
 // ── Интерактивный выбор раздачи (Jackett Torznab + native scoring) ─────
 // Показывает релизы с качеством/озвучкой/сидами и объяснением score.
+function TorrentCard({
+  release,
+  expanded,
+  busy,
+  done,
+  disabled,
+  onToggleDetails,
+  onGrab,
+}: {
+  release: ReleaseOption;
+  expanded: boolean;
+  busy: boolean;
+  done: boolean;
+  disabled: boolean;
+  onToggleDetails: () => void;
+  onGrab: () => void;
+}) {
+  const details = release.details;
+  const voice = releaseVoice(release);
+  const group = releaseGroup(release);
+  const studio = release.studioHint ?? release.parsed?.studioHint ?? null;
+  const tracker = releaseTracker(release);
+  const poster = details?.posterRemote ?? release.posterRemote;
+  const summary = details?.summary ?? release.description;
+  const tech = details?.technical;
+  const stats = details?.stats;
+  const seeders = stats?.seeders ?? release.seeders ?? 0;
+  const leechers = stats?.leechers ?? release.leechers;
+  const completed = stats?.completed ?? release.grabs;
+  const quality = tech?.quality ?? release.quality ?? (release.parsed?.resolution ? `${release.parsed.resolution}p` : null);
+  const source = release.parsed?.source;
+  const title = details?.title ?? release.title;
+  const date = tech?.uploadedAt ?? (release.publishDate ? fmtReleaseDate(release.publishDate) : null);
+  const detailChips = [
+    tracker && `tracker: ${tracker}`,
+    release.trackerId != null && `id: ${release.trackerId}`,
+    release.category && `cat: ${release.category}`,
+    release.query && `q: ${release.query}`,
+    release.infoHash && `hash: ${release.infoHash}`,
+    tech?.fileCount != null && `files: ${tech.fileCount}`,
+  ].filter((value): value is string => Boolean(value));
+
+  return (
+    <article
+      className={cn(
+        "flex w-[380px] flex-none gap-3 rounded-[16px] border border-hair bg-surface p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] max-mob:w-[calc(100vw-40px)]",
+        release.rejected && "border-bad/40",
+      )}
+    >
+      <div className="relative h-[166px] w-[112px] flex-none overflow-hidden rounded-[10px] bg-groove">
+        <div className="grid h-full w-full place-items-center px-2 text-center font-mono text-2xs text-muted">
+          NO ART
+        </div>
+        {poster && (
+          <img
+            src={poster}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="line-clamp-2 text-cell font-semibold leading-[1.25] text-ink [font-family:var(--font-ui)]" title={title}>
+          {title}
+        </div>
+
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-2xs text-muted">
+          <span className={media.badge}>{tracker}</span>
+          {voice && <span className={media.lang}>{voice}</span>}
+          {group && <span className={media.badge}>{group}</span>}
+          {studio && <span className={media.badge}>{studio}</span>}
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 font-mono text-label text-muted">
+          {quality && <span className={media.badge}>{quality}</span>}
+          {source && <span className={media.badge}>{source}</span>}
+          {release.parsed?.codec && <span className={media.badge}>{release.parsed.codec}</span>}
+          {release.parsed?.hdr && <span className={media.badge}>{release.parsed.hdr}</span>}
+          {(release.languages ?? release.parsed?.languages ?? []).map((l) => (
+            <span key={l} className={media.lang}>
+              {l}
+            </span>
+          ))}
+          {release.score != null && (
+            <span className={release.score >= 60 ? media.okText : release.score < 0 ? media.reject : media.badge}>
+              score {release.score}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-label text-muted">
+          <span>{tech?.size ?? fmtSize(release.size)}</span>
+          <span className={media.okText}>{seeders} seed</span>
+          {leechers != null && <span>{leechers} leech</span>}
+          {completed != null && <span>{completed} done</span>}
+          {date && <span>{date}</span>}
+        </div>
+
+        {summary && (
+          <div className="mt-2 line-clamp-2 text-label leading-[1.35] text-muted">
+            {summary}
+          </div>
+        )}
+
+        {(release.scoreReasons?.length ?? 0) > 0 && (
+          <div className="mt-2 line-clamp-1 font-mono text-label text-muted">
+            {release.scoreReasons?.slice(0, 3).join(" · ")}
+          </div>
+        )}
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className={media.button.sm} type="button" onClick={onToggleDetails}>
+            {expanded ? "Скрыть" : "Детали"}
+          </button>
+          <button
+            className={media.button.accentSm}
+            disabled={disabled}
+            onClick={onGrab}
+          >
+            {done ? "✓ В очереди" : busy ? "…" : "Скачать"}
+          </button>
+        </div>
+
+        {expanded && (
+          <div className="mt-3 border-t border-hair pt-3">
+            {detailChips.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 font-mono text-label text-muted">
+                {detailChips.map((chip) => (
+                  <span key={chip} className={media.badge}>
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            )}
+            {(tech?.video || tech?.audio || tech?.translation || tech?.duration || details?.ratings?.imdb || details?.ratings?.kinopoisk) && (
+              <div className="mt-2 grid gap-1 font-mono text-label text-muted">
+                {tech?.video && <span>video: {tech.video}</span>}
+                {tech?.audio && <span>audio: {tech.audio}</span>}
+                {tech?.translation && <span>voice: {tech.translation}</span>}
+                {tech?.duration && <span>time: {tech.duration}</span>}
+                {details?.ratings?.imdb && <span>IMDb: {details.ratings.imdb}</span>}
+                {details?.ratings?.kinopoisk && <span>Кинопоиск: {details.ratings.kinopoisk}</span>}
+              </div>
+            )}
+            {((release.warnings?.length ?? 0) > 0 || (release.rejections?.length ?? 0) > 0) && (
+              <div className="mt-2 grid gap-1 font-mono text-label">
+                {(release.warnings ?? []).map((warning) => (
+                  <span key={`warning-${warning}`} className={media.reject}>
+                    warning: {warning}
+                  </span>
+                ))}
+                {(release.rejections ?? []).map((rejection) => (
+                  <span key={`rejection-${rejection}`} className={media.reject}>
+                    reject: {rejection}
+                  </span>
+                ))}
+              </div>
+            )}
+            {release.detailUrl && (
+              <a
+                className="mt-2 inline-flex font-mono text-label text-accent"
+                href={release.detailUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Открыть страницу трекера
+              </a>
+            )}
+          </div>
+        )}
+
+        {done && /multi-season/i.test((release.rejections ?? []).join(" ")) && (
+          <div className={cn(media.reject, "mt-2 whitespace-normal text-label")}>
+            Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках.
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
 export function ReleasePicker({
   params,
   onGrabbed,
@@ -280,9 +467,7 @@ export function ReleasePicker({
   const [error, setError] = useState<string | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [done, setDone] = useState<Record<string, boolean>>({});
-  const [sel, setSel] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -290,7 +475,6 @@ export function ReleasePicker({
     setReleases(null);
     setError(null);
     setDone({});
-    setSel(new Set());
     setExpanded(new Set());
     searchReleaseOptions(params).then((r) => {
       if (!alive) return;
@@ -303,7 +487,7 @@ export function ReleasePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.type, params.id, params.seasonNumber]);
 
-  // Грабим один релиз; помечаем done. Возвращаем успех (для bulk-счётчика).
+  // Грабим один релиз и помечаем карточку как отправленную.
   const grabOne = async (r: ReleaseOption): Promise<{ ok: boolean; error: string | null }> => {
     const res = await grabRelease({
       type: params.type,
@@ -324,36 +508,12 @@ export function ReleasePicker({
     } else toast.error(res.error ?? "Не удалось отправить раздачу");
   };
 
-  const toggle = (guid: string) =>
-    setSel((p) => {
-      const n = new Set(p);
-      n.has(guid) ? n.delete(guid) : n.add(guid);
-      return n;
-    });
-
   const toggleDetails = (guid: string) =>
     setExpanded((p) => {
       const n = new Set(p);
       n.has(guid) ? n.delete(guid) : n.add(guid);
       return n;
     });
-
-  const onBulk = async () => {
-    if (!releases) return;
-    setBulkBusy(true);
-    let ok = 0,
-      fail = 0;
-    for (const r of releases.filter((x) => sel.has(x.guid) && !done[x.guid])) {
-      (await grabOne(r)).ok ? ok++ : fail++;
-    }
-    setBulkBusy(false);
-    setSel(new Set());
-    if (ok) {
-      toast.success(`Отправлено на загрузку: ${ok}`);
-      onGrabbed?.();
-    }
-    if (fail) toast.error(`Не удалось отправить: ${fail}`);
-  };
 
   if (releases === null)
     return <div className={cn(media.empty, "mt-2.5")}>Ищем раздачи…</div>;
@@ -362,208 +522,26 @@ export function ReleasePicker({
   if (releases.length === 0)
     return <div className={cn(media.empty, "mt-2.5")}>Раздачи не найдены.</div>;
 
-  const selCount = releases.filter(
-    (x) => sel.has(x.guid) && !done[x.guid],
-  ).length;
-
   return (
-    <>
-      <div className={media.list}>
-        {releases.map((r) => {
-          const isExpanded = expanded.has(r.guid);
-          const voice = releaseVoice(r);
-          const group = releaseGroup(r);
-          const studio = r.studioHint ?? r.parsed?.studioHint ?? null;
-          const tracker = releaseTracker(r);
-          const details = [
-            tracker && `tracker: ${tracker}`,
-            r.trackerId != null && `id: ${r.trackerId}`,
-            r.category && `cat: ${r.category}`,
-            r.query && `q: ${r.query}`,
-            r.publishDate && `date: ${fmtReleaseDate(r.publishDate)}`,
-            r.infoHash && `hash: ${r.infoHash}`,
-          ].filter((value): value is string => Boolean(value));
-          return (
-            <div
-              key={r.guid}
-              className={cn(media.row, "gap-3", r.rejected && "border-bad/35")}
-            >
-              <div className="flex min-w-0 gap-3 max-mob:flex-col">
-                <div className="relative h-[108px] w-[76px] flex-none overflow-hidden rounded-[10px] bg-groove max-mob:h-32 max-mob:w-full">
-                  <div className="grid h-full w-full place-items-center font-mono text-2xs text-muted">
-                    NO ART
-                  </div>
-                  {r.posterRemote && (
-                    <img
-                      src={r.posterRemote}
-                      alt=""
-                      loading="lazy"
-                      className="absolute inset-0 h-full w-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-start gap-2">
-                    <input
-                      type="checkbox"
-                      className={cn(media.checkbox, "mt-1")}
-                      checked={sel.has(r.guid)}
-                      disabled={done[r.guid]}
-                      onChange={() => toggle(r.guid)}
-                      aria-label={`Выбрать ${r.title}`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className={media.rowTitle} title={r.title}>
-                        {r.title}
-                      </div>
-                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 font-mono text-label text-muted">
-                        <span className={media.badge}>{tracker}</span>
-                        {voice && <span className={media.lang}>{voice}</span>}
-                        {group && <span className={media.badge}>{group}</span>}
-                        {studio && <span className={media.badge}>{studio}</span>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={cn(media.rowFoot, "mt-2 flex-wrap gap-1.5")}>
-                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 font-mono text-label text-muted">
-                      <span className={media.badge}>
-                        {r.quality ?? (r.parsed?.resolution ? `${r.parsed.resolution}p` : "—")}
-                      </span>
-                      {r.parsed?.codec && <span className={media.badge}>{r.parsed.codec}</span>}
-                      {r.parsed?.source && <span className={media.badge}>{r.parsed.source}</span>}
-                      {r.parsed?.hdr && <span className={media.badge}>{r.parsed.hdr}</span>}
-                      {(r.languages ?? r.parsed?.languages ?? []).map((l) => (
-                        <span key={l} className={media.lang}>
-                          {l}
-                        </span>
-                      ))}
-                      {r.score != null && (
-                        <span className={r.score >= 60 ? media.okText : r.score < 0 ? media.reject : media.badge}>
-                          score {r.score}
-                        </span>
-                      )}
-                      <span>{fmtSize(r.size)}</span>
-                      <span className={media.okText}>{r.seeders ?? 0} seed</span>
-                      {r.leechers != null && <span>{r.leechers} leech</span>}
-                      {r.grabs != null && <span>{r.grabs} grabs</span>}
-                      {r.publishDate && <span>{fmtReleaseDate(r.publishDate)}</span>}
-                      {r.rejected && (
-                        <span
-                          className={media.reject}
-                          title={(r.rejections ?? []).join("; ")}
-                        >
-                          ⚠ отклонён
-                        </span>
-                      )}
-                      {(r.warnings?.length ?? 0) > 0 && (
-                        <span className={media.reject} title={r.warnings?.join("; ")}>
-                          ⚠ warning
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      className={media.button.sm}
-                      type="button"
-                      onClick={() => toggleDetails(r.guid)}
-                    >
-                      {isExpanded ? "Скрыть детали" : "Детали"}
-                    </button>
-                    <button
-                      className={media.button.accentSm}
-                      disabled={busyGuid === r.guid || done[r.guid] || bulkBusy}
-                      onClick={() => onGrab(r)}
-                    >
-                      {done[r.guid]
-                        ? "✓ В очереди"
-                        : busyGuid === r.guid
-                          ? "…"
-                          : "Скачать"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {(r.scoreReasons?.length ?? 0) > 0 && (
-                <div className="font-mono text-label text-muted">
-                  {r.scoreReasons?.slice(0, 4).join(" · ")}
-                </div>
-              )}
-
-              {isExpanded && (
-                <div className="rounded-[10px] border border-hair bg-raise p-3">
-                  {details.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 font-mono text-label text-muted">
-                      {details.map((d) => (
-                        <span key={d} className={media.badge}>
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {r.description && (
-                    <div className="mt-2 line-clamp-4 text-cell leading-[1.45] text-muted">
-                      {r.description}
-                    </div>
-                  )}
-                  {((r.scoreReasons?.length ?? 0) > 0 || (r.warnings?.length ?? 0) > 0 || (r.rejections?.length ?? 0) > 0) && (
-                    <div className="mt-2 grid gap-1 font-mono text-label text-muted">
-                      {(r.scoreReasons ?? []).map((reason) => (
-                        <span key={`reason-${reason}`} className={media.okText}>
-                          + {reason}
-                        </span>
-                      ))}
-                      {(r.warnings ?? []).map((warning) => (
-                        <span key={`warning-${warning}`} className={media.reject}>
-                          warning: {warning}
-                        </span>
-                      ))}
-                      {(r.rejections ?? []).map((rejection) => (
-                        <span key={`rejection-${rejection}`} className={media.reject}>
-                          reject: {rejection}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {r.detailUrl && (
-                    <a
-                      className="mt-2 inline-flex font-mono text-label text-accent"
-                      href={r.detailUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Открыть страницу трекера
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {done[r.guid] && /multi-season/i.test((r.rejections ?? []).join(" ")) && (
-                <div className={cn(media.reject, "text-label")}>
-                  Пак нескольких сезонов — после скачивания нажми «Импорт» в
-                  Загрузках, чтобы разложить серии.
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {selCount > 0 && (
-        <button
-          className={cn(media.button.accent, "mt-2.5 w-full")}
-          disabled={bulkBusy}
-          onClick={onBulk}
-        >
-          {bulkBusy ? "Отправляем…" : `⬇ Скачать выбранное (${selCount})`}
-        </button>
-      )}
-    </>
+    <MediaRail
+      title="Релизы"
+      count={releases.length}
+      countLabel={`${releases.length} раздач`}
+      className="mt-3"
+    >
+      {releases.map((r) => (
+        <TorrentCard
+          key={r.guid}
+          release={r}
+          expanded={expanded.has(r.guid)}
+          busy={busyGuid === r.guid}
+          done={Boolean(done[r.guid])}
+          disabled={busyGuid === r.guid || done[r.guid]}
+          onToggleDetails={() => toggleDetails(r.guid)}
+          onGrab={() => onGrab(r)}
+        />
+      ))}
+    </MediaRail>
   );
 }
 

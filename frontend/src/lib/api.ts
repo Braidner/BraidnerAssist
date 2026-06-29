@@ -1369,6 +1369,35 @@ export interface ReleaseOption {
   voiceLabel?: string | null;
   releaseGroup?: string | null;
   studioHint?: string | null;
+  details?: {
+    provider: string;
+    rawUrl: string;
+    title?: string | null;
+    posterRemote?: string | null;
+    summary?: string | null;
+    technical?: {
+      quality?: string | null;
+      video?: string | null;
+      audio?: string | null;
+      translation?: string | null;
+      duration?: string | null;
+      size?: string | null;
+      uploadedAt?: string | null;
+      updatedAt?: string | null;
+      fileCount?: number | null;
+    };
+    ratings?: {
+      imdb?: string | null;
+      kinopoisk?: string | null;
+      tracker?: string | null;
+    };
+    stats?: {
+      seeders?: number | null;
+      leechers?: number | null;
+      completed?: number | null;
+      comments?: number | null;
+    };
+  } | null;
   protocol?: string;
   rejected?: boolean;
   rejections?: string[];

@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import type { SearchResult } from "./media.js";
 import { getQualityProfile, scoreRelease, type ReleaseQualityProfile } from "./releaseScore.js";
+import { getReleaseDetails } from "./releaseDetails.js";
 
 export interface JackettIndexerHealth {
   id: string;
@@ -72,12 +73,28 @@ const cleanDescription = (value: string | null): string | null => {
 const safeHttpUrl = (value: string | null): string | null => {
   if (!value) return null;
   try {
-    const url = new URL(value);
+    const url = new URL(value.startsWith("//") ? `https:${value}` : value);
     return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
   } catch {
     return null;
   }
 };
+
+async function enrichDetails(releases: SearchResult[]): Promise<SearchResult[]> {
+  return Promise.all(releases.map(async (release) => {
+    const details = await getReleaseDetails(release.detailUrl).catch(() => null);
+    if (!details) return release;
+    return {
+      ...release,
+      details,
+      posterRemote: details.posterRemote ?? release.posterRemote,
+      description: details.summary ?? release.description,
+      seeders: details.stats?.seeders ?? release.seeders,
+      leechers: details.stats?.leechers ?? release.leechers,
+      grabs: details.stats?.completed ?? release.grabs,
+    };
+  }));
+}
 
 function itemBlocks(xml: string): string[] {
   return [...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((m) => m[0]);
@@ -173,7 +190,7 @@ export async function jackettSearch(
     const key = (r.url ?? r.guid ?? r.title).toLowerCase();
     if (!dedup.has(key)) dedup.set(key, { ...r, query });
   }
-  return [...dedup.values()]
+  const scored = [...dedup.values()]
     .map((r) => {
       const scored = scoreRelease({ ...r, query, kind: opts.kind === "manual" ? undefined : opts.kind, profile });
       return {
@@ -187,6 +204,7 @@ export async function jackettSearch(
     })
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0))
     .slice(0, 50);
+  return enrichDetails(scored);
 }
 
 export async function jackettSearchMany(

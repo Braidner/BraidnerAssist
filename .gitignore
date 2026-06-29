@@ -2,7 +2,9 @@
 node_modules/
 **/node_modules/
 
-Braidner Assist/
+**/Braidner Assist/
+graphify-out/
+outputs/
 
 # Secrets
 .env
@@ -35,4 +37,3 @@ npm-debug.log*
 .DS_Store
 .vscode/
 .idea/
-outputs/

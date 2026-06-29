@@ -1380,6 +1380,8 @@ export interface ReleaseOption {
       video?: string | null;
       audio?: string | null;
       translation?: string | null;
+      voiceCodes?: string[];
+      voiceLabels?: string[];
       duration?: string | null;
       size?: string | null;
       uploadedAt?: string | null;

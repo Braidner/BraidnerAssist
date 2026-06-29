@@ -2,8 +2,8 @@
 // бэкенд: TMDB по IPv4 (у клиента часто нет IPv6-egress до BunnyCDN → таймаут) и
 // Jellyfin с инжектом токена (<img> не может слать bearer). Маршрут вынесен из-под
 // jwtAuth (постеры — публичная афиша, не секрет; LAN-only), но жёстко ограничен по
-// источнику (анти-SSRF): только image.tmdb.org, artworks.thetvdb.com и собственный
-// Jellyfin по id.
+// источнику (анти-SSRF): только image.tmdb.org, artworks.thetvdb.com,
+// kinozal.tv/i/poster и собственный Jellyfin по id.
 
 import { Router } from "express";
 import { Readable } from "node:stream";
@@ -26,7 +26,8 @@ posterRouter.get("/", async (req, res) => {
       // ушёл — full-size грузится мгновенно (TMDB original ~0.7МБ за <1с).
       if (
         !/^https:\/\/image\.tmdb\.org\//.test(tmdb) &&
-        !/^https:\/\/artworks\.thetvdb\.com\//.test(tmdb)
+        !/^https:\/\/artworks\.thetvdb\.com\//.test(tmdb) &&
+        !/^https:\/\/kinozal\.tv\/i\/poster\/[\w/-]+\.(?:jpe?g|png|webp)(?:\?.*)?$/i.test(tmdb)
       ) {
         return res.status(400).end("bad url");
       }

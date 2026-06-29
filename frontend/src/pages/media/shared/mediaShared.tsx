@@ -9,6 +9,7 @@ import {
   grabRelease,
   getImportCandidates,
   executeImport,
+  posterUrl,
   type DownloadItem,
   type ReleaseOption,
   type ManualImportFile,
@@ -69,6 +70,9 @@ function fmtReleaseDate(value?: string | null): string {
 }
 
 function releaseTracker(r: ReleaseOption): string {
+  if ((r.trackerName === "all" || r.indexer === "all") && r.details?.provider) {
+    return r.details.provider === "kinozal" ? "Kinozal" : r.details.provider;
+  }
   return r.trackerName ?? r.indexer;
 }
 
@@ -78,6 +82,22 @@ function releaseVoice(r: ReleaseOption): string | null {
 
 function releaseGroup(r: ReleaseOption): string | null {
   return r.releaseGroup ?? r.parsed?.releaseGroup ?? null;
+}
+
+function titleParts(title: string): string[] {
+  return title.split(/\s+\/\s+/).map((part) => part.trim()).filter(Boolean);
+}
+
+function torrentTagClass(kind: "tracker" | "voice" | "quality" | "source" | "lang" | "score" | "codec" | "warn"): string {
+  const base = "whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-2xs";
+  if (kind === "tracker") return cn(base, "bg-info/15 text-info");
+  if (kind === "voice") return cn(base, "bg-warn/15 text-warn");
+  if (kind === "quality") return cn(base, "bg-ok/15 text-ok");
+  if (kind === "source") return cn(base, "bg-white/[0.08] text-ink");
+  if (kind === "lang") return cn(base, "bg-[#6b8cff]/15 text-[#8fa6ff]");
+  if (kind === "score") return cn(base, "bg-accent/15 text-accent");
+  if (kind === "codec") return cn(base, "bg-[#9b7cff]/15 text-[#b7a3ff]");
+  return cn(base, "bg-bad/15 text-bad");
 }
 
 async function playVideo(video: HTMLVideoElement) {
@@ -293,6 +313,7 @@ function TorrentCard({
   const studio = release.studioHint ?? release.parsed?.studioHint ?? null;
   const tracker = releaseTracker(release);
   const poster = details?.posterRemote ?? release.posterRemote;
+  const posterSrc = posterUrl(poster);
   const summary = details?.summary ?? release.description;
   const tech = details?.technical;
   const stats = details?.stats;
@@ -302,7 +323,9 @@ function TorrentCard({
   const quality = tech?.quality ?? release.quality ?? (release.parsed?.resolution ? `${release.parsed.resolution}p` : null);
   const source = release.parsed?.source;
   const title = details?.title ?? release.title;
+  const titleLines = titleParts(title);
   const date = tech?.uploadedAt ?? (release.publishDate ? fmtReleaseDate(release.publishDate) : null);
+  const voiceTags = tech?.voiceCodes?.length ? tech.voiceCodes : voice ? [voice] : [];
   const detailChips = [
     tracker && `tracker: ${tracker}`,
     release.trackerId != null && `id: ${release.trackerId}`,
@@ -315,17 +338,17 @@ function TorrentCard({
   return (
     <article
       className={cn(
-        "flex w-[380px] flex-none gap-3 rounded-[16px] border border-hair bg-surface p-3 shadow-[0_18px_60px_rgba(0,0,0,0.22)] max-mob:w-[calc(100vw-40px)]",
+        "flex w-[420px] flex-none gap-3 rounded-[12px] border border-hair bg-raise p-3 max-mob:w-[calc(100vw-40px)]",
         release.rejected && "border-bad/40",
       )}
     >
-      <div className="relative h-[166px] w-[112px] flex-none overflow-hidden rounded-[10px] bg-groove">
+      <div className="relative h-[178px] w-[118px] flex-none overflow-hidden rounded-[9px] bg-groove">
         <div className="grid h-full w-full place-items-center px-2 text-center font-mono text-2xs text-muted">
           NO ART
         </div>
-        {poster && (
+        {posterSrc && (
           <img
-            src={poster}
+            src={posterSrc}
             alt=""
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"
@@ -337,35 +360,37 @@ function TorrentCard({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="line-clamp-2 text-cell font-semibold leading-[1.25] text-ink [font-family:var(--font-ui)]" title={title}>
-          {title}
+        <div className="space-y-0.5 text-cell font-semibold leading-[1.18] text-ink [font-family:var(--font-ui)]" title={title}>
+          {titleLines.length ? titleLines.slice(0, 3).map((part) => (
+            <div key={part} className="truncate">{part}</div>
+          )) : title}
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-2xs text-muted">
-          <span className={media.badge}>{tracker}</span>
-          {voice && <span className={media.lang}>{voice}</span>}
-          {group && <span className={media.badge}>{group}</span>}
-          {studio && <span className={media.badge}>{studio}</span>}
+          <span className={torrentTagClass("tracker")}>{tracker}</span>
+          {voiceTags.map((tag) => <span key={tag} className={torrentTagClass("voice")}>{tag}</span>)}
+          {group && <span className={torrentTagClass("source")}>{group}</span>}
+          {studio && <span className={torrentTagClass("source")}>{studio}</span>}
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5 font-mono text-label text-muted">
-          {quality && <span className={media.badge}>{quality}</span>}
-          {source && <span className={media.badge}>{source}</span>}
-          {release.parsed?.codec && <span className={media.badge}>{release.parsed.codec}</span>}
-          {release.parsed?.hdr && <span className={media.badge}>{release.parsed.hdr}</span>}
+          {quality && <span className={torrentTagClass("quality")}>{quality}</span>}
+          {source && <span className={torrentTagClass("source")}>{source}</span>}
+          {release.parsed?.codec && <span className={torrentTagClass("codec")}>{release.parsed.codec}</span>}
+          {release.parsed?.hdr && <span className={torrentTagClass("codec")}>{release.parsed.hdr}</span>}
           {(release.languages ?? release.parsed?.languages ?? []).map((l) => (
-            <span key={l} className={media.lang}>
+            <span key={l} className={torrentTagClass("lang")}>
               {l}
             </span>
           ))}
           {release.score != null && (
-            <span className={release.score >= 60 ? media.okText : release.score < 0 ? media.reject : media.badge}>
+            <span className={release.score < 0 ? torrentTagClass("warn") : torrentTagClass("score")}>
               score {release.score}
             </span>
           )}
         </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2 font-mono text-label text-muted">
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-label text-muted">
           <span>{tech?.size ?? fmtSize(release.size)}</span>
           <span className={media.okText}>{seeders} seed</span>
           {leechers != null && <span>{leechers} leech</span>}
@@ -386,7 +411,7 @@ function TorrentCard({
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <button className={media.button.sm} type="button" onClick={onToggleDetails}>
+          <button className={cn(media.button.sm, "bg-surface")} type="button" onClick={onToggleDetails}>
             {expanded ? "Скрыть" : "Детали"}
           </button>
           <button
@@ -403,7 +428,7 @@ function TorrentCard({
             {detailChips.length > 0 && (
               <div className="flex flex-wrap gap-1.5 font-mono text-label text-muted">
                 {detailChips.map((chip) => (
-                  <span key={chip} className={media.badge}>
+                  <span key={chip} className={torrentTagClass("source")}>
                     {chip}
                   </span>
                 ))}
@@ -414,6 +439,7 @@ function TorrentCard({
                 {tech?.video && <span>video: {tech.video}</span>}
                 {tech?.audio && <span>audio: {tech.audio}</span>}
                 {tech?.translation && <span>voice: {tech.translation}</span>}
+                {(tech?.voiceLabels?.length ?? 0) > 0 && <span>voice tags: {tech?.voiceLabels?.join(", ")}</span>}
                 {tech?.duration && <span>time: {tech.duration}</span>}
                 {details?.ratings?.imdb && <span>IMDb: {details.ratings.imdb}</span>}
                 {details?.ratings?.kinopoisk && <span>Кинопоиск: {details.ratings.kinopoisk}</span>}

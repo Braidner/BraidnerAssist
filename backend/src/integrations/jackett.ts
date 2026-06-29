@@ -80,13 +80,32 @@ const safeHttpUrl = (value: string | null): string | null => {
   }
 };
 
+const providerName = (provider: string): string =>
+  provider === "kinozal" ? "Kinozal" : provider;
+
+const detailUrlFrom = (...values: Array<string | null | undefined>): string | null => {
+  for (const value of values) {
+    const raw = String(value ?? "");
+    const kinozal = raw.match(/https?:\/\/(?:www\.)?kinozal\.tv\/details\.php\?id=\d+/i)?.[0]
+      ?? raw.match(/\/\/(?:www\.)?kinozal\.tv\/details\.php\?id=\d+/i)?.[0];
+    const normalized = safeHttpUrl(kinozal ?? raw);
+    if (normalized && /kinozal\.tv\/details\.php\?id=\d+/i.test(normalized)) return normalized;
+  }
+  return null;
+};
+
 async function enrichDetails(releases: SearchResult[]): Promise<SearchResult[]> {
   return Promise.all(releases.map(async (release) => {
     const details = await getReleaseDetails(release.detailUrl).catch(() => null);
     if (!details) return release;
+    const trackerName = release.trackerName && release.trackerName !== "all"
+      ? release.trackerName
+      : providerName(details.provider);
     return {
       ...release,
       details,
+      indexer: release.indexer !== "all" ? release.indexer : trackerName,
+      trackerName,
       posterRemote: details.posterRemote ?? release.posterRemote,
       description: details.summary ?? release.description,
       seeders: details.stats?.seeders ?? release.seeders,
@@ -160,7 +179,7 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
       trackerName,
       trackerId: indexer,
       url: magnet ?? enclosureUrl ?? link,
-      detailUrl: safeHttpUrl(first(comments, link)),
+      detailUrl: detailUrlFrom(comments, guid, link, enclosureUrl),
       publishDate: publishDate && Number.isFinite(publishDate.getTime()) ? publishDate.toISOString() : published,
       description: cleanDescription(tag(it, "description")),
       posterRemote,

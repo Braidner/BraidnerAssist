@@ -83,6 +83,21 @@ const safeHttpUrl = (value: string | null): string | null => {
 const providerName = (provider: string): string =>
   provider === "kinozal" ? "Kinozal" : provider;
 
+const trackerNameFromUrl = (value?: string | null): string | null => {
+  const normalized = safeHttpUrl(value ?? null);
+  if (!normalized) return null;
+  try {
+    const host = new URL(normalized).hostname.replace(/^www\./, "").toLowerCase();
+    if (host === "kinozal.tv") return "Kinozal";
+    return host.split(".")[0]?.replace(/^\w/, (c) => c.toUpperCase()) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const isLikelyDownloadUrl = (value: string): boolean =>
+  /^magnet:/i.test(value) || /(?:\/api\/|\/download|download\.php|\.torrent(?:$|[?#]))/i.test(value);
+
 const detailUrlFrom = (trackerName: string, ...values: Array<string | null | undefined>): string | null => {
   const isKinozal = /kinozal/i.test(trackerName);
   for (const value of values) {
@@ -92,6 +107,7 @@ const detailUrlFrom = (trackerName: string, ...values: Array<string | null | und
     const relativeKinozal = isKinozal ? raw.match(/\/details\.php\?id=\d+/i)?.[0] : null;
     const normalized = safeHttpUrl(kinozal ?? (relativeKinozal ? `https://kinozal.tv${relativeKinozal}` : raw));
     if (normalized && /kinozal\.tv\/details\.php\?id=\d+/i.test(normalized)) return normalized;
+    if (normalized && !isLikelyDownloadUrl(normalized)) return normalized;
   }
   return null;
 };
@@ -165,7 +181,11 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
     const peers = num(torznabAttr(it, "peers"));
     const grabs = num(torznabAttr(it, "grabs"), torznabAttr(it, "downloads"));
     const category = first(torznabAttr(it, "category"), tag(it, "category"));
-    const trackerName = first(torznabAttr(it, "jackettindexer"), torznabAttr(it, "tracker"), torznabAttr(it, "site"), indexer) ?? indexer;
+    const rawTrackerName = first(torznabAttr(it, "jackettindexer"), torznabAttr(it, "tracker"), torznabAttr(it, "site"), indexer) ?? indexer;
+    const detailUrl = detailUrlFrom(rawTrackerName, comments, guid, link);
+    const trackerName = rawTrackerName !== "all"
+      ? rawTrackerName
+      : trackerNameFromUrl(detailUrl) ?? rawTrackerName;
     const posterRemote = safeHttpUrl(first(
       torznabAttr(it, "poster"),
       torznabAttr(it, "cover"),
@@ -190,7 +210,7 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
       trackerName,
       trackerId: indexer,
       url: magnet ?? enclosureUrl ?? link,
-      detailUrl: detailUrlFrom(trackerName, comments, guid, link, enclosureUrl),
+      detailUrl,
       publishDate: publishDate && Number.isFinite(publishDate.getTime()) ? publishDate.toISOString() : published,
       description: cleanDescription(tag(it, "description")),
       posterRemote,

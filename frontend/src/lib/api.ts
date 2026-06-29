@@ -1358,6 +1358,7 @@ export interface ReleaseOption {
   indexer: string;
   trackerName?: string;
   trackerId?: number | string;
+  url?: string | null;
   detailUrl?: string | null;
   publishDate?: string | null;
   description?: string | null;

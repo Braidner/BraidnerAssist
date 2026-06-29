@@ -74,6 +74,11 @@ function titleParts(title: string): string[] {
   return title.split(/\s+\/\s+/).map((part) => part.trim()).filter(Boolean);
 }
 
+function releaseLink(r: ReleaseOption): string | null {
+  const url = r.detailUrl ?? r.url ?? null;
+  return url && /^https?:\/\//i.test(url) ? url : null;
+}
+
 function voiceTagClass(): string {
   return "whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-2xs text-warn";
 }
@@ -368,6 +373,7 @@ function TorrentCard({
   const title = details?.title ?? release.title;
   const titleLines = titleParts(title);
   const voiceTags = tech?.voiceCodes?.length ? tech.voiceCodes : voice ? [voice] : [];
+  const link = releaseLink(release);
   const titleContent = (
     <div className="space-y-0.5 text-[11.5px] font-bold leading-[1.18] text-white [font-family:Syne,var(--font-ui)]" title={title}>
       {(titleLines.length ? titleLines : [title]).map((line, index) => (
@@ -421,9 +427,9 @@ function TorrentCard({
         </div>
 
         <div className="absolute inset-x-0 bottom-0 p-2.5">
-          {release.detailUrl ? (
+          {link ? (
             <a
-              href={release.detailUrl}
+              href={link}
               target="_blank"
               rel="noreferrer"
               className="block transition-opacity hover:opacity-80"

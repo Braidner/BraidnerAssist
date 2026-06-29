@@ -5,7 +5,7 @@
 
 import { config } from "../config.js";
 import { prisma } from "../db/client.js";
-import { tmdbDetails } from "./tmdb.js";
+import { tmdbDetails, tmdbFindByTvdb, tmdbSeason, tmdbTvSeasons } from "./tmdb.js";
 import { request } from "undici";
 
 export interface NowPlaying {
@@ -391,6 +391,28 @@ async function jellyfinItem(id: string): Promise<JfFullItem | null> {
 }
 
 const ticksToMin = (t?: number): number | null => (t && t > 0 ? Math.round(t / 600_000_000) : null);
+const episodeKey = (seasonNumber: number | null | undefined, episodeNumber: number | null | undefined): string | null =>
+  Number.isFinite(seasonNumber) && Number.isFinite(episodeNumber)
+    ? `S${seasonNumber}E${episodeNumber}`
+    : null;
+
+async function importedEpisodeKeys(tmdbId: number | null, tvdbId: number | null): Promise<Set<string>> {
+  if (!tmdbId && !tvdbId) return new Set();
+  const files = await prisma.mediaTorrentFile.findMany({
+    where: {
+      importedPath: { not: null },
+      torrent: {
+        contentType: "series",
+        OR: [
+          ...(tmdbId ? [{ tmdbId }] : []),
+          ...(tvdbId ? [{ tvdbId }] : []),
+        ],
+      },
+    },
+    select: { seasonNumber: true, episodeNumber: true },
+  }).catch(() => []);
+  return new Set(files.map((f) => episodeKey(f.seasonNumber, f.episodeNumber)).filter((k): k is string => Boolean(k)));
+}
 
 // Детальная страница сериала: Native monitor metadata + Jellyfin episodes/play state.
 export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPageDetail> {
@@ -402,7 +424,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
   const jf = jfItemR.status === "fulfilled" ? jfItemR.value : null;
   const jfDetail = jfEpisodesR.status === "fulfilled" ? jfEpisodesR.value : null;
   const tvdbId = Number(jf?.ProviderIds?.Tvdb) || jfDetail?.tvdbId || null;
-  const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
+  const tmdbId = Number(jf?.ProviderIds?.Tmdb) || (tvdbId ? await tmdbFindByTvdb(tvdbId).catch(() => null) : null);
 
   const localizedText = await localizedMediaText("series", { tmdbId, tvdbId });
   const monitor = tmdbId
@@ -416,7 +438,16 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
       : []
     ).map((s) => [s.seasonNumber, s.monitored]),
   );
-  const seasons: DetailSeason[] = (jfDetail?.seasons ?? []).map((s) => ({
+  const importedKeys = await importedEpisodeKeys(tmdbId, tvdbId);
+  const jellyfinEpisodeByKey = new Map(
+    (jfDetail?.seasons ?? []).flatMap((s) =>
+      s.episodes.flatMap((e) => {
+        const key = episodeKey(s.seasonNumber, e.episodeNumber);
+        return key ? [[key, e] as const] : [];
+      }),
+    ),
+  );
+  let seasons: DetailSeason[] = (jfDetail?.seasons ?? []).map((s) => ({
     seasonNumber: s.seasonNumber,
     episodes: s.episodes.map((e) => ({
       seasonNumber: s.seasonNumber,
@@ -433,6 +464,71 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
     totalCount: s.episodes.length,
     monitored: seasonMonitored.get(s.seasonNumber) ?? monitor?.monitored ?? false,
   }));
+  if (seasons.length === 0 && monitor) {
+    const monitorEpisodes = await prisma.mediaMonitorEpisode.findMany({
+      where: { monitorId: monitor.id },
+      orderBy: [{ seasonNumber: "asc" }, { episodeNumber: "asc" }],
+    }).catch(() => []);
+    const grouped = new Map<number, (typeof monitorEpisodes)[number][]>();
+    for (const ep of monitorEpisodes) {
+      if (!grouped.has(ep.seasonNumber)) grouped.set(ep.seasonNumber, []);
+      grouped.get(ep.seasonNumber)!.push(ep);
+    }
+    seasons = [...grouped.entries()].map(([seasonNumber, eps]) => ({
+      seasonNumber,
+      episodes: eps.map((e) => {
+        const key = episodeKey(e.seasonNumber, e.episodeNumber);
+        const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
+        return {
+          seasonNumber,
+          episodeNumber: e.episodeNumber,
+          title: e.title ?? jfEp?.name ?? `Episode ${e.episodeNumber}`,
+          airDate: e.airDate ? e.airDate.toISOString().slice(0, 10) : null,
+          hasFile: Boolean(e.importedPath) || e.status === "downloaded" || (key ? importedKeys.has(key) || Boolean(jfEp) : false),
+          quality: null,
+          size: null,
+          jellyfinId: jfEp?.id ?? null,
+          played: Boolean(jfEp?.played),
+        };
+      }),
+      fileCount: eps.filter((e) => {
+        const key = episodeKey(e.seasonNumber, e.episodeNumber);
+        return Boolean(e.importedPath) || e.status === "downloaded" || (key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false);
+      }).length,
+      totalCount: eps.length,
+      monitored: seasonMonitored.get(seasonNumber) ?? monitor.monitored,
+    }));
+  }
+  if (seasons.length === 0 && tmdbId) {
+    const seasonNumbers = await tmdbTvSeasons(tmdbId).catch(() => []);
+    seasons = await Promise.all(seasonNumbers.map(async (seasonNumber) => {
+      const eps = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
+      return {
+        seasonNumber,
+        episodes: eps.map((e) => {
+          const key = episodeKey(seasonNumber, e.episodeNumber);
+          const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
+          return {
+            seasonNumber,
+            episodeNumber: e.episodeNumber,
+            title: e.title,
+            airDate: e.airDate,
+            hasFile: key ? importedKeys.has(key) || Boolean(jfEp) : false,
+            quality: null,
+            size: null,
+            jellyfinId: jfEp?.id ?? null,
+            played: Boolean(jfEp?.played),
+          };
+        }),
+        fileCount: eps.filter((e) => {
+          const key = episodeKey(seasonNumber, e.episodeNumber);
+          return key ? importedKeys.has(key) || jellyfinEpisodeByKey.has(key) : false;
+        }).length,
+        totalCount: eps.length,
+        monitored: seasonMonitored.get(seasonNumber) ?? monitor?.monitored ?? false,
+      };
+    }));
+  }
 
   return {
     jellyfinId,

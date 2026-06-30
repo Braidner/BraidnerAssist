@@ -12,6 +12,7 @@ import {
   DetailHero,
   SimilarRail,
   CardRail,
+  detailHeroButtonClass,
   tmdbRailCards,
   type DetailPlayer,
   type QueueItem,
@@ -292,6 +293,7 @@ export function MediaSeriesPage({
   const similarItems = library
     .filter((x) => x.id !== id && x.type === "Series")
     .slice(0, 8);
+  const inLibrary = det.inLibrary || Boolean(det.jellyfinId);
 
   const posterSrc = det.posterRemote
     ? posterUrl(det.posterRemote)
@@ -322,7 +324,7 @@ export function MediaSeriesPage({
             <>
               {watchTarget && (
                 <button
-                  className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                  className={detailHeroButtonClass("primary")}
                   disabled={busy === watchTarget.jellyfinId}
                   title={watchTarget.title}
                   onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
@@ -338,9 +340,18 @@ export function MediaSeriesPage({
                   {busy === watchTarget.jellyfinId ? "…" : watchLabel}
                 </button>
               )}
-              {!det.jellyfinId && tmdbId != null && (
+              {!watchTarget && inLibrary && tmdbId != null && (
                 <button
-                  className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                  className={detailHeroButtonClass("primary")}
+                  title="Поиск всех раздач сериала (включая мультисезонные паки)"
+                  onClick={() => setShowAllPicker((v) => !v)}
+                >
+                  {showAllPicker ? "Скрыть релизы" : "Найти релиз"}
+                </button>
+              )}
+              {!inLibrary && tmdbId != null && (
+                <button
+                  className={detailHeroButtonClass("primary")}
                   disabled={act === "add"}
                   onClick={addToLib}
                 >
@@ -355,9 +366,19 @@ export function MediaSeriesPage({
                   {act === "add" ? "…" : "В библиотеку"}
                 </button>
               )}
-              {tmdbId != null && (
+              {inLibrary && (
                 <button
-                  className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                  className={detailHeroButtonClass("active")}
+                  type="button"
+                  title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
+                >
+                  <span className="size-2 rounded-full bg-accent shadow-[0_0_18px_rgba(229,51,51,0.75)]" />
+                  В библиотеке
+                </button>
+              )}
+              {tmdbId != null && (watchTarget || !inLibrary) && (
+                <button
+                  className={detailHeroButtonClass("secondary")}
                   title="Поиск всех раздач сериала (включая мультисезонные паки)"
                   onClick={() => setShowAllPicker((v) => !v)}
                 >
@@ -376,29 +397,20 @@ export function MediaSeriesPage({
             setActiveEpisodeId(null);
           }}
         />
-
-        <DetailBody className="pt-[38px]">
-          {showAllPicker && tmdbId != null && (
-            <div style={{ marginTop: 16 }}>
-              <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ВСЕ РАЗДАЧИ</div>
-              <div className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0" style={{ marginBottom: 8 }}>
-                Включая мультисезонные паки. Выбранный релиз qBittorrent сохранит сразу в папку сериалов.
-              </div>
-              <ReleasePicker
-                params={{ type: "series", id: tmdbId }}
-                downloads={media.downloads}
-                onGrabbed={() => {
-                  onMediaUpdate();
-                  refreshTitleTorrents();
-                  window.setTimeout(refreshTitleTorrents, 2_000);
-                }}
-              />
-            </div>
-          )}
-
-        </DetailBody>
       </div>
-
+      {showAllPicker && tmdbId != null && (
+        <div style={{ marginTop: 16 }}>
+          <ReleasePicker
+            params={{ type: "series", id: tmdbId }}
+            downloads={media.downloads}
+            onGrabbed={() => {
+              onMediaUpdate();
+              refreshTitleTorrents();
+              window.setTimeout(refreshTitleTorrents, 2_000);
+            }}
+          />
+        </div>
+      )}
 
       {/* Season rails */}
       {det.seasons.length === 0 ? (

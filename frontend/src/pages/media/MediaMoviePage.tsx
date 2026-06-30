@@ -8,10 +8,10 @@ import {
 	TorrentRailCard,
 } from "./shared/mediaShared.tsx";
 import {
-	DetailBody,
 	DetailHero,
 	SimilarRail,
 	CardRail,
+	detailHeroButtonClass,
 	tmdbRailCards,
 	type DetailPlayer,
 } from "./shared/mediaDetail.tsx";
@@ -196,6 +196,7 @@ export function MediaMoviePage({
 	const similarItems = library
 		.filter((x) => x.id !== id && x.type === "Movie")
 		.slice(0, 8);
+	const inLibrary = det.inLibrary || det.hasFile || Boolean(det.jellyfinId);
 
 	return (
 		<div>
@@ -216,7 +217,7 @@ export function MediaMoviePage({
 						<>
 							{det.hasFile && det.jellyfinId && (
 								<button
-									className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+									className={detailHeroButtonClass("primary")}
 									disabled={busy}
 									onClick={play}
 								>
@@ -231,9 +232,18 @@ export function MediaMoviePage({
 									{busy ? "…" : "Смотреть"}
 								</button>
 							)}
-							{!det.hasFile && det.tmdbId != null && (
+							{!det.hasFile && inLibrary && det.tmdbId != null && (
 								<button
-									className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+									className={detailHeroButtonClass("primary")}
+									disabled={det.tmdbId == null}
+									onClick={() => setShowPicker((v) => !v)}
+								>
+									{showPicker ? "Скрыть релизы" : "Найти релиз"}
+								</button>
+							)}
+							{!inLibrary && det.tmdbId != null && (
+								<button
+									className={detailHeroButtonClass("primary")}
 									disabled={act === "add"}
 									title="Зарегистрировать тайтл и выбрать релиз"
 									onClick={addToLib}
@@ -241,35 +251,45 @@ export function MediaMoviePage({
 									{act === "add" ? "…" : "➕ В библиотеку"}
 								</button>
 							)}
-							<button
-								className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-								disabled={det.tmdbId == null}
-								title={det.tmdbId == null ? "Нет tmdbId" : ""}
-								onClick={() => setShowPicker((v) => !v)}
-							>
-								{showPicker ? "Скрыть поиск" : "Поиск"}
-							</button>
+							{inLibrary && (
+								<button
+									className={detailHeroButtonClass("active")}
+									type="button"
+									title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
+								>
+									<span className="size-2 rounded-full bg-accent shadow-[0_0_18px_rgba(229,51,51,0.75)]" />
+									В библиотеке
+								</button>
+							)}
+							{(det.hasFile || !inLibrary) && (
+								<button
+									className={detailHeroButtonClass("secondary")}
+									disabled={det.tmdbId == null}
+									title={det.tmdbId == null ? "Нет tmdbId" : ""}
+									onClick={() => setShowPicker((v) => !v)}
+								>
+									{showPicker ? "Скрыть поиск" : "Поиск"}
+								</button>
+							)}
 						</>
 					}
 					onBack={goBack}
 					onQueueClick={() => setShowPicker((v) => !v)}
 					onClosePlayer={() => setPlayer(null)}
 				/>
-
-				<DetailBody className="pt-5">
-					{showPicker && det.tmdbId != null && (
-						<ReleasePicker
-							params={{type: "movie", id: det.tmdbId}}
-							downloads={media.downloads}
-								onGrabbed={() => {
-									onMediaUpdate();
-									refreshTitleTorrents();
-									window.setTimeout(refreshTitleTorrents, 2_000);
-								}}
-							/>
-					)}
-				</DetailBody>
 			</div>
+
+			{showPicker && det.tmdbId != null && (
+				<ReleasePicker
+					params={{type: "movie", id: det.tmdbId}}
+					downloads={media.downloads}
+					onGrabbed={() => {
+						onMediaUpdate();
+						refreshTitleTorrents();
+						window.setTimeout(refreshTitleTorrents, 2_000);
+					}}
+				/>
+			)}
 			{collection && collection.items.length > 1 && (
 				<CardRail
 					label={`КОЛЛЕКЦИЯ · ${collection.name}`}

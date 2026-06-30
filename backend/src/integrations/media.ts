@@ -110,6 +110,7 @@ export interface SeriesPageDetail {
   backdropRemote: string | null;
   tmdbId: number | null;
   tvdbId: number | null;
+  inLibrary: boolean;
   inMonitor: boolean;
   monitored: boolean;
   seasons: DetailSeason[];
@@ -127,6 +128,7 @@ export interface MoviePageDetail {
   posterRemote: string | null;
   backdropRemote: string | null;
   tmdbId: number | null;
+  inLibrary: boolean;
   inMonitor: boolean;
   monitored: boolean;
   hasFile: boolean;
@@ -414,6 +416,17 @@ async function registryJellyfinId(
   return title?.jellyfinId ?? null;
 }
 
+async function registryTitleExists(
+  kind: "movie" | "series",
+  tmdbId: number,
+): Promise<boolean> {
+  const title = await prisma.mediaTitle.findUnique({
+    where: { kind_tmdbId: { kind, tmdbId } },
+    select: { id: true },
+  }).catch(() => null);
+  return Boolean(title);
+}
+
 async function updateRegistryJellyfinLink(
   kind: "movie" | "series",
   tmdbId: number,
@@ -530,6 +543,7 @@ export async function getMediaTitleDetail(
   if (kind === "movie") {
     const jellyfinId = await resolveJellyfinIdForTitle("movie", { tmdbId });
     const jf = jellyfinId && config.media.jellyfin.configured ? await jellyfinItem(jellyfinId) : null;
+    const inRegistry = await registryTitleExists("movie", tmdbId);
     await updateRegistryJellyfinLink("movie", tmdbId, null, jf?.Type === "Movie" ? jellyfinId : null);
     return {
       jellyfinId: jf?.Type === "Movie" && jellyfinId ? jellyfinId : "",
@@ -544,6 +558,7 @@ export async function getMediaTitleDetail(
       posterRemote: detail.poster,
       backdropRemote: detail.backdrop,
       tmdbId,
+      inLibrary: inRegistry || jf?.Type === "Movie",
       inMonitor: false,
       monitored: false,
       hasFile: jf?.Type === "Movie",
@@ -554,6 +569,7 @@ export async function getMediaTitleDetail(
 
   const tvdbId = await tmdbTvToTvdb(tmdbId).catch(() => null);
   const jellyfinId = await resolveJellyfinIdForTitle("series", { tmdbId, tvdbId });
+  const inRegistry = await registryTitleExists("series", tmdbId);
   const [jfItemR, jfEpisodesR] = await Promise.allSettled([
     jellyfinId && config.media.jellyfin.configured ? jellyfinItem(jellyfinId) : Promise.resolve(null),
     jellyfinId && config.media.jellyfin.configured ? getSeriesDetail(jellyfinId) : Promise.resolve(null),
@@ -581,6 +597,7 @@ export async function getMediaTitleDetail(
     backdropRemote: detail.backdrop,
     tmdbId,
     tvdbId: resolvedTvdbId,
+    inLibrary: inRegistry || jf?.Type === "Series",
     inMonitor: false,
     monitored: false,
     seasons,
@@ -676,6 +693,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
     backdropRemote: null,
     tmdbId,
     tvdbId,
+    inLibrary: true,
     inMonitor: false,
     monitored: false,
     seasons,
@@ -702,6 +720,7 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
     posterRemote: null,
     backdropRemote: null,
     tmdbId,
+    inLibrary: true,
     inMonitor: false,
     monitored: false,
     hasFile: hasJellyfinMovie,

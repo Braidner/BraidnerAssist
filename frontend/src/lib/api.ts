@@ -1152,6 +1152,7 @@ export interface SeriesPageDetail {
   backdropRemote: string | null;
   tmdbId: number | null;
   tvdbId: number | null;
+  inLibrary: boolean;
   inMonitor: boolean;
   monitored: boolean;
   seasons: DetailSeason[];
@@ -1169,6 +1170,7 @@ export interface MoviePageDetail {
   posterRemote: string | null;
   backdropRemote: string | null;
   tmdbId: number | null;
+  inLibrary: boolean;
   inMonitor: boolean;
   monitored: boolean;
   hasFile: boolean;

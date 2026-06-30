@@ -15,6 +15,27 @@ import { fmtSize, useVideoPlayer } from "./mediaShared.tsx";
 
 export type DetailPlayer = { url: string; title: string } | null;
 export type QueueItem = { jellyfinId: string; title: string };
+export type DetailHeroButtonVariant = "primary" | "secondary" | "active";
+
+export function detailHeroButtonClass(variant: DetailHeroButtonVariant): string {
+  return cn(
+    "group inline-flex items-center justify-center gap-2 rounded-[7px] px-[22px] py-3 font-ui text-body font-bold tracking-2 transition-all duration-300 ease-out",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+    "disabled:pointer-events-none disabled:opacity-55 max-mob:px-4 max-mob:py-2.5 max-mob:text-sm",
+    variant === "primary" && [
+      "border border-accent bg-accent px-[26px] text-white shadow-[0_0_28px_rgba(229,51,51,0.30)]",
+      "hover:-translate-y-0.5 hover:brightness-[1.18] hover:shadow-[0_0_36px_rgba(229,51,51,0.40)] active:translate-y-0",
+    ],
+    variant === "secondary" && [
+      "border border-white/30 bg-transparent text-white/90 backdrop-blur-md",
+      "hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/[0.06] hover:text-white active:translate-y-0",
+    ],
+    variant === "active" && [
+      "border border-white/24 bg-white/[0.035] text-white/72 backdrop-blur-md",
+      "hover:-translate-y-0.5 hover:border-white/42 hover:bg-white/[0.065] hover:text-white active:translate-y-0",
+    ],
+  );
+}
 
 function fmtPlayerTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);

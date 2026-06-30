@@ -85,6 +85,29 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 `docker-compose.prod.yml` (с `image:` из GHCR) — для сервера.
 `.env` создаётся на сервере из `.env.example` (в гит не коммитится).
 
+### Временный внешний доступ через ngrok
+
+На `hermes.lan` ngrok установлен как `/tmp/ngrok`, authtoken уже лежит в
+`/home/braidner/.config/ngrok/ngrok.yml`. Туннелим **frontend** (`127.0.0.1:3000`);
+nginx сам проксирует `/api` на backend. Перед публикацией убедиться, что первый admin уже
+создан, иначе публичный setup-экран позволит создать администратора.
+
+```bash
+# start
+ssh braidner@hermes.lan 'nohup /tmp/ngrok http http://127.0.0.1:3000 \
+  --config /home/braidner/.config/ngrok/ngrok.yml \
+  --log=stdout > ~/ngrok-mission-control.log 2>&1 &'
+
+# public URL / status
+ssh braidner@hermes.lan 'curl -fsS http://127.0.0.1:4040/api/tunnels'
+
+# logs
+ssh braidner@hermes.lan 'tail -f ~/ngrok-mission-control.log'
+
+# stop
+ssh braidner@hermes.lan "pkill -f '/tmp/ngrok http http://127.0.0.1:3000'"
+```
+
 ## Модули (виджеты)
 
 1. **Tasks Hub** — GitLab issues/MRs + локальные задачи (SQLite), CRUD, клик → drawer с деталями.

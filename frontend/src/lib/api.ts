@@ -1170,17 +1170,21 @@ export async function getSeriesPageDetail(
 export async function getMediaTitleDetail(
   kind: "movie",
   tmdbId: number,
+  opts?: { idType?: "tmdb" | "tvdb" | "auto" },
 ): Promise<MoviePageDetail | null>;
 export async function getMediaTitleDetail(
   kind: "series",
   tmdbId: number,
+  opts?: { idType?: "tmdb" | "tvdb" | "auto" },
 ): Promise<SeriesPageDetail | null>;
 export async function getMediaTitleDetail(
   kind: "movie" | "series",
   tmdbId: number,
+  opts: { idType?: "tmdb" | "tvdb" | "auto" } = {},
 ): Promise<MoviePageDetail | SeriesPageDetail | null> {
   try {
-    const res = await apiFetch(`/api/media/title/${kind}/${tmdbId}`);
+    const query = opts.idType ? `?idType=${opts.idType}` : "";
+    const res = await apiFetch(`/api/media/title/${kind}/${tmdbId}${query}`);
     if (!res.ok) return null;
     return (await res.json()) as MoviePageDetail | SeriesPageDetail;
   } catch {
@@ -1218,9 +1222,11 @@ export async function discoverSearch(q: string): Promise<MediaLookupItem[]> {
 
 export async function getSeriesDiscoverDetail(
   tvdbId: number,
+  opts: { idType?: "tmdb" | "tvdb" | "auto" } = {},
 ): Promise<SeriesPageDetail | null> {
   try {
-    const res = await apiFetch(`/api/media/discover/detail/series/${tvdbId}`);
+    const query = opts.idType ? `?idType=${opts.idType}` : "";
+    const res = await apiFetch(`/api/media/discover/detail/series/${tvdbId}${query}`);
     if (!res.ok) return null;
     return (await res.json()) as SeriesPageDetail;
   } catch {

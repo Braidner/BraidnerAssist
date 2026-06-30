@@ -371,11 +371,12 @@ apiRouter.get("/media/detail/movie/:id", async (req, res) => {
 
 apiRouter.get("/media/title/:kind/:tmdbId", async (req, res) => {
   const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
-  const tmdbId = Number(req.params.tmdbId);
-  if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
+  const id = Number(req.params.tmdbId);
+  if (!kind || !Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
   if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  const idType = req.query.idType === "tvdb" || req.query.idType === "auto" ? req.query.idType : "tmdb";
   try {
-    res.json(await getMediaTitleDetail(kind, tmdbId));
+    res.json(await getMediaTitleDetail(kind, id, { idType }));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -400,8 +401,9 @@ apiRouter.get("/media/discover/detail/series/:id", async (req, res) => {
   if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const tvdbId = Number(req.params.id);
   if (!Number.isFinite(tvdbId) || tvdbId <= 0) return res.status(400).json({ error: "id required" });
+  const idType = req.query.idType === "tmdb" || req.query.idType === "auto" ? req.query.idType : "tvdb";
   try {
-    res.json(await nativeSeriesDiscoverDetail(tvdbId));
+    res.json(await nativeSeriesDiscoverDetail(tvdbId, idType));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

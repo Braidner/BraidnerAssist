@@ -11,7 +11,7 @@ import {
   type MoviePageDetail,
   type SearchResult,
   type SeriesPageDetail,
-  type DetailSeason,
+  type SeriesTitleIdType,
 } from "./media.js";
 import {
   tmdbDetails,
@@ -392,9 +392,11 @@ export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise
   return items;
 }
 
-export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPageDetail> {
-  const tmdbId = await tmdbFindByTvdb(id).catch(() => null) ?? id;
-  return await getMediaTitleDetail("series", tmdbId) as SeriesPageDetail;
+export async function nativeSeriesDiscoverDetail(
+  id: number,
+  idType: SeriesTitleIdType = "tvdb",
+): Promise<SeriesPageDetail> {
+  return await getMediaTitleDetail("series", id, { idType }) as SeriesPageDetail;
 }
 
 export async function nativeMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail> {

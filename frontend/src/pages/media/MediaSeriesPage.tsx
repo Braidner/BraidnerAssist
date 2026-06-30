@@ -104,8 +104,8 @@ export function MediaSeriesPage({
     source === "jellyfin"
       ? getSeriesPageDetail(id)
       : source === "discover"
-        ? getSeriesDiscoverDetail(Number(id))
-        : getMediaTitleDetail("series", Number(id));
+        ? getSeriesDiscoverDetail(Number(id), { idType: "tvdb" })
+        : getMediaTitleDetail("series", Number(id), { idType: "auto" });
 
   useEffect(() => {
     setD("loading");
@@ -113,6 +113,16 @@ export function MediaSeriesPage({
     getMediaLibrary().then(setLibrary);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, source]);
+
+  useEffect(() => {
+    if (source === "jellyfin" || d === "loading" || !d?.tmdbId) return;
+    const routeId = Number(id);
+    if (!Number.isFinite(routeId) || routeId === d.tmdbId) return;
+    nav(`/media/series/${d.tmdbId}${location.search}`, {
+      replace: true,
+      state: location.state,
+    });
+  }, [d, id, location.search, location.state, nav, source]);
 
   const play = async (jellyfinId: string, title: string) => {
     setBusy(jellyfinId);

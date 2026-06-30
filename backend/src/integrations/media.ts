@@ -133,6 +133,8 @@ export interface MoviePageDetail {
   size: number | null;
 }
 
+export type SeriesTitleIdType = "tmdb" | "tvdb" | "auto";
+
 export interface SearchResult {
   guid: string;
   indexerId?: number | string;
@@ -498,11 +500,27 @@ function seasonsFromJellyfinOnly(jfDetail: SeriesDetail | null): DetailSeason[] 
   }));
 }
 
+async function resolveSeriesTitleId(id: number, idType: SeriesTitleIdType): Promise<number> {
+  if (idType === "tmdb") return id;
+  if (idType === "tvdb") {
+    const tmdbId = await tmdbFindByTvdb(id).catch(() => null);
+    if (!tmdbId) throw new Error(`series tvdbId ${id} not found in TMDB`);
+    return tmdbId;
+  }
+  const tmdbDetail = await tmdbDetails("series", id).catch(() => null);
+  if (tmdbDetail) return id;
+  const tmdbId = await tmdbFindByTvdb(id).catch(() => null);
+  if (!tmdbId) throw new Error(`series id ${id} not found as TMDB or TVDB`);
+  return tmdbId;
+}
+
 export async function getMediaTitleDetail(
   kind: "movie" | "series",
-  tmdbId: number,
+  id: number,
+  opts: { idType?: SeriesTitleIdType } = {},
 ): Promise<MoviePageDetail | SeriesPageDetail> {
   if (!config.media.tmdb.configured) throw new Error("TMDB не настроен");
+  const tmdbId = kind === "series" ? await resolveSeriesTitleId(id, opts.idType ?? "tmdb") : id;
   const detail = await tmdbDetails(kind, tmdbId);
   if (!detail) throw new Error(`${kind} not found in TMDB`);
 

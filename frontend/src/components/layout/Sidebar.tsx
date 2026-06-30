@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import type { UserRole } from "@/lib/auth";
 import { cn } from "../../lib/cn.ts";
 import { ui } from "../../lib/ui.ts";
 import { icons, type IconName } from "../icons.tsx";
@@ -7,6 +8,7 @@ interface NavItem {
   to: string;
   icon: IconName;
   label: string;
+  roles?: UserRole[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -14,15 +16,16 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/media", icon: "pulse", label: "Медиа" },
   { to: "/hermes", icon: "bot", label: "Hermes" },
   { to: "/system", icon: "server", label: "Система" },
+  { to: "/settings", icon: "gear", label: "Настройки", roles: ["admin"] },
 ];
 
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
-  onSettings: () => void;
+  role: UserRole;
 }
 
-export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
+export function Sidebar({ open, onClose, role }: SidebarProps) {
   const navItem = (active = false) =>
     cn(
       "group relative flex h-12 items-center gap-0 overflow-hidden rounded-[14px] bg-transparent px-0 text-ink-soft no-underline transition-colors hover:bg-accent/10 hover:text-ink max-mob:gap-4 max-mob:px-2",
@@ -62,7 +65,7 @@ export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
           </button>
         </div>
 
-        {NAV_ITEMS.map(({ to, icon, label }) => {
+        {NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role)).map(({ to, icon, label }) => {
           const Ic = icons[icon];
           return (
             <NavLink
@@ -88,28 +91,6 @@ export function Sidebar({ open, onClose, onSettings }: SidebarProps) {
             </NavLink>
           );
         })}
-
-        <span className="flex-1" />
-        <button
-          className={navItem()}
-          onClick={() => {
-            onSettings();
-            onClose();
-          }}
-          title="Настройки"
-        >
-          <span className="grid size-12 flex-none place-items-center max-mob:size-10">
-            <icons.gear className="size-[21px]" />
-          </span>
-          <span
-            className={cn(
-              "whitespace-nowrap text-lead font-medium tracking-1 opacity-0 transition-opacity duration-200 max-mob:opacity-100",
-              open && "opacity-100",
-            )}
-          >
-            Настройки
-          </span>
-        </button>
       </aside>
     </>
   );

@@ -414,10 +414,12 @@ export function MediaPage({
   media,
   onMediaUpdate,
   tab = "library",
+  allowSystem = true,
 }: {
   media: MediaData;
   onMediaUpdate: () => void;
   tab?: MediaTab;
+  allowSystem?: boolean;
 }) {
   const nav = useNavigate();
   const location = useLocation();
@@ -436,10 +438,15 @@ export function MediaPage({
     }
   }, [location.search, nav]);
 
+  const visibleTabs = allowSystem ? TAB_KEYS : TAB_KEYS.filter((key) => key !== "system");
+  const visibleLabels = allowSystem
+    ? ["Библиотека", "Дискавери", "Система"]
+    : ["Библиотека", "Дискавери"];
+
   useRegisterTabs(
-    ["Библиотека", "Дискавери", "Система"],
-    Math.max(0, TAB_KEYS.indexOf(tab)),
-    (i: number) => nav(TAB_ROUTES[TAB_KEYS[i]]),
+    visibleLabels,
+    Math.max(0, visibleTabs.indexOf(tab)),
+    (i: number) => nav(TAB_ROUTES[visibleTabs[i]]),
   );
 
   // ── Shared state ──────────────────────────────────────────────────────────
@@ -751,7 +758,7 @@ export function MediaPage({
         />
       )}
 
-      {tab === "system" && (
+      {allowSystem && tab === "system" && (
         <MediaSystemTab
           media={media}
           tsStreams={tsStreams}

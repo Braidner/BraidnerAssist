@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model AppUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  displayName  String?
+  passwordHash String
+  role         String   @default("media") // admin | media
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 // Локальная задача (источник "local"). GitLab-задачи не хранятся в БД —
 // они подтягиваются на лету и сливаются с локальными в Tasks Hub.
 model Task {

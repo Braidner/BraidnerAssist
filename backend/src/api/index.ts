@@ -80,6 +80,12 @@ apiRouter.use((req, _res, next) => {
   next();
 });
 
+apiRouter.use((req, res, next) => {
+  if (res.locals.user?.role !== "media") return next();
+  if (req.path.startsWith("/media")) return next();
+  return res.status(403).json({ error: "media role can access media only" });
+});
+
 apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/settings", settingsRouter);
 

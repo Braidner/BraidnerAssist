@@ -20,8 +20,6 @@ export const config = {
   mcpToken: env("MCP_TOKEN"),
 
   auth: {
-    user: env("AUTH_USER") ?? "braidner",
-    passwordHash: env("AUTH_PASSWORD_HASH") ?? "$2b$10$e7soZessyEaSqsCVB3tAc.uHMPOqPAo7wQvBs765ozxzq0L3dfZG.",
     jwtSecret: env("JWT_SECRET") ?? "mc-dev-secret-change-in-prod",
     // Статический токен для iOS Shortcuts / Hermes (не истекает).
     appToken: env("APP_TOKEN"),

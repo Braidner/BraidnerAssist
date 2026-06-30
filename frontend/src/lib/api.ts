@@ -2,7 +2,7 @@
 // Каждый вызов изолирован — при ошибке возвращаем пустое/безопасное значение,
 // чтобы одна нерабочая интеграция не роняла весь дашборд.
 
-import { getToken, clearToken } from "./auth.ts";
+import { getToken, clearToken, type CurrentUser, type UserRole } from "./auth.ts";
 
 // Fetch with JWT; fires onUnauthorized callback on 401 (token expired/invalid).
 let onUnauthorized: (() => void) | null = null;
@@ -194,6 +194,76 @@ export interface ServiceStatus {
 export interface ServicesData {
   configured: boolean;
   services: ServiceStatus[];
+}
+
+export interface AppUser {
+  id: string;
+  username: string;
+  displayName: string | null;
+  role: UserRole;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    const res = await apiFetch("/api/auth/me");
+    if (!res.ok) return null;
+    return (await res.json()) as CurrentUser;
+  } catch {
+    return null;
+  }
+}
+
+export async function getUsers(): Promise<AppUser[]> {
+  try {
+    const res = await apiFetch("/api/settings/users");
+    if (!res.ok) throw new Error();
+    return (await res.json()) as AppUser[];
+  } catch {
+    return [];
+  }
+}
+
+export async function createUser(input: {
+  username: string;
+  password: string;
+  displayName?: string;
+  role: UserRole;
+}): Promise<AppUser> {
+  const res = await apiFetch("/api/settings/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as AppUser;
+}
+
+export async function updateUser(
+  id: string,
+  input: Partial<Pick<AppUser, "displayName" | "role" | "active">> & {
+    password?: string;
+  },
+): Promise<AppUser> {
+  const res = await apiFetch(`/api/settings/users/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as AppUser;
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const res = await apiFetch(`/api/settings/users/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await errorText(res));
+}
+
+async function errorText(res: Response): Promise<string> {
+  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  return err.error ?? "Request failed";
 }
 
 export async function getServicesConfig(): Promise<ServiceConfig[]> {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Routes, Route, useLocation, matchPath } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate, matchPath } from "react-router-dom";
 import { MediaPage } from "./MediaPage.tsx";
 import { MediaSeriesPage } from "./MediaSeriesPage.tsx";
 import { MediaMoviePage } from "./MediaMoviePage.tsx";
@@ -34,8 +34,9 @@ const isDetailPath = (pathname: string) =>
       matchPath("/media/discover/genre/:kind/:genreId", pathname),
   );
 
-export function MediaRoutes() {
+export function MediaRoutes({ allowSystem = true }: { allowSystem?: boolean }) {
   const location = useLocation();
+  const nav = useNavigate();
   const [media, setMedia] = useState<MediaData>(DEFAULT_MEDIA);
   const currentTab = tabForPath(location.pathname);
   const [lastTab, setLastTab] = useState<MediaTab>(currentTab ?? "library");
@@ -55,6 +56,12 @@ export function MediaRoutes() {
     );
     return () => clearInterval(t);
   }, [dlActive]);
+
+  useEffect(() => {
+    if (!allowSystem && location.pathname === "/media/system") {
+      nav("/media", { replace: true });
+    }
+  }, [allowSystem, location.pathname, nav]);
 
   const onMediaUpdate = () => getMedia().then(setMedia);
   const showingDetail = isDetailPath(location.pathname);
@@ -123,7 +130,12 @@ export function MediaRoutes() {
         aria-hidden={showingDetail}
         style={{ display: showingDetail ? "none" : "contents" }}
       >
-        <MediaPage media={media} onMediaUpdate={onMediaUpdate} tab={lastTab} />
+        <MediaPage
+          media={media}
+          onMediaUpdate={onMediaUpdate}
+          tab={!allowSystem && lastTab === "system" ? "library" : lastTab}
+          allowSystem={allowSystem}
+        />
       </div>
 
       {showingDetail && (

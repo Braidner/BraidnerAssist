@@ -1,9 +1,47 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { config } from "../config.js";
+import { jwtAuth } from "../middleware/jwtAuth.js";
+import {
+  createFirstAdmin,
+  hasUsers,
+  toPublicUser,
+  verifyUserCredentials,
+} from "../auth/users.js";
 
 export const authRouter = Router();
+
+function issueToken(user: { id: string; username: string; role: string }) {
+  return jwt.sign(
+    { sub: user.username, uid: user.id, role: user.role },
+    config.auth.jwtSecret,
+    { expiresIn: 60 * 60 * 24 * 30 },
+  );
+}
+
+authRouter.get("/setup-status", async (_req, res) => {
+  res.json({ setupRequired: !(await hasUsers()) });
+});
+
+authRouter.post("/setup", async (req, res) => {
+  const { username, password, displayName } = req.body ?? {};
+  if (
+    typeof username !== "string" ||
+    typeof password !== "string" ||
+    !username ||
+    !password
+  ) {
+    return res.status(400).json({ error: "username and password required" });
+  }
+
+  try {
+    const user = await createFirstAdmin({ username, password, displayName });
+    const token = issueToken(user);
+    res.status(201).json({ token, user });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
 
 authRouter.post("/login", async (req, res) => {
   const { username, password } = req.body ?? {};
@@ -17,18 +55,20 @@ authRouter.post("/login", async (req, res) => {
     return res.status(400).json({ error: "username and password required" });
   }
 
-  if (username !== config.auth.user) {
+  if (!(await hasUsers())) {
+    return res.status(409).json({ setupRequired: true });
+  }
+
+  const user = await verifyUserCredentials(username, password);
+  if (!user) {
     return res.status(401).json({ error: "invalid credentials" });
   }
 
-  const ok = await bcrypt.compare(password, config.auth.passwordHash);
-  if (!ok) {
-    return res.status(401).json({ error: "invalid credentials" });
-  }
+  const token = issueToken(user);
 
-  const token = jwt.sign({ sub: username }, config.auth.jwtSecret, {
-    expiresIn: 60 * 60 * 24 * 30, // 30 days
-  });
+  res.json({ token, user: toPublicUser(user) });
+});
 
-  res.json({ token });
+authRouter.get("/me", jwtAuth, (req, res) => {
+  res.json(res.locals.user);
 });

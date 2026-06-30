@@ -29,6 +29,7 @@ import {
   type MediaPreference,
 } from "../../lib/api.ts";
 import { useTasksCtx } from "../../lib/tasksContext.tsx";
+import type { UserRole } from "@/lib/auth";
 
 const EMPTY_MEDIA: UnifiedSearchResult = {
   inLibrary: [],
@@ -43,7 +44,7 @@ interface Action {
   run: () => void;
 }
 
-export function CommandPalette() {
+export function CommandPalette({ role }: { role: UserRole }) {
   const [docker, setDocker] = useState<DockerData>({
     configured: false,
     containers: [],
@@ -58,6 +59,7 @@ export function CommandPalette() {
   });
 
   useEffect(() => {
+    if (role !== "admin") return;
     getDocker().then(setDocker);
     getAdguard().then(setAdguard);
     const t = setInterval(() => {
@@ -65,7 +67,7 @@ export function CommandPalette() {
       getAdguard().then(setAdguard);
     }, 30_000);
     return () => clearInterval(t);
-  }, []);
+  }, [role]);
   const { onAddTask } = useTasksCtx();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -116,16 +118,18 @@ export function CommandPalette() {
 
   const navActions: Action[] = useMemo(
     () =>
-      NAV_ITEMS.map((item) => ({
-        id: `nav:${item.to}`,
-        label: item.label,
-        hint: "Перейти",
-        run: () => {
-          navigate(item.to);
-          close();
-        },
-      })),
-    [navigate],
+      NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role)).map(
+        (item) => ({
+          id: `nav:${item.to}`,
+          label: item.label,
+          hint: "Перейти",
+          run: () => {
+            navigate(item.to);
+            close();
+          },
+        }),
+      ),
+    [navigate, role],
   );
 
   // Действия с Docker-контейнерами (рестарт).
@@ -172,7 +176,7 @@ export function CommandPalette() {
   const lc = trimmed.toLowerCase();
 
   // С введённым текстом первыми идут «команда Hermes» и «создать задачу».
-  const textActions: Action[] = trimmed
+  const textActions: Action[] = role === "admin" && trimmed
     ? [
         {
           id: "hermes:send",
@@ -256,8 +260,8 @@ export function CommandPalette() {
     ...exactNavActions,
     ...textActions,
     ...mediaActions,
-    ...dnsActions.filter(match),
-    ...dockerActions.filter(match),
+    ...(role === "admin" ? dnsActions.filter(match) : []),
+    ...(role === "admin" ? dockerActions.filter(match) : []),
     ...fuzzyNavActions,
   ];
 

@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
+  getCurrentUser,
   getVersion,
   setUnauthorizedHandler,
   type VersionData,
 } from "./lib/api.ts";
 import { TabsProvider } from "./lib/tabsContext.tsx";
 import { TasksProvider } from "./lib/tasksContext.tsx";
-import { SettingsPanel } from "./components/overlays/SettingsPanel.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
-import { getToken, clearToken } from "./lib/auth.ts";
+import { getToken, clearToken, type CurrentUser } from "./lib/auth.ts";
 import { ui } from "./lib/ui.ts";
 import { LoginForm } from "./components/overlays/LoginForm.tsx";
 import { Drawer } from "./components/layout/Drawer.tsx";
@@ -21,6 +21,7 @@ import { SystemPage } from "./pages/system/SystemPage.tsx";
 import { MediaRoutes } from "./pages/media/MediaRoutes.tsx";
 import { OverviewPage } from "./pages/overview/OverviewPage.tsx";
 import { CommandPalette } from "./components/layout/CommandPalette.tsx";
+import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
 
 type Backend = "up" | "down" | "checking";
 
@@ -29,6 +30,7 @@ export function App() {
 
   // ── Auth ──────────────────────────────────────────────────────────
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
+  const [user, setUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
     setUnauthorizedHandler(() => setAuthed(false));
@@ -37,7 +39,6 @@ export function App() {
   // ── UI state ──────────────────────────────────────────────────────
   const [backend, setBackend] = useState<Backend>("checking");
   const [versionData, setVersionData] = useState<VersionData | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [sbOpen, setSbOpen] = useState(false);
 
@@ -60,6 +61,14 @@ export function App() {
   useEffect(() => {
     if (!authed) return;
 
+    getCurrentUser().then((current) => {
+      if (current) setUser(current);
+      else {
+        clearToken();
+        setAuthed(false);
+      }
+    });
+
     fetch("/healthz")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(() => setBackend("up"))
@@ -72,28 +81,35 @@ export function App() {
   const onLogout = () => {
     clearToken();
     setAuthed(false);
+    setUser(null);
   };
 
   // ── Render ────────────────────────────────────────────────────────
   if (!authed) {
     return (
       <div className={ui.shell} data-theme={theme}>
-        <LoginForm onSuccess={() => setAuthed(true)} />
+        <LoginForm
+          onSuccess={(nextUser) => {
+            setUser(nextUser);
+            setAuthed(true);
+          }}
+        />
       </div>
     );
   }
+
+  if (!user) {
+    return <div className={ui.shell} data-theme={theme} />;
+  }
+
+  const role = user.role;
 
   return (
     <TabsProvider>
       <TasksProvider>
         <div className={ui.shell} data-theme={theme}>
-          <SettingsPanel
-            open={showSettings}
-            onOpenChange={setShowSettings}
-            onSave={() => setShowSettings(false)}
-          />
           <LogsPanel open={showLogs} onOpenChange={setShowLogs} />
-          <CommandPalette />
+          <CommandPalette role={role} />
           <Drawer />
 
           <TopBar
@@ -110,16 +126,23 @@ export function App() {
             <Sidebar
               open={sbOpen}
               onClose={() => setSbOpen(false)}
-              onSettings={() => setShowSettings(true)}
+              role={role}
             />
 
             <div id={"router-container"} className={ui.main}>
               <Routes>
-                <Route path="/" element={<OverviewPage />} />
-                <Route path="/hermes" element={<HermesPage />} />
-                <Route path="/system" element={<SystemPage />} />
-                <Route path="/media/*" element={<MediaRoutes />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {role === "admin" && <Route path="/" element={<OverviewPage />} />}
+                {role === "admin" && <Route path="/hermes" element={<HermesPage />} />}
+                {role === "admin" && <Route path="/system" element={<SystemPage />} />}
+                {role === "admin" && <Route path="/settings" element={<SettingsPage />} />}
+                <Route
+                  path="/media/*"
+                  element={<MediaRoutes allowSystem={role === "admin"} />}
+                />
+                <Route
+                  path="*"
+                  element={<Navigate to={role === "media" ? "/media" : "/"} replace />}
+                />
               </Routes>
             </div>
           </div>

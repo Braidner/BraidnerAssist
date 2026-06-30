@@ -1,30 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Target } from "lucide-react";
-import { login } from "../../lib/auth.ts";
+import { getSetupRequired, login, setupAdmin } from "../../lib/auth.ts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface Props {
-  onSuccess: () => void;
+  onSuccess: (user: import("../../lib/auth.ts").CurrentUser) => void;
 }
 
 export function LoginForm({ onSuccess }: Props) {
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [setupMode, setSetupMode] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    getSetupRequired().then(setSetupMode);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (setupMode && password !== confirm) {
+      setError("Пароли не совпадают");
+      return;
+    }
     setLoading(true);
-    const ok = await login(username, password);
+    const user = setupMode
+      ? await setupAdmin({ username, password, displayName })
+      : await login(username, password);
     setLoading(false);
-    if (ok) {
-      onSuccess();
+    if (user) {
+      onSuccess(user);
     } else {
-      setError("Неверный логин или пароль");
+      setError(setupMode ? "Не удалось создать администратора" : "Неверный логин или пароль");
     }
   }
 
@@ -40,11 +53,10 @@ export function LoginForm({ onSuccess }: Props) {
             Mission Control
           </div>
           <div className="mt-1 text-xs tracking-3 text-muted">
-            braidner · self-hosted · LAN-only
+            {setupMode ? "создание администратора" : "braidner · self-hosted · LAN-only"}
           </div>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-1.5">
             <Label className="text-data uppercase tracking-4 text-muted">
@@ -60,6 +72,21 @@ export function LoginForm({ onSuccess }: Props) {
             />
           </div>
 
+          {setupMode && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-data uppercase tracking-4 text-muted">
+                Имя
+              </Label>
+              <Input
+                type="text"
+                autoComplete="name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Admin"
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <Label className="text-data uppercase tracking-4 text-muted">
               Пароль
@@ -73,14 +100,34 @@ export function LoginForm({ onSuccess }: Props) {
             />
           </div>
 
+          {setupMode && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-data uppercase tracking-4 text-muted">
+                Повтор пароля
+              </Label>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          )}
+
           {error && <div className="text-center text-xs text-bad">{error}</div>}
 
           <Button
             type="submit"
             className="mt-1 w-full"
-            disabled={loading || !username || !password}
+            disabled={
+              loading ||
+              !username ||
+              password.length < 6 ||
+              (setupMode && !confirm)
+            }
           >
-            {loading ? "Вход…" : "Войти"}
+            {loading ? "Секунду…" : setupMode ? "Создать администратора" : "Войти"}
           </Button>
         </form>
       </div>

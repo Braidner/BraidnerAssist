@@ -423,7 +423,8 @@
       `/home/braidner/mission-control-db.bak-simplify-media-20260630-021943`.
 - [x] Backend pipeline: `nativeMedia.ts` теперь делает lookup/search/grab и registry only.
       `POST /media/release/grab` отправляет релиз в qB с category `mc-library` и `savePath`
-      в `MEDIA_ROOT/MEDIA_MOVIES` или `MEDIA_ROOT/MEDIA_TV` (default `/media/movies|/media/tv`).
+      в `QBITTORRENT_SAVE_ROOT/MEDIA_MOVIES` или `QBITTORRENT_SAVE_ROOT/MEDIA_TV`
+      (default `/data/movies|/data/tv` для qB namespace).
 - [x] Torrent rails: `GET /api/media/torrent-rail` отдаёт выбранные раздачи, которые скачиваются
       или ещё не связаны с Jellyfin item. После link по TMDB/TVDB → `jellyfinId` item исчезает
       из library rail. `GET /api/media/torrents/:kind/:tmdbId` отдаёт все раздачи конкретного
@@ -445,7 +446,7 @@
       убраны ImportDrawer, Native pipeline/Repair Center, monitor toggles, import badges и
       пофайловый picker. Discovery actions «В список»/«Скрыть» оставлены.
 - [x] Env/docs: удалены `MEDIA_DOWNLOADS`, `POLL_MEDIA_IMPORTER`, `POLL_MEDIA_MONITOR`;
-      задокументированы `MEDIA_ROOT`, `MEDIA_TV`, `MEDIA_MOVIES`.
+      задокументированы `MEDIA_ROOT`, `QBITTORRENT_SAVE_ROOT`, `MEDIA_TV`, `MEDIA_MOVIES`.
 - [x] Проверено: локальный replay всех Prisma migrations через SQLite, `cd backend && npm run build`,
       `cd frontend && npm run build`, `graphify update .`. На сервере `prisma migrate status`
       показывает `Database schema is up to date!`, backend `/healthz` отвечает.

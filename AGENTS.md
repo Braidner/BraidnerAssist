@@ -116,8 +116,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     2026-06-30**) максимально простой: TMDB (метаданные/discovery) → Jackett Torznab
     (`integrations/jackett.ts`, `JACKETT_URL`/`JACKETT_API_KEY`/`JACKETT_INDEXERS`) →
     release parse/score (`releaseParse.ts`/`releaseScore.ts`) → qBittorrent →
-    Jellyfin library folders (`MEDIA_ROOT` + `MEDIA_MOVIES|MEDIA_TV`, default
-    `/media/movies|/media/tv`) → Jellyfin scan/playback/watch-state.
+    Jellyfin library folders (qB savePath = `QBITTORRENT_SAVE_ROOT` + `MEDIA_MOVIES|MEDIA_TV`,
+    default `/data/movies|/data/tv`; backend/Jellyfin path = `MEDIA_ROOT`, default `/media`) →
+    Jellyfin scan/playback/watch-state.
     Sonarr/Radarr/Prowlarr, native monitor/missing queue, quality profiles, Repair Center,
     importer, hardlink/copy organizer and per-file picker are not part of the active pipeline.
     qB saves the selected release directly into the final Jellyfin folder; Jellyfin is trusted
@@ -183,7 +184,7 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     **Правильный пайплайн в медиатеку**: `GET /media/lookup?type=movie|series&q=` ищет тайтл в TMDB,
     `POST /media/release/search` ищет релизы через Jackett Torznab, `POST /media/release/grab`
     отправляет выбранный релиз в qBittorrent с категорией `mc-library` и `savePath` сразу в
-    `/media/movies` или `/media/tv`, затем пишет `MediaTitle`/`MediaTorrent`. Фронт:
+    `/data/movies` или `/data/tv` (qB namespace), затем пишет `MediaTitle`/`MediaTorrent`. Фронт:
     `ReleasePicker` доступен на детальной странице сериала на каждый сезон, на странице фильма
     и в дравере добавления.
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent),
@@ -199,7 +200,7 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     TMDB-title на detail-странице, включая уже связанный с Jellyfin контент. `MediaSystemTab`
     больше не показывает Native pipeline/Repair Center.
     Env: `JELLYFIN_*`/`QBITTORRENT_*`/`JACKETT_*`/`TORRSERVER_*`/`TMDB_API_KEY`/`MEDIA_ROOT`/
-    `MEDIA_TV`/`MEDIA_MOVIES`.
+    `QBITTORRENT_SAVE_ROOT`/`MEDIA_TV`/`MEDIA_MOVIES`.
     MCP: `search_releases`/`grab_release`, `list_jackett_indexers`, `test_jackett_search`,
     `add_torrent`, `get_media_status`, `list_devices`, `play_on_device`, discovery preference tools.
     **Дискавери-таб (LAMPA/ZONA-style подборки на TMDB)** — таб «Дискавери» (`MediaDiscoverTab.tsx`)

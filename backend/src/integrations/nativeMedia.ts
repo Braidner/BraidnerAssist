@@ -76,12 +76,8 @@ function keepCacheFresh(): void {
   }
 }
 
-function mediaRoot(): string | null {
-  return config.mediaFs.root ? path.resolve(config.mediaFs.root) : null;
-}
-
 function librarySavePath(kind: MediaKind): string | undefined {
-  const root = mediaRoot();
+  const root = config.mediaFs.qbittorrentRoot ? path.resolve(config.mediaFs.qbittorrentRoot) : null;
   if (!root) return undefined;
   return path.join(root, kind === "series" ? config.mediaFs.tv : config.mediaFs.movies);
 }

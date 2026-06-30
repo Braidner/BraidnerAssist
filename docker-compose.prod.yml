@@ -12,6 +12,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: file:/data/mission-control.db
+      MEDIA_ROOT: /media
+      # qBittorrent-контейнер homelab-стека видит тот же MEDIA_HOST_PATH как /data.
+      # Это значение уходит в qB WebAPI torrents/add savepath.
+      QBITTORRENT_SAVE_ROOT: /data
       # Docker Engine API (opt-in включён): backend читает контейнеры через этот сокет.
       # ВНИМАНИЕ: docker.sock = root-эквивалент на хосте — осознанный риск (LAN-only, bearer).
       DOCKER_SOCKET: /var/run/docker.sock

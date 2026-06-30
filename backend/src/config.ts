@@ -134,10 +134,12 @@ export const config = {
     },
   },
 
-  // MEDIA_ROOT — корень медиатеки внутри контейнера. qB сохраняет выбранные
-  // релизы сразу в tv/movies; файл-браузер заперт в этом корне.
+  // MEDIA_ROOT — корень медиатеки внутри backend-контейнера; файл-браузер
+  // заперт в этом корне. QBITTORRENT_SAVE_ROOT — тот же каталог, но как его
+  // видит qBittorrent-контейнер при torrents/add savepath.
   mediaFs: {
-    root: env("MEDIA_ROOT") ?? "data",
+    root: env("MEDIA_ROOT") ?? (nodeEnv === "production" ? "/media" : "data"),
+    qbittorrentRoot: env("QBITTORRENT_SAVE_ROOT") ?? "/data",
     tv: env("MEDIA_TV") ?? "tv",
     movies: env("MEDIA_MOVIES") ?? "movies",
     get configured() { return Boolean(this.root); },

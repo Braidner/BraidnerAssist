@@ -212,51 +212,51 @@ export function MediaMoviePage({
 					runtimeLabel={det.runtime ? `${det.runtime} мин` : null}
 					rating={det.rating}
 					genres={det.genres}
+					actions={
+						<>
+							{det.hasFile && det.jellyfinId && (
+								<button
+									className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+									disabled={busy}
+									onClick={play}
+								>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="currentColor"
+									>
+										<polygon points="6,3 21,12 6,21"/>
+									</svg>
+									{busy ? "…" : "Смотреть"}
+								</button>
+							)}
+							{!det.hasFile && det.tmdbId != null && (
+								<button
+									className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+									disabled={act === "add"}
+									title="Зарегистрировать тайтл и выбрать релиз"
+									onClick={addToLib}
+								>
+									{act === "add" ? "…" : "➕ В библиотеку"}
+								</button>
+							)}
+							<button
+								className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+								disabled={det.tmdbId == null}
+								title={det.tmdbId == null ? "Нет tmdbId" : ""}
+								onClick={() => setShowPicker((v) => !v)}
+							>
+								{showPicker ? "Скрыть поиск" : "Поиск"}
+							</button>
+						</>
+					}
 					onBack={goBack}
 					onQueueClick={() => setShowPicker((v) => !v)}
 					onClosePlayer={() => setPlayer(null)}
 				/>
 
 				<DetailBody className="pt-5">
-
-					{/* Actions */}
-					<div className="flex gap-3 mb-7">
-						{det.hasFile && det.jellyfinId && (
-							<button
-								className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-								disabled={busy}
-								onClick={play}
-							>
-								<svg
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="currentColor"
-								>
-									<polygon points="6,3 21,12 6,21"/>
-								</svg>
-								{busy ? "…" : "Смотреть"}
-							</button>
-						)}
-						{!det.hasFile && det.tmdbId != null && (
-							<button
-								className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-								disabled={act === "add"}
-								title="Зарегистрировать тайтл и выбрать релиз"
-								onClick={addToLib}
-							>
-								{act === "add" ? "…" : "➕ В библиотеку"}
-							</button>
-						)}
-						<button
-							className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-							disabled={det.tmdbId == null}
-							title={det.tmdbId == null ? "Нет tmdbId" : ""}
-							onClick={() => setShowPicker((v) => !v)}
-						>
-							{showPicker ? "Скрыть поиск" : "Поиск"}
-						</button>
-					</div>
 					{showPicker && det.tmdbId != null && (
 						<ReleasePicker
 							params={{type: "movie", id: det.tmdbId}}

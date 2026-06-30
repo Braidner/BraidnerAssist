@@ -318,6 +318,54 @@ export function MediaSeriesPage({
           runtimeLabel={det.runtime ? `${det.runtime} мин / эп.` : null}
           rating={det.rating}
           genres={det.genres}
+          actions={
+            <>
+              {watchTarget && (
+                <button
+                  className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                  disabled={busy === watchTarget.jellyfinId}
+                  title={watchTarget.title}
+                  onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <polygon points="6,3 21,12 6,21" />
+                  </svg>
+                  {busy === watchTarget.jellyfinId ? "…" : watchLabel}
+                </button>
+              )}
+              {!det.jellyfinId && tmdbId != null && (
+                <button
+                  className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                  disabled={act === "add"}
+                  onClick={addToLib}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <polygon points="6,3 21,12 6,21" />
+                  </svg>
+                  {act === "add" ? "…" : "В библиотеку"}
+                </button>
+              )}
+              {tmdbId != null && (
+                <button
+                  className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
+                  title="Поиск всех раздач сериала (включая мультисезонные паки)"
+                  onClick={() => setShowAllPicker((v) => !v)}
+                >
+                  {showAllPicker ? "Скрыть поиск" : "Найти"}
+                </button>
+              )}
+            </>
+          }
           previousItem={previousItem}
           nextItem={nextItem}
           onBack={goBack}
@@ -330,54 +378,6 @@ export function MediaSeriesPage({
         />
 
         <DetailBody className="pt-[38px]">
-          {/* Actions */}
-          <div className="flex flex-wrap gap-3 mb-7">
-            {watchTarget && (
-              <button
-                className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-                disabled={busy === watchTarget.jellyfinId}
-                title={watchTarget.title}
-                onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <polygon points="6,3 21,12 6,21" />
-                </svg>
-                {busy === watchTarget.jellyfinId ? "…" : watchLabel}
-              </button>
-            )}
-            {!det.jellyfinId && tmdbId != null && (
-              <button
-                className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-                disabled={act === "add"}
-                onClick={addToLib}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <polygon points="6,3 21,12 6,21" />
-                </svg>
-                {act === "add" ? "…" : "В библиотеку"}
-              </button>
-            )}
-            {tmdbId != null && (
-              <button
-                className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
-                title="Поиск всех раздач сериала (включая мультисезонные паки)"
-                onClick={() => setShowAllPicker((v) => !v)}
-              >
-                {showAllPicker ? "Скрыть поиск" : "Найти"}
-              </button>
-            )}
-          </div>
-
           {showAllPicker && tmdbId != null && (
             <div style={{ marginTop: 16 }}>
               <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ВСЕ РАЗДАЧИ</div>

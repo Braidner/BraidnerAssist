@@ -136,6 +136,7 @@ export function DetailHero({
   runtimeLabel,
   rating,
   genres,
+  actions,
   previousItem,
   nextItem,
   onBack,
@@ -154,6 +155,7 @@ export function DetailHero({
   runtimeLabel?: string | null;
   rating?: number | null;
   genres?: string[];
+  actions?: ReactNode;
   previousItem?: QueueItem | null;
   nextItem?: QueueItem | null;
   onBack: () => void;
@@ -419,6 +421,18 @@ export function DetailHero({
               {genres.slice(0, 4).map((g) => (
                 <span key={g} className="rounded-[4px] border border-white/[0.13] px-2.5 py-[3px] font-ui text-label font-bold uppercase tracking-genre text-white/[0.45]">{g}</span>
               ))}
+            </div>
+          )}
+          {actions && (
+            <div
+              className="mb-4 pt-5 flex flex-wrap gap-3 overflow-hidden transition-all duration-700 ease-out"
+              style={{
+                maxHeight: player ? 0 : 96,
+                opacity: player ? 0 : 1,
+                transform: player ? "translateY(18px)" : "translateY(0)",
+              }}
+            >
+              {actions}
             </div>
           )}
         </div>

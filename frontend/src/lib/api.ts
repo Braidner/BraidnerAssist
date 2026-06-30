@@ -1602,10 +1602,10 @@ export async function grabRelease(p: {
 // (TMDB резолвится в AAAA) → прямой <img> виснет по таймауту. Бэкенд ходит по IPv4.
 export function posterUrl(
   remote: string | null | undefined,
-  w?: "w342" | "w780" | "w1280" | "original",
+  w: "w342" | "w780" | "w1280" | "original" = "w342",
 ): string | undefined {
   if (!remote) return undefined;
-  return `/api/poster?url=${encodeURIComponent(remote)}${w ? `&w=${w}` : ""}`;
+  return `/api/poster?url=${encodeURIComponent(remote)}&w=${w}`;
 }
 
 // Широкий бэкдроп (для hero-фона). Тащим w1280-кроп через прокси.

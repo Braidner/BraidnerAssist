@@ -54,8 +54,13 @@ posterRouter.get("/", async (req, res) => {
       // Опциональный размер: бэкдропы тащим широким кропом (w1280), постеры остаются мелкими.
       // Переписываем сегмент /t/p/<size>/ у TMDB; whitelist чтобы не дёргать произвольный путь.
       let target = tmdb;
-      const w = typeof req.query.w === "string" ? req.query.w : "";
-      if (w && /^(w342|w780|w1280|original)$/.test(w)) {
+      const requestedW = typeof req.query.w === "string" ? req.query.w : "";
+      const w = /^(w342|w780|w1280|original)$/.test(requestedW)
+        ? requestedW
+        : source === "tmdb"
+          ? "w342"
+          : "";
+      if (w) {
         target = tmdb.replace(/(image\.tmdb\.org\/t\/p\/)(w\d+|original)\//, `$1${w}/`);
       }
       desc = {

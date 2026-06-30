@@ -240,7 +240,7 @@ export function MediaMoviePage({
 						)}
 						{!det.hasFile && det.tmdbId != null && (
 							<button
-								className={ms.button.accentSm}
+								className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
 								disabled={act === "add"}
 								title="Зарегистрировать тайтл и выбрать релиз"
 								onClick={addToLib}

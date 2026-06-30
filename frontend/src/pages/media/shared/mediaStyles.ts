@@ -77,7 +77,7 @@ export const media = {
   libHeroMeta: "mb-3.5 flex flex-wrap items-center gap-2",
   libActions: "mb-6 flex flex-wrap gap-3",
   playButton:
-    "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white transition-[filter,transform] shadow-[0_0_28px_color-mix(in_srgb,var(--bc,var(--accent))_50%,transparent)] hover:brightness-[1.2] hover:-translate-y-0.5",
+    "flex cursor-pointer items-center gap-2 rounded-[7px] border-0 bg-[var(--bc,var(--accent))] px-[26px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white transition-[filter,transform] shadow-[0_0_28px_color-mix(in_srgb,var(--bc,var(--accent))_50%,transparent)] hover:brightness-[1.2] hover:-translate-y-0.5 tracking-2 transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-55",
   progRow: "flex max-w-[360px] items-center gap-3",
   progTrack: "h-1 flex-1 overflow-hidden rounded bg-white/15",
   progFill: "h-full rounded",
@@ -138,7 +138,7 @@ export const media = {
   heroDesc:
     "mb-5 max-w-[420px] text-body leading-relaxed text-white/70 line-clamp-2",
   heroGhostBtn:
-    "flex cursor-pointer items-center gap-2 rounded-[7px] border border-white/30 bg-transparent px-[22px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white/90 transition-colors hover:border-white/60",
+    "flex cursor-pointer items-center gap-2 rounded-[7px] border border-white/30 bg-transparent px-[22px] py-3 [font-family:Syne,var(--font)] text-body font-bold tracking-2 text-white/90 transition-colors hover:border-white/60 hover:-translate-y-0.5 tracking-2 transition-all duration-300 ease-out disabled:pointer-events-none disabled:opacity-55",
   heroLoadingSheen:
     "pointer-events-none absolute inset-0 z-[1] animate-[skel-pulse_1.4s_ease-in-out_infinite] bg-[linear-gradient(100deg,transparent_0%,rgba(255,255,255,0.045)_45%,transparent_78%)]",
 

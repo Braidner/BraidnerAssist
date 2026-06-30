@@ -217,7 +217,7 @@ export function MediaMoviePage({
 						<>
 							{det.hasFile && det.jellyfinId && (
 								<button
-									className={detailHeroButtonClass("primary")}
+									className={ms.playButton}
 									disabled={busy}
 									onClick={play}
 								>
@@ -232,18 +232,9 @@ export function MediaMoviePage({
 									{busy ? "…" : "Смотреть"}
 								</button>
 							)}
-							{!det.hasFile && inLibrary && det.tmdbId != null && (
-								<button
-									className={detailHeroButtonClass("primary")}
-									disabled={det.tmdbId == null}
-									onClick={() => setShowPicker((v) => !v)}
-								>
-									{showPicker ? "Скрыть релизы" : "Найти релиз"}
-								</button>
-							)}
 							{!inLibrary && det.tmdbId != null && (
 								<button
-									className={detailHeroButtonClass("primary")}
+									className={ms.playButton}
 									disabled={act === "add"}
 									title="Зарегистрировать тайтл и выбрать релиз"
 									onClick={addToLib}
@@ -253,7 +244,7 @@ export function MediaMoviePage({
 							)}
 							{inLibrary && (
 								<button
-									className={detailHeroButtonClass("active")}
+									className={ms.heroGhostBtn}
 									type="button"
 									title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
 								>
@@ -263,7 +254,7 @@ export function MediaMoviePage({
 							)}
 							{(det.hasFile || !inLibrary) && (
 								<button
-									className={detailHeroButtonClass("secondary")}
+									className={ms.heroGhostBtn}
 									disabled={det.tmdbId == null}
 									title={det.tmdbId == null ? "Нет tmdbId" : ""}
 									onClick={() => setShowPicker((v) => !v)}

@@ -323,8 +323,9 @@ export function MediaSeriesPage({
           actions={
             <>
               {watchTarget && (
+
                 <button
-                  className={detailHeroButtonClass("primary")}
+                  className={ms.playButton}
                   disabled={busy === watchTarget.jellyfinId}
                   title={watchTarget.title}
                   onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
@@ -340,18 +341,9 @@ export function MediaSeriesPage({
                   {busy === watchTarget.jellyfinId ? "…" : watchLabel}
                 </button>
               )}
-              {!watchTarget && inLibrary && tmdbId != null && (
-                <button
-                  className={detailHeroButtonClass("primary")}
-                  title="Поиск всех раздач сериала (включая мультисезонные паки)"
-                  onClick={() => setShowAllPicker((v) => !v)}
-                >
-                  {showAllPicker ? "Скрыть релизы" : "Найти релиз"}
-                </button>
-              )}
               {!inLibrary && tmdbId != null && (
                 <button
-                  className={detailHeroButtonClass("primary")}
+                  className={ms.playButton}
                   disabled={act === "add"}
                   onClick={addToLib}
                 >
@@ -368,7 +360,7 @@ export function MediaSeriesPage({
               )}
               {inLibrary && (
                 <button
-                  className={detailHeroButtonClass("active")}
+                  className={ms.heroGhostBtn}
                   type="button"
                   title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
                 >
@@ -378,7 +370,7 @@ export function MediaSeriesPage({
               )}
               {tmdbId != null && (watchTarget || !inLibrary) && (
                 <button
-                  className={detailHeroButtonClass("secondary")}
+                  className={ms.heroGhostBtn}
                   title="Поиск всех раздач сериала (включая мультисезонные паки)"
                   onClick={() => setShowAllPicker((v) => !v)}
                 >
@@ -418,6 +410,9 @@ export function MediaSeriesPage({
       ) : (
         <div className="mb-10 space-y-8" style={{ marginTop: 24 }}>
           {det.seasons.map((s) => {
+            if (s.seasonNumber === 0) {
+              return null
+            }
             const pickerOn = pickerSeason === s.seasonNumber;
             const label =
               s.seasonNumber === 0

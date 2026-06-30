@@ -206,8 +206,8 @@ function DownloadProgressButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "relative grid size-[34px] flex-none place-items-center overflow-hidden rounded-full border-0 p-0 text-white transition-[background,opacity,color,transform]",
-        busy || realProgress != null ? "cursor-default bg-transparent text-accent opacity-100" : "bg-white/[0.16] opacity-60 hover:bg-accent hover:opacity-100",
+        "relative grid size-[34px] flex-none place-items-center overflow-hidden rounded-full border border-white/10 p-0 text-white shadow-[0_8px_24px_rgba(0,0,0,0.32)] backdrop-blur-md transition-[background,opacity,color,transform]",
+        busy || realProgress != null ? "cursor-default bg-black/35 text-accent opacity-100" : "bg-black/35 opacity-85 hover:bg-accent hover:opacity-100",
         done && "bg-ok/20 text-ok opacity-100",
         !busy && !done && realProgress == null && "hover:scale-105",
       )}
@@ -438,6 +438,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
 // Показывает релизы с постером, качеством, озвучкой, сидами и отправкой в qB.
 export function TorrentCard({
   release,
+  fallbackPosterSrc,
   busy,
   done,
   disabled,
@@ -448,6 +449,7 @@ export function TorrentCard({
   onGrab,
 }: {
   release: ReleaseOption;
+  fallbackPosterSrc?: string | null;
   busy: boolean;
   done: boolean;
   disabled: boolean;
@@ -461,7 +463,7 @@ export function TorrentCard({
   const voice = releaseVoice(release);
   const tracker = releaseTracker(release);
   const poster = details?.posterRemote ?? release.posterRemote;
-  const posterSrc = posterUrl(poster);
+  const posterSrc = poster ? posterUrl(poster) : fallbackPosterSrc;
   const tech = details?.technical;
   const stats = details?.stats;
   const seeders = stats?.seeders ?? release.seeders ?? 0;
@@ -515,18 +517,18 @@ export function TorrentCard({
         )}
         <div className="absolute inset-0 z-[2] bg-[linear-gradient(to_top,rgba(0,0,0,0.78)_0%,rgba(0,0,0,0.16)_58%,transparent_100%)] transition-colors duration-700 group-hover:bg-[linear-gradient(to_top,rgba(0,0,0,0.88)_0%,rgba(0,0,0,0.28)_64%,transparent_100%)]" />
 
-        <div className="absolute left-2 top-2 z-[4] flex max-w-[72%] flex-col items-start gap-1">
-          <span className={media.posterBadge}>
+        <div className="absolute left-2 top-2 z-[4] flex max-w-[calc(100%-16px)] flex-wrap items-start gap-1.5 pr-10">
+          <span className="max-w-full truncate rounded-full bg-black/70 px-2 py-1 font-mono text-2xs font-semibold leading-none text-white/80 backdrop-blur-md">
             {tracker}
           </span>
           {quality && (
-            <span className="max-w-full truncate rounded-full bg-black/70 px-2 py-1 text-2xs font-semibold text-white/70">
+            <span className="max-w-full truncate rounded-full bg-black/70 px-2 py-1 font-mono text-2xs font-semibold leading-none text-white/70 backdrop-blur-md">
               {quality}
             </span>
           )}
         </div>
 
-        <div className="absolute bottom-2 right-2 z-[4]">
+        <div className="absolute right-2 top-2 z-[5]">
           {actionSlot ?? (
             <DownloadProgressButton
               busy={busy}
@@ -537,22 +539,29 @@ export function TorrentCard({
             />
           )}
         </div>
+        <div className="absolute inset-x-0 bottom-0 z-[3] px-2.5 pb-2.5 pt-10">
+          {link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noreferrer"
+              className="block max-h-[4.8em] overflow-hidden whitespace-normal break-words text-[12px] font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] transition-colors hover:text-accent"
+              title={title}
+            >
+              {titleText}
+            </a>
+          ) : (
+            <div
+              className="max-h-[4.8em] overflow-hidden whitespace-normal break-words text-[12px] font-semibold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+              title={title}
+            >
+              {titleText}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={media.posterInfo}>
-        {link ? (
-          <a
-            href={link}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(media.posterTitle, "block transition-colors hover:text-accent")}
-            title={title}
-          >
-            {titleText}
-          </a>
-        ) : (
-          <div className={media.posterTitle} title={title}>{titleText}</div>
-        )}
         <div className={media.posterSub}>{meta}</div>
         {voiceTags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
@@ -580,10 +589,12 @@ export function TorrentCard({
 export function ReleasePicker({
   params,
   onGrabbed,
+  fallbackPosterSrc,
   downloads = [],
 }: {
   params: { type: "movie" | "series"; id: number; seasonNumber?: number };
   onGrabbed?: () => void;
+  fallbackPosterSrc?: string | null;
   downloads?: DownloadItem[];
 }) {
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
@@ -661,6 +672,7 @@ export function ReleasePicker({
           <TorrentCard
             key={r.guid}
             release={r}
+            fallbackPosterSrc={fallbackPosterSrc}
             busy={busyGuid === r.guid || pending}
             done={complete}
             disabled={busyGuid === r.guid || grabbed}

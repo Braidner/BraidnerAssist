@@ -393,6 +393,7 @@ export function MediaSeriesPage({
           <ReleasePicker
             params={{ type: "series", id: tmdbId }}
             downloads={media.downloads}
+            fallbackPosterSrc={posterSrc}
             onGrabbed={() => {
               onMediaUpdate();
               refreshTitleTorrents();
@@ -505,6 +506,7 @@ export function MediaSeriesPage({
                         seasonNumber: s.seasonNumber,
                       }}
                       downloads={media.downloads}
+                      fallbackPosterSrc={posterSrc}
                       onGrabbed={() => {
                         onMediaUpdate();
                         refreshTitleTorrents();

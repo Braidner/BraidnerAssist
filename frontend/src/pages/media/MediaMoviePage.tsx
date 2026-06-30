@@ -271,6 +271,7 @@ export function MediaMoviePage({
 				<ReleasePicker
 					params={{type: "movie", id: det.tmdbId}}
 					downloads={media.downloads}
+					fallbackPosterSrc={posterSrc}
 					onGrabbed={() => {
 						onMediaUpdate();
 						refreshTitleTorrents();

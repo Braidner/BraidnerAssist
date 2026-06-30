@@ -15,6 +15,10 @@ export interface JackettIndexerHealth {
 
 let healthCache: { at: number; data: JackettIndexerHealth[] } | null = null;
 
+export function invalidateJackettHealthCache(): void {
+  healthCache = null;
+}
+
 const MOVIE_CATS = "2000,2010,2020,2030,2040,2045,2050,2060,2070,2080";
 const SERIES_CATS = "5000,5010,5020,5030,5040,5045,5050,5060,5070,5080";
 const BROAD_CATS = `${MOVIE_CATS},${SERIES_CATS}`;

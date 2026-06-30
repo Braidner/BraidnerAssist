@@ -49,6 +49,7 @@ type PosterCacheStats = {
 const inFlightRefresh = new Set<string>();
 let lastCleanupAt = 0;
 let cleanupTimer: NodeJS.Timeout | null = null;
+let cleanupIntervalTimer: NodeJS.Timeout | null = null;
 let cleanupRunning = false;
 
 function cacheKey(desc: PosterCacheDescriptor): string {
@@ -307,10 +308,15 @@ export function schedulePosterCacheCleanup() {
 }
 
 export function startPosterCacheCleanup() {
+  if (cleanupIntervalTimer) clearInterval(cleanupIntervalTimer);
   const interval = config.posterCache.cleanupIntervalMs;
   if (interval <= 0) return;
-  const timer = setInterval(() => {
+  cleanupIntervalTimer = setInterval(() => {
     void cleanupPosterCache().catch(() => undefined);
   }, interval);
-  timer.unref?.();
+  cleanupIntervalTimer.unref?.();
+}
+
+export function restartPosterCacheCleanup() {
+  startPosterCacheCleanup();
 }

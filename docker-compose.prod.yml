@@ -12,6 +12,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: file:/data/mission-control.db
+      ENV_FILE_PATH: /app/.env.runtime
       MEDIA_ROOT: /media
       # qBittorrent-контейнер homelab-стека видит тот же MEDIA_HOST_PATH как /data.
       # Это значение уходит в qB WebAPI torrents/add savepath.
@@ -23,6 +24,7 @@ services:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
       - ./data:/data
+      - ./.env:/app/.env.runtime:rw
       # Медиатека (movies/tv и прочие подпапки) на 1ТБ-диске. На hermes.lan это /srv/stack/media;
       # переопределяется MEDIA_HOST_PATH в .env. rw — нужен для qB savePath registry/файл-браузера.
       - ${MEDIA_HOST_PATH:-/srv/stack/media}:/media:rw

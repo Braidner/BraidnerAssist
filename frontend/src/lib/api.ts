@@ -206,6 +206,37 @@ export interface AppUser {
   updatedAt: string;
 }
 
+export interface EnvField {
+  key: string;
+  label: string;
+  type: "text" | "secret" | "number";
+  runtime: boolean;
+  requiresRestart?: boolean;
+  serviceRecreate?: string;
+  value: string;
+  hasValue: boolean;
+  maskedValue?: string;
+}
+
+export interface EnvGroup {
+  id: string;
+  title: string;
+  fields: EnvField[];
+}
+
+export interface EnvSettings {
+  envFilePath: string;
+  writable: boolean;
+  groups: EnvGroup[];
+}
+
+export interface EnvUpdateResult {
+  applied: boolean;
+  requiresRestart: string[];
+  requiresServiceRecreate: string[];
+  warnings: string[];
+}
+
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     const res = await apiFetch("/api/auth/me");
@@ -259,6 +290,24 @@ export async function updateUser(
 export async function deleteUser(id: string): Promise<void> {
   const res = await apiFetch(`/api/settings/users/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await errorText(res));
+}
+
+export async function getEnvSettings(): Promise<EnvSettings> {
+  const res = await apiFetch("/api/settings/env");
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as EnvSettings;
+}
+
+export async function putEnvSettings(
+  values: Record<string, string>,
+): Promise<EnvUpdateResult> {
+  const res = await apiFetch("/api/settings/env", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ values }),
+  });
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as EnvUpdateResult;
 }
 
 async function errorText(res: Response): Promise<string> {

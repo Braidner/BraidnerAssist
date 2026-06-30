@@ -180,6 +180,11 @@ export interface PlayDevice {
 
 let cache: { data: MediaData; at: number } | null = null;
 
+export function invalidateMediaCache(): void {
+  cache = null;
+  jfUserId = null;
+}
+
 // ── Jellyfin ───────────────────────────────────────────────────────────
 interface JfSession {
   Id?: string;

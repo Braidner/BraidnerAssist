@@ -81,3 +81,9 @@ export async function containerAction(id: string, action: string): Promise<void>
   // Инвалидируем кеш после успешной операции
   cache = null;
 }
+
+export function resetDockerIntegration(): void {
+  client?.close();
+  client = null;
+  cache = null;
+}

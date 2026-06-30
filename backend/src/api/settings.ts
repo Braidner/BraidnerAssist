@@ -8,10 +8,27 @@ import {
   listUsers,
   updateUser,
 } from "../auth/users.js";
+import { getEnvSettings, updateEnvSettings } from "../settings/envSettings.js";
 
 export const settingsRouter = Router();
 
 settingsRouter.use(requireAdmin);
+
+settingsRouter.get("/env", async (_req, res) => {
+  try {
+    res.json(await getEnvSettings());
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+settingsRouter.put("/env", async (req, res) => {
+  try {
+    res.json(await updateEnvSettings(req.body));
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
 
 settingsRouter.get("/users", async (_req, res) => {
   try {

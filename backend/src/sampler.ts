@@ -6,8 +6,11 @@ import { config } from "./config.js";
 import { getServices } from "./integrations/services.js";
 import { log } from "./logger.js";
 
+let samplerTimer: NodeJS.Timeout | null = null;
+
 export function startSampler(): void {
-  setInterval(async () => {
+  if (samplerTimer) clearInterval(samplerTimer);
+  samplerTimer = setInterval(async () => {
     try {
       const result = await getServices();
       if (!result.configured) return;
@@ -31,4 +34,9 @@ export function startSampler(): void {
       log.warn("sampler", "Ошибка сэмплера аптайма", String(err));
     }
   }, config.poll.services);
+  samplerTimer.unref?.();
+}
+
+export function restartSampler(): void {
+  startSampler();
 }

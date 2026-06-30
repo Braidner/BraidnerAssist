@@ -35,6 +35,10 @@ interface OpenMeteoResponse {
 
 let cache: { data: WeatherResult; at: number } | null = null;
 
+export function invalidateWeatherCache(): void {
+  cache = null;
+}
+
 export async function getWeather(): Promise<WeatherResult | { configured: false }> {
   if (!config.weather.configured) return { configured: false };
 

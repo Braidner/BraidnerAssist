@@ -66,6 +66,10 @@ async function glFetch<T>(path: string): Promise<T> {
 
 let cache: { data: GitLabTask[]; at: number } | null = null;
 
+export function invalidateGitLabCache(): void {
+  cache = null;
+}
+
 export async function getGitLabTasks(): Promise<GitLabTask[]> {
   if (!config.gitlab.configured) return [];
   if (cache && Date.now() - cache.at < config.poll.tasks) return cache.data;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Save, Trash2, UserRound } from "lucide-react";
+import { AlertTriangle, KeyRound, Plus, RotateCcw, Save, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +17,14 @@ import {
   deleteUser,
   getServicesConfig,
   getUsers,
+  getEnvSettings,
   putServicesConfig,
+  putEnvSettings,
   updateUser,
   type AppUser,
+  type EnvField,
+  type EnvSettings,
+  type EnvUpdateResult,
   type ServiceConfig,
 } from "@/lib/api";
 import type { UserRole } from "@/lib/auth";
@@ -56,6 +61,9 @@ export function SettingsPage() {
           <TabsTrigger value="services" className="h-9 px-1">
             Сервисы
           </TabsTrigger>
+          <TabsTrigger value="env" className="h-9 px-1">
+            Env
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="users">
           <UsersTab />
@@ -63,8 +71,173 @@ export function SettingsPage() {
         <TabsContent value="services">
           <ServicesTab />
         </TabsContent>
+        <TabsContent value="env">
+          <EnvTab />
+        </TabsContent>
       </Tabs>
     </main>
+  );
+}
+
+function EnvTab() {
+  const [settings, setSettings] = useState<EnvSettings | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState<Set<string>>(() => new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<EnvUpdateResult | null>(null);
+
+  const load = async () => {
+    const next = await getEnvSettings();
+    setSettings(next);
+    setDraft(
+      Object.fromEntries(
+        next.groups.flatMap((group) =>
+          group.fields.map((field) => [field.key, field.type === "secret" ? "" : field.value]),
+        ),
+      ),
+    );
+    setDirty(new Set());
+  };
+
+  useEffect(() => {
+    load().catch((e) => setError(e instanceof Error ? e.message : "Ошибка загрузки"));
+  }, []);
+
+  const mark = (key: string, value: string) => {
+    setDraft((current) => ({ ...current, [key]: value }));
+    setDirty((current) => new Set(current).add(key));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    setResult(null);
+    try {
+      const payload = Object.fromEntries([...dirty].map((key) => [key, draft[key] ?? ""]));
+      const saved = await putEnvSettings(payload);
+      setResult(saved);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка сохранения");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!settings) {
+    return <section className={ui.panel}>Загружаю env…</section>;
+  }
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div className={cn(ui.panel, "flex flex-wrap items-center justify-between gap-3 py-4")}>
+        <div className="min-w-0">
+          <div className={ui.panelTitle}>
+            <KeyRound className="size-4" />
+            Runtime env
+          </div>
+          <div className="mt-1 truncate font-mono text-label text-muted" title={settings.envFilePath}>
+            {settings.envFilePath}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {!settings.writable && (
+            <Badge variant="bad">
+              <AlertTriangle className="size-3" />
+              Нет записи
+            </Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={() => load()} disabled={saving}>
+            <RotateCcw />
+            Обновить
+          </Button>
+          <Button onClick={save} disabled={saving || dirty.size === 0 || !settings.writable}>
+            <Save />
+            {saving ? "Сохраняю" : `Сохранить${dirty.size ? ` (${dirty.size})` : ""}`}
+          </Button>
+        </div>
+      </div>
+
+      {error && <div className="rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-body text-bad">{error}</div>}
+      {result?.warnings.length ? (
+        <div className="rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-body text-warn">
+          {result.warnings.join(" ")}
+        </div>
+      ) : result?.applied ? (
+        <div className="rounded-xl border border-ok/30 bg-ok/10 px-4 py-3 text-body text-ok">
+          Runtime-настройки применены.
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {settings.groups.map((group) => (
+          <div key={group.id} className={ui.panel}>
+            <div className={ui.panelHead}>
+              <div className={ui.panelTitle}>{group.title}</div>
+              <div className={ui.panelCount}>{group.fields.length}</div>
+            </div>
+            <div className="grid gap-3">
+              {group.fields.map((field) => (
+                <EnvFieldRow
+                  key={field.key}
+                  field={field}
+                  value={draft[field.key] ?? ""}
+                  dirty={dirty.has(field.key)}
+                  onChange={(value) => mark(field.key, value)}
+                  onClear={() => mark(field.key, "")}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EnvFieldRow({
+  field,
+  value,
+  dirty,
+  onChange,
+  onClear,
+}: {
+  field: EnvField;
+  value: string;
+  dirty: boolean;
+  onChange: (value: string) => void;
+  onClear: () => void;
+}) {
+  const restart = field.requiresRestart || field.serviceRecreate;
+  return (
+    <label className="grid gap-1.5">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="truncate font-mono text-label uppercase tracking-3 text-muted">
+          {field.label}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {dirty && <Badge variant="accent">changed</Badge>}
+          {restart && <Badge variant="warn">{field.serviceRecreate ? "recreate" : "restart"}</Badge>}
+          {field.runtime && <Badge variant="outline">runtime</Badge>}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          className="font-mono text-xs"
+          type={field.type === "number" ? "number" : field.type === "secret" ? "password" : "text"}
+          value={value}
+          placeholder={field.type === "secret" ? field.maskedValue || "не задано" : field.value || "не задано"}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {field.type === "secret" && field.hasValue && (
+          <Button type="button" variant="outline" size="sm" onClick={onClear}>
+            Очистить
+          </Button>
+        )}
+      </div>
+      <div className="font-mono text-[10px] tracking-1 text-muted">{field.key}</div>
+    </label>
   );
 }
 

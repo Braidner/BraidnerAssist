@@ -29,6 +29,10 @@ const EMPTY: AdguardStats = {
 
 let cache: { data: AdguardStats; at: number } | null = null;
 
+export function invalidateAdguardCache(): void {
+  cache = null;
+}
+
 function authHeader(): string {
   const token = Buffer.from(`${config.adguard.username}:${config.adguard.password}`).toString("base64");
   return `Basic ${token}`;

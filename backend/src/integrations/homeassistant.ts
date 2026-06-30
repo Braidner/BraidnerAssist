@@ -15,6 +15,10 @@ export interface HassData {
 let cache: { data: HassData; at: number } | null = null;
 const CACHE_TTL = 30_000;
 
+export function invalidateHomeAssistantCache(): void {
+  cache = null;
+}
+
 export async function getAutomations(): Promise<HassData> {
   if (!config.hass.configured) return { configured: false, automations: [] };
 

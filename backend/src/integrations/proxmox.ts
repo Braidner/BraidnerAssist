@@ -32,6 +32,10 @@ const dispatcher = new Agent({ connect: { rejectUnauthorized: false } });
 
 let cache: { data: ProxmoxData; at: number } | null = null;
 
+export function invalidateProxmoxCache(): void {
+  cache = null;
+}
+
 async function pve<T>(path: string): Promise<T> {
   const res = await fetch(`${config.proxmox.url}/api2/json${path}`, {
     headers: { Authorization: `PVEAPIToken=${config.proxmox.token}` },

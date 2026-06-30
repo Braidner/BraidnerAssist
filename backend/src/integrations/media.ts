@@ -85,6 +85,7 @@ export interface DetailEpisode {
   hasFile: boolean;
   quality: string | null;
   size: number | null;
+  stillRemote: string | null;
   jellyfinId: string | null; // для плеера, если эпизод есть в Jellyfin
   played: boolean;
 }
@@ -466,6 +467,7 @@ async function buildTmdbSeasons(
           hasFile: Boolean(jfEp),
           quality: null,
           size: null,
+          stillRemote: e.still,
           jellyfinId: jfEp?.id ?? null,
           played: Boolean(jfEp?.played),
         };
@@ -491,6 +493,7 @@ function seasonsFromJellyfinOnly(jfDetail: SeriesDetail | null): DetailSeason[] 
       hasFile: true,
       quality: null,
       size: null,
+      stillRemote: null,
       jellyfinId: e.id,
       played: e.played,
     })),
@@ -624,6 +627,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
             hasFile: Boolean(jfEp),
             quality: null,
             size: null,
+            stillRemote: e.still,
             jellyfinId: jfEp?.id ?? null,
             played: Boolean(jfEp?.played),
           };
@@ -648,6 +652,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
         hasFile: true,
         quality: null,
         size: null,
+        stillRemote: null,
         jellyfinId: e.id,
         played: e.played,
       })),

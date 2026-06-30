@@ -413,9 +413,14 @@ export function MediaSeriesPage({
             return (
               <div key={s.seasonNumber}>
                 <MediaRail title={label} countLabel={`${s.fileCount}/${s.totalCount}`} className="mt-0">
-                  {s.episodes.map((ep) => {
-                    const missed = !ep.hasFile && isAired(ep.airDate);
-                    return (
+                      {s.episodes.map((ep) => {
+                        const missed = !ep.hasFile && isAired(ep.airDate);
+                        const episodeImage = ep.jellyfinId
+                          ? jellyfinPosterUrl(ep.jellyfinId)
+                          : ep.stillRemote
+                            ? posterUrl(ep.stillRemote, "w342")
+                            : null;
+                        return (
                       <article
                         key={`${ep.seasonNumber}-${ep.episodeNumber}`}
                         className={cn(
@@ -423,10 +428,10 @@ export function MediaSeriesPage({
                           ep.played ? "media-ep-played" : "",
                         )}
                       >
-                        {ep.jellyfinId ? (
+                        {episodeImage ? (
                           <img
                             className="h-full w-[112px] flex-none object-cover"
-                            src={jellyfinPosterUrl(ep.jellyfinId)}
+                            src={episodeImage}
                             alt=""
                             loading="lazy"
                             onError={(e) => {

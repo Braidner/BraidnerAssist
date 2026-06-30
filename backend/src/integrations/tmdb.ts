@@ -38,6 +38,7 @@ export interface TmdbSeasonEpisode {
   airDate: string | null;
   overview: string;
   runtime: number | null;
+  still: string | null;
 }
 
 export interface DiscoverOpts {
@@ -248,6 +249,7 @@ export async function tmdbSeason(tmdbId: number, seasonNumber: number): Promise<
     airDate: e.air_date ? String(e.air_date) : null,
     overview: String(e.overview ?? ""),
     runtime: Number.isFinite(Number(e.runtime)) ? Number(e.runtime) : null,
+    still: e.still_path ? `${IMG}${e.still_path}` : null,
   })).filter((e: TmdbSeasonEpisode) => Number.isFinite(e.episodeNumber));
 }
 

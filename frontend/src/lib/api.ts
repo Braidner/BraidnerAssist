@@ -1105,6 +1105,7 @@ export interface DetailEpisode {
   hasFile: boolean;
   quality: string | null;
   size: number | null;
+  stillRemote: string | null;
   jellyfinId: string | null;
   played: boolean;
 }

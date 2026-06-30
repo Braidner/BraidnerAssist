@@ -89,7 +89,7 @@ function keepCacheFresh(): void {
   }
 }
 
-function librarySavePath(kind: MediaKind): string | undefined {
+export function librarySavePath(kind: MediaKind): string | undefined {
   const root = config.mediaFs.qbittorrentRoot ? path.resolve(config.mediaFs.qbittorrentRoot) : null;
   if (!root) return undefined;
   return path.join(root, kind === "series" ? config.mediaFs.tv : config.mediaFs.movies);
@@ -116,7 +116,7 @@ function canonicalFolderName(
   return `${name}${year} ${ids.join(" ")}`;
 }
 
-function titleSavePath(kind: MediaKind, title: { title: string; year: number | null; tmdbId: number; tvdbId: number | null }, detail: TmdbItem | null): string | undefined {
+export function titleSavePath(kind: MediaKind, title: { title: string; year: number | null; tmdbId: number; tvdbId: number | null }, detail: TmdbItem | null): string | undefined {
   const root = librarySavePath(kind);
   if (!root) return undefined;
   return path.join(root, canonicalFolderName(kind, title, detail));

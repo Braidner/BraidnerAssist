@@ -48,7 +48,23 @@ services:
       - backend
     restart: unless-stopped
 
+  cloudpub:
+    image: cloudpub/cloudpub:latest
+    restart: unless-stopped
+    environment:
+      TOKEN: ${CLOUDPUB_TOKEN}
+      # Публикуем только frontend: nginx внутри него сам проксирует /api на backend.
+      HTTP: frontend:80
+    command: run
+    depends_on:
+      - frontend
+    volumes:
+      - cloudpub-config:/home/cloudpub
+
 networks:
   homelab:
     external: true
     name: stack_stack
+
+volumes:
+  cloudpub-config:

@@ -11,7 +11,6 @@ import {
 	DetailHero,
 	SimilarRail,
 	CardRail,
-	detailHeroButtonClass,
 	tmdbRailCards,
 	type DetailPlayer,
 } from "./shared/mediaDetail.tsx";
@@ -252,7 +251,6 @@ export function MediaMoviePage({
 									В библиотеке
 								</button>
 							)}
-							{(det.hasFile || !inLibrary) && (
 								<button
 									className={ms.heroGhostBtn}
 									disabled={det.tmdbId == null}
@@ -261,7 +259,6 @@ export function MediaMoviePage({
 								>
 									{showPicker ? "Скрыть поиск" : "Поиск"}
 								</button>
-							)}
 						</>
 					}
 					onBack={goBack}

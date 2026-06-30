@@ -311,7 +311,7 @@ export function DetailHero({
   return (
     <div
       ref={heroRef}
-      className="relative h-[56vh] min-h-[360px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px] fullscreen:h-screen fullscreen:min-h-screen fullscreen:w-screen"
+      className="relative h-[56vh] min-h-[460px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px] fullscreen:h-screen fullscreen:min-h-screen fullscreen:w-screen"
       style={{ animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both" }}
       onMouseMove={player ? revealControls : undefined}
       onTouchStart={player ? revealControls : undefined}

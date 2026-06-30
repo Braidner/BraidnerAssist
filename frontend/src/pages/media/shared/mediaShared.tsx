@@ -56,7 +56,7 @@ export function fmtEta(eta?: number | null): string {
   return `${m}м`;
 }
 
-export function TorrentRailCard({ item }: { item: TorrentRailItem }) {
+export function TorrentRailCard({ item, onOpen }: { item: TorrentRailItem; onOpen?: () => void }) {
   const meta = [
     item.kind === "series" ? "сериал" : "фильм",
     item.year ? String(item.year) : "",
@@ -83,7 +83,19 @@ export function TorrentRailCard({ item }: { item: TorrentRailItem }) {
         : `${item.progress}%`;
 
   return (
-    <div className={cn(media.posterCard, "group cursor-default")}>
+    <div
+      className={cn(media.posterCard, "group", onOpen ? "cursor-pointer" : "cursor-default")}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (!onOpen) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       <div className={media.posterArt}>
         <div className="absolute inset-0 z-0 bg-[#09090d]" />
         {item.poster ? (

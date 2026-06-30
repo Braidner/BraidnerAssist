@@ -9,6 +9,7 @@ import {
     jellyfinBackdropUrl,
     getMoviePageDetail,
     getSeriesPageDetail,
+    tmdbResolveTvdb,
     type LibraryItem,
     type ResumeItem,
     type MoviePageDetail,
@@ -81,6 +82,25 @@ export function MediaLibraryTab({
             },
         );
 
+    const openTorrentTitle = async (item: TorrentRailItem) => {
+        if (item.jellyfinId) {
+            nav(`/media/${item.kind === "series" ? "series" : "movie"}/${item.jellyfinId}`, {
+                state: returnState(),
+            });
+            return;
+        }
+        if (item.kind === "movie") {
+            nav(`/media/discover/movie/${item.tmdbId}`, {state: returnState()});
+            return;
+        }
+        const tvdbId = item.tvdbId ?? await tmdbResolveTvdb(item.tmdbId);
+        if (tvdbId) {
+            nav(`/media/discover/series/${tvdbId}`, {state: returnState()});
+        } else {
+            toast.error("Не удалось открыть карточку: TMDB не вернул tvdbId");
+        }
+    };
+
     const sortedLibrary = [...library].sort((a, b) => a.name.localeCompare(b.name, "ru"));
     const movieItems = sortedLibrary.filter((it) => it.type === "Movie");
     const seriesItems = sortedLibrary.filter((it) => it.type === "Series");
@@ -108,7 +128,7 @@ export function MediaLibraryTab({
             {torrentRail.length > 0 && (
                 <MediaRail title="СКАЧИВАЕТСЯ / СКОРО В БИБЛИОТЕКЕ" countLabel={String(torrentRail.length)} className={ms.section}>
                     {torrentRail.map((it) => (
-                        <TorrentRailCard key={it.infohash} item={it} />
+                        <TorrentRailCard key={it.infohash} item={it} onOpen={() => void openTorrentTitle(it)} />
                     ))}
                 </MediaRail>
             )}

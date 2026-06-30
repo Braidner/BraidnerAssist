@@ -269,13 +269,6 @@ export function MediaMoviePage({
 								}}
 							/>
 					)}
-					{titleTorrents.length > 0 && (
-						<MediaRail title="РАЗДАЧИ ЭТОГО ФИЛЬМА" countLabel={String(titleTorrents.length)} className="mt-8">
-							{titleTorrents.map((it) => (
-								<TorrentRailCard key={it.infohash} item={it} />
-							))}
-						</MediaRail>
-					)}
 				</DetailBody>
 			</div>
 			{collection && collection.items.length > 1 && (
@@ -291,6 +284,14 @@ export function MediaMoviePage({
 				<CardRail label="ПОХОЖИЕ" cards={tmdbRailCards(tmdbSimilar, openTmdb)}/>
 			) : (
 				<SimilarRail items={similarItems}/>
+			)}
+
+			{titleTorrents.length > 0 && (
+				<MediaRail title="Медиа" countLabel={String(titleTorrents.length)} className="mt-8">
+					{titleTorrents.map((it) => (
+						<TorrentRailCard key={it.infohash} item={it} />
+					))}
+				</MediaRail>
 			)}
 			</div>
 	);

@@ -573,14 +573,6 @@ export function MediaSeriesPage({
             </div>
           )}
 
-          {titleTorrents.length > 0 && (
-            <MediaRail title="РАЗДАЧИ ЭТОГО СЕРИАЛА" countLabel={String(titleTorrents.length)} className="mb-10">
-              {titleTorrents.map((it) => (
-                <TorrentRailCard key={it.infohash} item={it} />
-              ))}
-            </MediaRail>
-          )}
-
         </DetailBody>
       </div>
 
@@ -588,6 +580,14 @@ export function MediaSeriesPage({
         <CardRail label="ПОХОЖИЕ" cards={tmdbRailCards(tmdbSimilar, openTmdb)} />
       ) : (
         <SimilarRail items={similarItems} />
+      )}
+
+      {titleTorrents.length > 0 && (
+        <MediaRail title="Медиа" countLabel={String(titleTorrents.length)} className="mb-10">
+          {titleTorrents.map((it) => (
+            <TorrentRailCard key={it.infohash} item={it} />
+          ))}
+        </MediaRail>
       )}
 
     </div>

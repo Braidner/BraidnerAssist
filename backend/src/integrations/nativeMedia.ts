@@ -82,6 +82,33 @@ function librarySavePath(kind: MediaKind): string | undefined {
   return path.join(root, kind === "series" ? config.mediaFs.tv : config.mediaFs.movies);
 }
 
+function safeFolderName(value: string): string {
+  return value
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[. ]+$/g, "")
+    .trim()
+    .slice(0, 140) || "Untitled";
+}
+
+function canonicalFolderName(
+  kind: MediaKind,
+  title: { title: string; year: number | null; tmdbId: number; tvdbId: number | null },
+  detail: TmdbItem | null,
+): string {
+  const name = safeFolderName(detail?.originalTitle ?? title.title);
+  const year = title.year ? ` (${title.year})` : "";
+  const ids = [`[tmdbid-${title.tmdbId}]`];
+  if (kind === "series" && title.tvdbId) ids.push(`[tvdbid-${title.tvdbId}]`);
+  return `${name}${year} ${ids.join(" ")}`;
+}
+
+function titleSavePath(kind: MediaKind, title: { title: string; year: number | null; tmdbId: number; tvdbId: number | null }, detail: TmdbItem | null): string | undefined {
+  const root = librarySavePath(kind);
+  if (!root) return undefined;
+  return path.join(root, canonicalFolderName(kind, title, detail));
+}
+
 function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: number): string[] {
   const titles = [title, detail?.originalTitle]
     .map((v) => String(v ?? "").trim())
@@ -196,7 +223,8 @@ export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId
   const item = cached.item;
   const source = String(item.url);
   const title = await ensureTitle(kind, item.tmdbId);
-  const savePath = librarySavePath(kind);
+  const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
+  const savePath = titleSavePath(kind, title, detail);
   const addedIds = await qbAddRaw(source, { category: LIBRARY_CATEGORY, savePath });
   const infohash = (addedIds[0] ?? item.infoHash ?? "").toLowerCase();
   if (!infohash) throw new Error("qBittorrent добавил торрент, но не вернул hash");

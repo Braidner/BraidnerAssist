@@ -423,8 +423,9 @@
       `/home/braidner/mission-control-db.bak-simplify-media-20260630-021943`.
 - [x] Backend pipeline: `nativeMedia.ts` теперь делает lookup/search/grab и registry only.
       `POST /media/release/grab` отправляет релиз в qB с category `mc-library` и `savePath`
-      в `QBITTORRENT_SAVE_ROOT/MEDIA_MOVIES` или `QBITTORRENT_SAVE_ROOT/MEDIA_TV`
-      (default `/data/movies|/data/tv` для qB namespace).
+      в canonical provider-id папку внутри `QBITTORRENT_SAVE_ROOT/MEDIA_MOVIES` или
+      `QBITTORRENT_SAVE_ROOT/MEDIA_TV`, например
+      `/data/tv/Creature Commandos (2024) [tmdbid-219543] [tvdbid-430518]`.
 - [x] Torrent rails: `GET /api/media/torrent-rail` отдаёт выбранные раздачи, которые скачиваются
       или ещё не связаны с Jellyfin item. После link по TMDB/TVDB → `jellyfinId` item исчезает
       из library rail. `GET /api/media/torrents/:kind/:tmdbId` отдаёт все раздачи конкретного

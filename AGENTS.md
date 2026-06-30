@@ -116,9 +116,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     2026-06-30**) максимально простой: TMDB (метаданные/discovery) → Jackett Torznab
     (`integrations/jackett.ts`, `JACKETT_URL`/`JACKETT_API_KEY`/`JACKETT_INDEXERS`) →
     release parse/score (`releaseParse.ts`/`releaseScore.ts`) → qBittorrent →
-    Jellyfin library folders (qB savePath = `QBITTORRENT_SAVE_ROOT` + `MEDIA_MOVIES|MEDIA_TV`,
-    default `/data/movies|/data/tv`; backend/Jellyfin path = `MEDIA_ROOT`, default `/media`) →
-    Jellyfin scan/playback/watch-state.
+    Jellyfin library folders (qB savePath = `QBITTORRENT_SAVE_ROOT` + `MEDIA_MOVIES|MEDIA_TV` +
+    canonical provider-id folder, e.g. `/data/tv/Creature Commandos (2024) [tmdbid-219543] [tvdbid-430518]`;
+    backend/Jellyfin path = `MEDIA_ROOT`, default `/media`) → Jellyfin scan/playback/watch-state.
     Sonarr/Radarr/Prowlarr, native monitor/missing queue, quality profiles, Repair Center,
     importer, hardlink/copy organizer and per-file picker are not part of the active pipeline.
     qB saves the selected release directly into the final Jellyfin folder; Jellyfin is trusted
@@ -184,7 +184,8 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     **Правильный пайплайн в медиатеку**: `GET /media/lookup?type=movie|series&q=` ищет тайтл в TMDB,
     `POST /media/release/search` ищет релизы через Jackett Torznab, `POST /media/release/grab`
     отправляет выбранный релиз в qBittorrent с категорией `mc-library` и `savePath` сразу в
-    `/data/movies` или `/data/tv` (qB namespace), затем пишет `MediaTitle`/`MediaTorrent`. Фронт:
+    provider-id папку внутри `/data/movies` или `/data/tv` (qB namespace), затем пишет
+    `MediaTitle`/`MediaTorrent`. Фронт:
     `ReleasePicker` доступен на детальной странице сериала на каждый сезон, на странице фильма
     и в дравере добавления.
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent),

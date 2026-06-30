@@ -472,29 +472,34 @@ export function TorrentCard({
   const link = releaseLink(release);
   const progress = download?.progress;
   const isComplete = Boolean(done) || Boolean(download && progress != null && progress >= 100);
-  const titleContent = (
-    <div className="space-y-0.5 text-[11.5px] font-bold leading-[1.18] text-white [font-family:Syne,var(--font-ui)]" title={title}>
-      {(titleLines.length ? titleLines : [title]).map((line, index) => (
-        <div key={`${line}-${index}`} className="break-words">
-          {line}
-        </div>
-      ))}
-    </div>
-  );
+  const titleText = titleLines.length ? titleLines.join(" / ") : title;
+  const meta = [
+    tracker,
+    quality,
+    tech?.size ?? fmtSize(release.size),
+    `${seeders} seed`,
+  ].filter(Boolean).join(" · ");
+  const status = download
+    ? [download.state, download.dlspeed ? fmtSpeed(download.dlspeed) : "", download.eta ? fmtEta(download.eta) : ""]
+      .filter(Boolean)
+      .join(" · ")
+    : null;
 
   return (
     <article
       className={cn(
-        "group media-hover-card relative w-[220px] flex-none scroll-ml-5 max-mob:w-[calc(100vw-40px)]",
+        media.posterCard,
+        "group scroll-ml-5",
+        release.rejected && "opacity-70",
       )}
     >
       <div
         className={cn(
-          "group relative aspect-[2/3.25] overflow-hidden rounded-[10px] bg-raise",
-          release.rejected && "ring-1 ring-bad/40",
+          media.posterArt,
+          release.rejected && "ring-1 ring-bad/45",
         )}
       >
-        <div className="absolute inset-0 grid place-items-center px-2 text-center font-mono text-2xs tracking-[0.1em] text-muted">
+        <div className="absolute inset-0 z-0 grid place-items-center px-2 text-center font-mono text-2xs tracking-[0.1em] text-muted">
           NO ART
         </div>
         {posterSrc && (
@@ -502,70 +507,65 @@ export function TorrentCard({
             src={posterSrc}
             alt=""
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="absolute inset-0 z-[1] h-full w-full object-cover"
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
           />
         )}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_38%,rgba(0,0,0,0.34)_72%,rgba(0,0,0,0.78)_100%),linear-gradient(to_top,rgba(0,0,0,0.97)_0%,rgba(0,0,0,0.7)_48%,rgba(0,0,0,0.16)_76%,rgba(0,0,0,0.18)_100%)]" />
+        <div className="absolute inset-0 z-[2] bg-[linear-gradient(to_top,rgba(0,0,0,0.78)_0%,rgba(0,0,0,0.16)_58%,transparent_100%)] transition-colors duration-700 group-hover:bg-[linear-gradient(to_top,rgba(0,0,0,0.88)_0%,rgba(0,0,0,0.28)_64%,transparent_100%)]" />
 
-        <div className="absolute left-2.5 top-2.5 flex max-w-[72%] flex-col items-start gap-1">
-          <span className="whitespace-nowrap rounded bg-black/80 px-2 py-1 font-mono text-2xs font-bold text-white/90 shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="absolute left-2 top-2 z-[4] flex max-w-[72%] flex-col items-start gap-1">
+          <span className={media.posterBadge}>
             {tracker}
           </span>
           {quality && (
-            <span className="max-w-full truncate rounded bg-black/70 px-2 py-1 font-mono text-2xs font-semibold text-white/65 backdrop-blur-md">
+            <span className="max-w-full truncate rounded-full bg-black/70 px-2 py-1 text-2xs font-semibold text-white/70">
               {quality}
             </span>
           )}
         </div>
-        <div className="absolute right-2.5 top-2.5 rounded bg-black/60 px-2 py-1 font-mono text-2xs font-bold text-accent backdrop-blur-md">
-          {seeders} сид
-        </div>
 
-        <div className="absolute inset-x-0 bottom-0 p-2.5">
-          {link ? (
-            <a
-              href={link}
-              target="_blank"
-              rel="noreferrer"
-              className="block transition-opacity hover:opacity-80"
-            >
-              {titleContent}
-            </a>
-          ) : titleContent}
-
-          <div className="mt-2 flex flex-wrap gap-1">
-            {voiceTags.slice(0, 3).map((tag) => <span key={tag} className={voiceTagClass()}>{tag}</span>)}
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate font-mono text-[11.5px] font-semibold text-white/70">
-              {tech?.size ?? fmtSize(release.size)}
-            </span>
-            {actionSlot ?? (
-              <DownloadProgressButton
-                busy={busy}
-                done={isComplete}
-                progress={progress}
-                disabled={disabled || Boolean(download)}
-                onClick={onGrab}
-              />
-            )}
-          </div>
-          {extraMeta}
-          {download && (
-            <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[10px] text-white/58">
-              <span className="truncate">{download.state}</span>
-              {download.dlspeed ? <span>{fmtSpeed(download.dlspeed)}</span> : null}
-              {download.eta ? <span>{fmtEta(download.eta)}</span> : null}
-            </div>
+        <div className="absolute bottom-2 right-2 z-[4]">
+          {actionSlot ?? (
+            <DownloadProgressButton
+              busy={busy}
+              done={isComplete}
+              progress={progress}
+              disabled={disabled || Boolean(download)}
+              onClick={onGrab}
+            />
           )}
         </div>
       </div>
 
-      <div className="min-h-0">
+      <div className={media.posterInfo}>
+        {link ? (
+          <a
+            href={link}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(media.posterTitle, "block transition-colors hover:text-accent")}
+            title={title}
+          >
+            {titleText}
+          </a>
+        ) : (
+          <div className={media.posterTitle} title={title}>{titleText}</div>
+        )}
+        <div className={media.posterSub}>{meta}</div>
+        {voiceTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {voiceTags.slice(0, 3).map((tag) => <span key={tag} className={voiceTagClass()}>{tag}</span>)}
+          </div>
+        )}
+        {download && (
+          <div className="mt-2">
+            <ProgressBar pct={progress ?? 0} />
+            {status && <div className={cn(media.posterSub, "mt-1")}>{status}</div>}
+          </div>
+        )}
+        {extraMeta}
         {done && /multi-season/i.test((release.rejections ?? []).join(" ")) && (
           <div className={cn(media.reject, "mt-2 whitespace-normal text-label")}>
             Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках.

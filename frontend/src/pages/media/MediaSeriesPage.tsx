@@ -8,11 +8,9 @@ import {
   TorrentRailCard,
 } from "./shared/mediaShared.tsx";
 import {
-  DetailBody,
   DetailHero,
   SimilarRail,
   CardRail,
-  detailHeroButtonClass,
   tmdbRailCards,
   type DetailPlayer,
   type QueueItem,
@@ -432,50 +430,51 @@ export function MediaSeriesPage({
                       <article
                         key={`${ep.seasonNumber}-${ep.episodeNumber}`}
                         className={cn(
-                          "relative flex h-[150px] w-[280px] flex-none overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.035] text-left transition-all hover:-translate-y-0.5 hover:bg-white/[0.055]",
+                          "group relative flex h-[150px] w-[280px] flex-none overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.035] text-left transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-white/[0.055]",
                           ep.played ? "media-ep-played" : "",
                         )}
                       >
                         {episodeImage ? (
                           <img
-                            className="h-full w-[112px] flex-none object-cover"
+                            className="absolute inset-0 z-0 size-full object-cover opacity-55 transition-transform duration-700 ease-out group-hover:scale-[1.04]"
                             src={episodeImage}
                             alt=""
                             loading="lazy"
                             onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
                             }}
                           />
                         ) : (
-                          <span className="h-full w-[112px] flex-none bg-groove" />
+                          <span className="absolute inset-0 z-0 bg-groove" />
                         )}
-                        <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
+                        <div className="absolute inset-0 z-[1] bg-[linear-gradient(to_top,rgba(0,0,0,0.82)_0%,rgba(0,0,0,0.50)_54%,rgba(0,0,0,0.20)_100%),linear-gradient(to_right,rgba(0,0,0,0.72)_0%,rgba(0,0,0,0.22)_70%,transparent_100%)]" />
+                        <div className="relative z-[2] flex min-w-0 flex-1 flex-col gap-2 p-3">
                           <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-2xs uppercase tracking-2 text-muted">
+                                <span className="font-mono text-2xs uppercase tracking-2 text-white/62">
                                   S{String(ep.seasonNumber).padStart(2, "0")}E{String(ep.episodeNumber ?? 0).padStart(2, "0")}
                                 </span>
                             <span
                               className={cn(
                                 "whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-2xs",
                                 ep.hasFile
-                                  ? "bg-white/[0.08] text-ink"
+                                  ? "bg-white/[0.12] text-white"
                                   : missed
-                                    ? "bg-groove text-[#e06666]"
-                                    : "bg-groove text-muted",
+                                    ? "bg-black/45 text-[#ff8a8a]"
+                                    : "bg-black/45 text-white/58",
                               )}
                             >
                                   {ep.hasFile ? "есть" : missed ? "пропущено" : "нет файла"}
                                 </span>
                           </div>
-                          <div className="line-clamp-2 text-row font-semibold text-ink" title={ep.title}>
+                          <div className="line-clamp-2 text-row font-semibold text-white" title={ep.title}>
                             {ep.title}
                           </div>
                           <div className="mt-auto flex items-center justify-between gap-2">
-                                <span className="truncate font-mono text-2xs text-muted" title={fmtAir(ep.airDate)}>
+                                <span className="truncate font-mono text-2xs text-white/58" title={fmtAir(ep.airDate)}>
                                   {relAir(ep.airDate)}
                                 </span>
                             <button
-                              className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.14] bg-white/[0.05] text-ink-soft transition-all hover:border-transparent hover:bg-[var(--epa,var(--accent))] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                              className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.18] bg-black/25 text-white/78 backdrop-blur-md transition-all hover:border-transparent hover:bg-[var(--epa,var(--accent))] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
                               title={ep.jellyfinId ? "Воспроизвести" : "Файл недоступен"}
                               disabled={!ep.jellyfinId || busy === ep.jellyfinId}
                               onClick={() =>

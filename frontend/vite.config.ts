@@ -33,6 +33,18 @@ export default defineConfig({
       workbox: {
         runtimeCaching: [
           {
+            urlPattern: /^\/api\/poster/,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "poster-cache",
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: {
+                maxEntries: 2500,
+                maxAgeSeconds: 90 * 24 * 60 * 60,
+              },
+            },
+          },
+          {
             urlPattern: /^\/api\//,
             handler: "NetworkFirst",
             options: { cacheName: "api-cache", networkTimeoutSeconds: 5 },

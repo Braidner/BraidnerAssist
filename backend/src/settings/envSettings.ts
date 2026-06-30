@@ -44,6 +44,17 @@ export interface EnvUpdateResult {
   warnings: string[];
 }
 
+const DEFAULT_ENV_VALUES: Record<string, string> = {
+  POSTER_CACHE_DIR: "/data/poster-cache",
+  POSTER_CACHE_MAX_MB: "5120",
+  POSTER_CACHE_OBJECT_MAX_MB: "20",
+  POSTER_CACHE_TMDB_TTL_DAYS: "90",
+  POSTER_CACHE_TVDB_TTL_DAYS: "90",
+  POSTER_CACHE_KINOZAL_TTL_DAYS: "30",
+  POSTER_CACHE_JELLYFIN_TTL_DAYS: "7",
+  POSTER_CACHE_CLEANUP_INTERVAL_MS: "3600000",
+};
+
 export async function getEnvSettings(): Promise<EnvSettingsResponse> {
   const writable = await canWriteEnvFile();
   return {
@@ -111,7 +122,7 @@ export async function updateEnvSettings(input: unknown): Promise<EnvUpdateResult
 }
 
 function fieldResponse(field: EnvFieldDefinition): EnvFieldResponse {
-  const raw = getEffectiveEnvValue(field.key) ?? "";
+  const raw = getEffectiveEnvValue(field.key) ?? DEFAULT_ENV_VALUES[field.key] ?? "";
   const hasValue = raw.trim() !== "";
   if (SECRET_ENV_KEYS.has(field.key)) {
     return {

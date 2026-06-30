@@ -19,14 +19,17 @@ INSERT OR IGNORE INTO "MediaTitle" (
   "id", "kind", "tmdbId", "tvdbId", "title", "createdAt", "updatedAt"
 )
 SELECT
-  'legacy-' || lower("infohash"),
+  MIN('legacy-' || lower("infohash")),
   CASE WHEN "contentType" = 'series' THEN 'series' ELSE 'movie' END,
   COALESCE("tmdbId", abs(random()) + 1000000000),
-  "tvdbId",
-  COALESCE(NULLIF("title", ''), 'Legacy torrent'),
-  COALESCE("createdAt", CURRENT_TIMESTAMP),
-  COALESCE("updatedAt", CURRENT_TIMESTAMP)
-FROM "MediaTorrent";
+  MAX("tvdbId"),
+  COALESCE(NULLIF(MAX("title"), ''), 'Legacy torrent'),
+  MIN(COALESCE("createdAt", CURRENT_TIMESTAMP)),
+  MAX(COALESCE("updatedAt", CURRENT_TIMESTAMP))
+FROM "MediaTorrent"
+GROUP BY
+  CASE WHEN "contentType" = 'series' THEN 'series' ELSE 'movie' END,
+  COALESCE("tmdbId", abs(random()) + 1000000000);
 
 CREATE TABLE "new_MediaTorrent" (
   "id" TEXT NOT NULL PRIMARY KEY,

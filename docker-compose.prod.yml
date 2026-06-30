@@ -15,9 +15,6 @@ services:
       # Docker Engine API (opt-in включён): backend читает контейнеры через этот сокет.
       # ВНИМАНИЕ: docker.sock = root-эквивалент на хосте — осознанный риск (LAN-only, bearer).
       DOCKER_SOCKET: /var/run/docker.sock
-      # Корень медиатеки внутри контейнера. qB сохраняет выбранные релизы сразу
-      # в movies/tv; Jellyfin каталогизирует эти папки напрямую.
-      MEDIA_ROOT: /media
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:

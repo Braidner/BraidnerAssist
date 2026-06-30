@@ -62,6 +62,7 @@ import {
   upsertMediaPreference,
   type MediaPreferenceStatus,
 } from "../integrations/mediaPreferences.js";
+import { clearPosterCache, getPosterCacheStatus } from "../integrations/posterCache.js";
 import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integrations/files.js";
 import { log, getEntries } from "../logger.js";
 
@@ -306,6 +307,22 @@ apiRouter.get("/media", async (_req, res) => {
     res.json(await getMedia());
   } catch (e) {
     res.status(502).json({ configured: false, error: String(e) });
+  }
+});
+
+apiRouter.get("/poster-cache/status", async (_req, res) => {
+  try {
+    res.json(await getPosterCacheStatus());
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+
+apiRouter.delete("/poster-cache", async (_req, res) => {
+  try {
+    res.json(await clearPosterCache());
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
   }
 });
 

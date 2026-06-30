@@ -10,11 +10,14 @@ import type {
   DockerData,
   DockerContainer,
   AdguardData,
+  PosterCacheStatus,
 } from "../../lib/api.ts";
 import {
+  clearPosterCache,
   dockerAction,
   getDocker,
   getAdguard,
+  getPosterCacheStatus,
   getProxmox,
   getServices,
 } from "../../lib/api.ts";
@@ -27,6 +30,18 @@ const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
 
 function gb(bytes: number): number {
   return Math.round(bytes / 1024 ** 3);
+}
+
+function humanBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 Б";
+  const units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
+  let value = bytes;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i += 1;
+  }
+  return `${value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
 }
 
 const statList = "flex flex-col gap-0";
@@ -212,6 +227,82 @@ function AdguardCard({ adguard }: { adguard: AdguardData }) {
   );
 }
 
+function PosterCacheCard({
+  cache,
+  onRefresh,
+}: {
+  cache: PosterCacheStatus;
+  onRefresh: (d: PosterCacheStatus) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const pct = cache.maxBytes > 0 ? Math.round((cache.sizeBytes / cache.maxBytes) * 100) : 0;
+  const sources = Object.entries(cache.sources).sort((a, b) => b[1].sizeBytes - a[1].sizeBytes);
+
+  const purge = async () => {
+    if (busy) return;
+    const ok = window.confirm("Очистить серверный кэш постеров?");
+    if (!ok) return;
+    setBusy(true);
+    const cleared = await clearPosterCache();
+    const fresh = await getPosterCacheStatus();
+    onRefresh(fresh);
+    setBusy(false);
+    if (!cleared) window.alert("Не удалось очистить кэш постеров");
+  };
+
+  return (
+    <Card
+      icon="cloud"
+      title="Poster cache"
+      action={
+        <button className={ui.button.sm} disabled={busy} onClick={purge}>
+          Очистить
+        </button>
+      }
+    >
+      {!cache.configured ? (
+        <div className="py-2.5 font-mono text-xs text-muted">
+          Статус кэша недоступен.
+        </div>
+      ) : (
+        <>
+          <div className={cn(gaugeRow, "mt-1")}>
+            <div className={gaugeItem}>
+              <Ring pct={Math.min(100, pct)} size={96} />
+              <div className={gaugeLabel}>
+                <div className={gaugeName}>DISK CACHE</div>
+                <div className={gaugeValue}>
+                  {humanBytes(cache.sizeBytes)} / {humanBytes(cache.maxBytes)}
+                </div>
+              </div>
+            </div>
+            <div className={cn(gaugeItem, "justify-center")}>
+              <div className={gaugeLabel}>
+                <div className={gaugeName}>ФАЙЛЫ</div>
+                <div className={gaugeValue}>{cache.files.toLocaleString("ru-RU")}</div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 truncate font-mono text-2xs text-muted" title={cache.dir}>
+            {cache.dir}
+          </div>
+          {sources.length > 0 && (
+            <div className={cn(statList, "mt-3")}>
+              {sources.map(([source, s]) => (
+                <div key={source} className={cn(statRow, "grid-cols-[1fr_auto_auto]")}>
+                  <span className={statName}>{source}</span>
+                  <span className={statTag}>{s.files.toLocaleString("ru-RU")} files</span>
+                  <span className={statTag}>{humanBytes(s.sizeBytes)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 // /system — развёрнутая страница: Proxmox-гейджи, VM/LXC, таблица сервисов, Docker, AdGuard.
 export function SystemPage() {
   const [proxmox, setProxmox] = useState<ProxmoxData>({
@@ -236,19 +327,31 @@ export function SystemPage() {
     avgProcessingMs: 0,
     topBlocked: [],
   });
+  const [posterCache, setPosterCache] = useState<PosterCacheStatus>({
+    configured: false,
+    dir: "",
+    maxBytes: 0,
+    sizeBytes: 0,
+    files: 0,
+    sources: {},
+  });
 
   useEffect(() => {
     getProxmox().then(setProxmox);
     getServices().then(setServicesData);
     getDocker().then(setDocker);
     getAdguard().then(setAdguard);
+    getPosterCacheStatus().then(setPosterCache);
     const fastTimer = setInterval(() => {
       getProxmox().then(setProxmox);
       getDocker().then(setDocker);
       getAdguard().then(setAdguard);
     }, 30_000);
     const slowTimer = setInterval(
-      () => getServices().then(setServicesData),
+      () => {
+        getServices().then(setServicesData);
+        getPosterCacheStatus().then(setPosterCache);
+      },
       60_000,
     );
     return () => {
@@ -399,6 +502,9 @@ export function SystemPage() {
 
           {/* AdGuard DNS */}
           <AdguardCard adguard={adguard} />
+
+          {/* Poster cache */}
+          <PosterCacheCard cache={posterCache} onRefresh={setPosterCache} />
         </div>
       </div>
     </div>

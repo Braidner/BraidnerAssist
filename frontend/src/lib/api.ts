@@ -602,6 +602,48 @@ export async function dockerAction(
   }
 }
 
+// ─── Poster cache ───────────────────────────────────────────────────
+
+export interface PosterCacheSourceStats {
+  files: number;
+  sizeBytes: number;
+}
+
+export interface PosterCacheStatus {
+  configured: boolean;
+  dir: string;
+  maxBytes: number;
+  sizeBytes: number;
+  files: number;
+  sources: Record<string, PosterCacheSourceStats>;
+}
+
+export async function getPosterCacheStatus(): Promise<PosterCacheStatus> {
+  try {
+    const res = await apiFetch("/api/poster-cache/status");
+    if (!res.ok) throw new Error();
+    return (await res.json()) as PosterCacheStatus;
+  } catch {
+    return {
+      configured: false,
+      dir: "",
+      maxBytes: 0,
+      sizeBytes: 0,
+      files: 0,
+      sources: {},
+    };
+  }
+}
+
+export async function clearPosterCache(): Promise<boolean> {
+  try {
+    const res = await apiFetch("/api/poster-cache", { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Metrics / Uptime ────────────────────────────────────────────────
 
 export interface UptimeSample {

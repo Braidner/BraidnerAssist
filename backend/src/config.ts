@@ -149,6 +149,17 @@ export const config = {
     exportPath: env("HEALTH_EXPORT_PATH") ?? "/data/health/export.xml",
   },
 
+  posterCache: {
+    dir: env("POSTER_CACHE_DIR") ?? "/data/poster-cache",
+    maxBytes: num("POSTER_CACHE_MAX_MB", 5120) * 1024 * 1024,
+    objectMaxBytes: num("POSTER_CACHE_OBJECT_MAX_MB", 20) * 1024 * 1024,
+    tmdbTtlMs: num("POSTER_CACHE_TMDB_TTL_DAYS", 90) * 86_400_000,
+    tvdbTtlMs: num("POSTER_CACHE_TVDB_TTL_DAYS", 90) * 86_400_000,
+    kinozalTtlMs: num("POSTER_CACHE_KINOZAL_TTL_DAYS", 30) * 86_400_000,
+    jellyfinTtlMs: num("POSTER_CACHE_JELLYFIN_TTL_DAYS", 7) * 86_400_000,
+    cleanupIntervalMs: num("POSTER_CACHE_CLEANUP_INTERVAL_MS", 3_600_000),
+  },
+
   poll: {
     services: num("POLL_SERVICES", 60_000),
     weather: num("POLL_WEATHER", 1_800_000),

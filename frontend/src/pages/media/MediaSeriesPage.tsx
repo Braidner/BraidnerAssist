@@ -6,7 +6,6 @@ import { useParams, useNavigate, useLocation, useSearchParams } from "react-rout
 import {
   ReleasePicker,
   ProgressBar,
-  fmtSize,
   TorrentRailCard,
 } from "./shared/mediaShared.tsx";
 import {
@@ -24,6 +23,7 @@ import { media as ms } from "./shared/mediaStyles.ts";
 import {
   getSeriesPageDetail,
   getSeriesDiscoverDetail,
+  getMediaTitleDetail,
   addTitle,
   getMediaPlayUrl,
   jellyfinPosterUrl,
@@ -31,7 +31,6 @@ import {
   getMediaLibrary,
   getDiscoverSimilar,
   getTitleTorrents,
-  tmdbResolveTvdb,
   backdropUrl,
   type SeriesPageDetail,
   type MediaData,
@@ -70,11 +69,11 @@ const isAired = (iso: string | null) =>
 export function MediaSeriesPage({
   media,
   onMediaUpdate,
-  source = "library",
+  source = "tmdb",
 }: {
   media: MediaData;
   onMediaUpdate: () => void;
-  source?: "library" | "discover";
+  source?: "tmdb" | "jellyfin" | "discover";
 }) {
   const { id = "" } = useParams();
   const nav = useNavigate();
@@ -87,7 +86,6 @@ export function MediaSeriesPage({
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [act, setAct] = useState<string | null>(null);
-  const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
   const [showAllPicker, setShowAllPicker] = useState(false);
   const [titleTorrents, setTitleTorrents] = useState<TorrentRailItem[]>([]);
@@ -102,11 +100,13 @@ export function MediaSeriesPage({
     nav(backTarget, { replace: true });
   };
 
-  // discover-карточка резолвится по tvdbId (id = tvdbId), library — по Jellyfin-id.
+  // Основной маршрут использует TMDB id; legacy routes оставлены для старых ссылок.
   const fetchDetail = () =>
-    source === "discover"
-      ? getSeriesDiscoverDetail(Number(id))
-      : getSeriesPageDetail(id);
+    source === "jellyfin"
+      ? getSeriesPageDetail(id)
+      : source === "discover"
+        ? getSeriesDiscoverDetail(Number(id))
+        : getMediaTitleDetail("series", Number(id));
 
   useEffect(() => {
     setD("loading");
@@ -127,7 +127,7 @@ export function MediaSeriesPage({
     }
   };
 
-  // TMDB-похожие для сериала. На входе tvdbId → бэкенд резолвит в TMDB tv id (idType=tvdb).
+  // TMDB-похожие для сериала. Основной путь теперь всегда работает по TMDB id.
   const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
   const detTvdbId = d && d !== "loading" ? d.tvdbId : null;
   const detTmdbId = d && d !== "loading" ? d.tmdbId : null;
@@ -139,12 +139,13 @@ export function MediaSeriesPage({
     getTitleTorrents("series", detTmdbId).then(setTitleTorrents);
   };
   useEffect(() => {
-    if (!media.tmdb || detTvdbId == null) {
+    if (!media.tmdb || (detTmdbId == null && detTvdbId == null)) {
       setTmdbSimilar([]);
       return;
     }
-    getDiscoverSimilar("series", detTvdbId, "tvdb").then(setTmdbSimilar);
-  }, [media.tmdb, detTvdbId]);
+    if (detTmdbId != null) getDiscoverSimilar("series", detTmdbId).then(setTmdbSimilar);
+    else if (detTvdbId != null) getDiscoverSimilar("series", detTvdbId, "tvdb").then(setTmdbSimilar);
+  }, [media.tmdb, detTmdbId, detTvdbId]);
 
   useEffect(() => {
     refreshTitleTorrents();
@@ -152,18 +153,14 @@ export function MediaSeriesPage({
   }, [detTmdbId]);
 
   const openTmdb = (it: TmdbItem) => {
-    if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
-    else tmdbResolveTvdb(it.tmdbId).then((tvdb) => {
-      if (tvdb) nav(`/media/discover/series/${tvdb}`);
-      else toast.error("Не удалось открыть сериал: TMDB не вернул tvdbId");
-    });
+    nav(`/media/${it.kind === "movie" ? "movie" : "series"}/${it.tmdbId}`);
   };
 
   useEffect(() => {
     const state = location.state as AutoplayLocationState;
     const shouldAutoplay =
       state?.autoplay || searchParams.get("autoplay") === "1";
-    if (source !== "library" || d === "loading" || !d || !shouldAutoplay) return;
+    if (d === "loading" || !d || !shouldAutoplay) return;
 
     const requestedId = searchParams.get("play") ?? state?.autoplayItemId;
     const playable = d.seasons
@@ -389,14 +386,12 @@ export function MediaSeriesPage({
             </div>
           )}
 
-          {/* Seasons accordion */}
+          {/* Season rails */}
           {det.seasons.length === 0 ? (
             <div className={cn(ms.empty, "mt-6")}>Эпизоды не найдены.</div>
           ) : (
-            <div className="mb-10" style={{ marginTop: 24 }}>
-              <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">СЕЗОНЫ</div>
+            <div className="mb-10 space-y-8" style={{ marginTop: 24 }}>
               {det.seasons.map((s) => {
-                const isOpen = openSeason === s.seasonNumber;
                 const pickerOn = pickerSeason === s.seasonNumber;
                 const label =
                   s.seasonNumber === 0
@@ -407,166 +402,111 @@ export function MediaSeriesPage({
                     ? Math.round((s.fileCount / s.totalCount) * 100)
                     : 0;
                 return (
-                  <div key={s.seasonNumber} className="border border-white/[0.07] rounded-[11px] mb-2 overflow-hidden bg-white/[0.02]">
-                    <button
-                      className="w-full flex items-center gap-3 px-[18px] py-[15px] border-none cursor-pointer bg-transparent font-ui text-lead-lg font-bold text-ink text-left transition-colors hover:bg-white/[0.04]"
-                      onClick={() =>
-                        setOpenSeason(isOpen ? null : s.seasonNumber)
-                      }
-                    >
-                      <span>{label}</span>
-                      <span className="text-data text-muted lmono">
-                      <ProgressBar pct={pct} />
-                      <span style={{ marginLeft: 6 }}>
-                        {s.fileCount}/{s.totalCount} эп.
-                      </span>
-                    </span>
+                  <div key={s.seasonNumber}>
+                    <div className="mb-3 flex flex-wrap items-center gap-3 px-7 md:px-10">
+                      <div className="flex min-w-[160px] items-center gap-3 text-data text-muted lmono">
+                        <ProgressBar pct={pct} />
+                        <span>{s.fileCount}/{s.totalCount} эп.</span>
+                      </div>
                       <button
                         className={ms.button.sm}
                         disabled={tmdbId == null}
-                        title={
-                          tmdbId == null
-                            ? "Нет tmdbId"
-                            : "Выбрать раздачу для сезона"
-                        }
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPickerSeason(pickerOn ? null : s.seasonNumber);
-                        }}
+                        title={tmdbId == null ? "Нет tmdbId" : "Выбрать раздачу для сезона"}
+                        onClick={() => setPickerSeason(pickerOn ? null : s.seasonNumber)}
                       >
-                        🔍 Раздача
+                        {pickerOn ? "Скрыть поиск" : "Найти сезон"}
                       </button>
-                      <span
-                        className="ml-auto text-muted flex transition-transform duration-[220ms] [cubic-bezier(0.22,0.61,0.36,1)]"
-                        style={{
-                          transform: isOpen ? "rotate(180deg)" : "none",
-                          display: "inline-flex",
-                          alignItems: "center",
-                        }}
-                      >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <path
-                          d="M6 9l6 6 6-6"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
-                    </button>
+                    </div>
+
+                    <MediaRail title={label} countLabel={`${s.fileCount}/${s.totalCount}`} className="mt-0">
+                      {s.episodes.map((ep) => {
+                        const missed = !ep.hasFile && isAired(ep.airDate);
+                        return (
+                          <article
+                            key={`${ep.seasonNumber}-${ep.episodeNumber}`}
+                            className={cn(
+                              "relative flex h-[150px] w-[280px] flex-none overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.035] text-left transition-all hover:-translate-y-0.5 hover:bg-white/[0.055]",
+                              ep.played ? "media-ep-played" : "",
+                            )}
+                          >
+                            {ep.jellyfinId ? (
+                              <img
+                                className="h-full w-[112px] flex-none object-cover"
+                                src={jellyfinPosterUrl(ep.jellyfinId)}
+                                alt=""
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                                }}
+                              />
+                            ) : (
+                              <span className="h-full w-[112px] flex-none bg-groove" />
+                            )}
+                            <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-2xs uppercase tracking-2 text-muted">
+                                  S{String(ep.seasonNumber).padStart(2, "0")}E{String(ep.episodeNumber ?? 0).padStart(2, "0")}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-2xs",
+                                    ep.hasFile
+                                      ? "bg-white/[0.08] text-ink"
+                                      : missed
+                                        ? "bg-groove text-[#e06666]"
+                                        : "bg-groove text-muted",
+                                  )}
+                                >
+                                  {ep.hasFile ? "есть" : missed ? "пропущено" : "нет файла"}
+                                </span>
+                              </div>
+                              <div className="line-clamp-2 text-row font-semibold text-ink" title={ep.title}>
+                                {ep.title}
+                              </div>
+                              <div className="mt-auto flex items-center justify-between gap-2">
+                                <span className="truncate font-mono text-2xs text-muted" title={fmtAir(ep.airDate)}>
+                                  {relAir(ep.airDate)}
+                                </span>
+                                <button
+                                  className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.14] bg-white/[0.05] text-ink-soft transition-all hover:border-transparent hover:bg-[var(--epa,var(--accent))] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                                  title={ep.jellyfinId ? "Воспроизвести" : "Файл недоступен"}
+                                  disabled={!ep.jellyfinId || busy === ep.jellyfinId}
+                                  onClick={() =>
+                                    ep.jellyfinId &&
+                                    play(
+                                      ep.jellyfinId,
+                                      `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
+                                    )
+                                  }
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                    <polygon points="6,3 21,12 6,21" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </MediaRail>
 
                     {pickerOn && tmdbId != null && (
-                      <ReleasePicker
-                        params={{
-                          type: "series",
-                          id: tmdbId,
-                          seasonNumber: s.seasonNumber,
-                        }}
-                        downloads={media.downloads}
-                        onGrabbed={() => {
-                          onMediaUpdate();
-                          refreshTitleTorrents();
-                          window.setTimeout(refreshTitleTorrents, 2_000);
-                        }}
-                      />
-                    )}
-
-                    <div
-                      className={cn(
-                        "overflow-hidden transition-[max-height] duration-300 [cubic-bezier(0.22,0.61,0.36,1)]",
-                        isOpen ? "max-h-[800px]" : "max-h-0",
-                      )}
-                    >
-                      <div className="border-t border-white/[0.05]">
-                        {s.episodes.map((ep) => {
-                          const missed = !ep.hasFile && isAired(ep.airDate);
-                          return (
-                            <div
-                              key={`${ep.seasonNumber}-${ep.episodeNumber}`}
-                              className={cn(
-                                "flex items-center gap-3.5 px-[18px] py-[13px] border-b border-white/[0.04] last:border-b-0 transition-colors hover:bg-white/[0.03]",
-                                ep.played ? "media-ep-played" : "",
-                              )}
-                            >
-                              {ep.jellyfinId ? (
-                                <img
-                                  className="media-ep-thumb"
-                                  src={jellyfinPosterUrl(ep.jellyfinId)}
-                                  alt=""
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    (
-                                      e.currentTarget as HTMLImageElement
-                                    ).style.visibility = "hidden";
-                                  }}
-                                />
-                              ) : (
-                                <span className="media-ep-thumb media-ep-thumb-ph" />
-                              )}
-                              <span className="text-data text-muted w-[22px] flex-none lmono">
-                              {String(ep.episodeNumber ?? 0).padStart(2, "0")}
-                            </span>
-                              <span className="flex-1 text-row text-ink" title={ep.title}>
-                              {ep.title}
-                            </span>
-                              {ep.hasFile ? (
-                                <span className={ms.badge}>
-                                {ep.quality ?? "есть"}
-                                  {ep.size ? ` · ${fmtSize(ep.size)}` : ""}
-                              </span>
-                              ) : missed ? (
-                                <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-[#e06666]">
-                                пропущено
-                              </span>
-                              ) : (
-                                <span className="whitespace-nowrap rounded-full bg-groove px-2 py-0.5 font-mono text-2xs text-muted">
-                                нет файла
-                              </span>
-                              )}
-                              <span
-                                className="text-data text-muted flex-none lmono"
-                                title={fmtAir(ep.airDate)}
-                              >
-                              {relAir(ep.airDate)}
-                            </span>
-                              <button
-                                className="w-8 h-8 rounded-full flex-none grid place-items-center border border-white/[0.14] bg-white/[0.05] text-ink-soft cursor-pointer transition-all hover:bg-[var(--epa,var(--accent))] hover:text-white hover:border-transparent"
-                                title={
-                                  ep.jellyfinId
-                                    ? "Воспроизвести"
-                                    : "Файл недоступен"
-                                }
-                                disabled={
-                                  !ep.jellyfinId || busy === ep.jellyfinId
-                                }
-                                onClick={() =>
-                                  ep.jellyfinId &&
-                                  play(
-                                    ep.jellyfinId,
-                                    `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
-                                  )
-                                }
-                              >
-                                <svg
-                                  width="12"
-                                  height="12"
-                                  viewBox="0 0 24 24"
-                                  fill="currentColor"
-                                >
-                                  <polygon points="6,3 21,12 6,21" />
-                                </svg>
-                              </button>
-                            </div>
-                          );
-                        })}
+                      <div className="mx-7 mt-4 md:mx-10">
+                        <ReleasePicker
+                          params={{
+                            type: "series",
+                            id: tmdbId,
+                            seasonNumber: s.seasonNumber,
+                          }}
+                          downloads={media.downloads}
+                          onGrabbed={() => {
+                            onMediaUpdate();
+                            refreshTitleTorrents();
+                            window.setTimeout(refreshTitleTorrents, 2_000);
+                          }}
+                        />
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}

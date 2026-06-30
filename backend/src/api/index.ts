@@ -16,6 +16,7 @@ import {
   getSeriesDetail,
   getSeriesPageDetail,
   getMoviePageDetail,
+  getMediaTitleDetail,
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
@@ -363,6 +364,18 @@ apiRouter.get("/media/detail/movie/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     res.json(await getMoviePageDetail(req.params.id));
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.get("/media/title/:kind/:tmdbId", async (req, res) => {
+  const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
+  const tmdbId = Number(req.params.tmdbId);
+  if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
+  if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getMediaTitleDetail(kind, tmdbId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

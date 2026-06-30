@@ -6,7 +6,6 @@ import {useLocation, useParams, useNavigate, useSearchParams} from "react-router
 import {
     getDiscoverGenre,
     getDiscoverGenres,
-    tmdbResolveTvdb,
     posterUrl,
     type TmdbItem,
     type Genre,
@@ -118,8 +117,7 @@ export function MediaGenrePage({media}: {media: MediaData}) {
 
     const open = (it: TmdbItem) => {
         const from = `${location.pathname}${location.search}`;
-        if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`, {state: {from}});
-        else tmdbResolveTvdb(it.tmdbId).then((tvdb) => tvdb && nav(`/media/discover/series/${tvdb}`, {state: {from}}));
+        nav(`/media/${it.kind === "movie" ? "movie" : "series"}/${it.tmdbId}`, {state: {from}});
     };
 
     const setFilter = (key: "sort" | "year", value: string) => {

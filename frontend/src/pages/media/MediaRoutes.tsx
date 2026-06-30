@@ -27,6 +27,8 @@ const isDetailPath = (pathname: string) =>
   Boolean(
     matchPath("/media/movie/:id", pathname) ||
       matchPath("/media/series/:id", pathname) ||
+      matchPath("/media/jellyfin/movie/:id", pathname) ||
+      matchPath("/media/jellyfin/series/:id", pathname) ||
       matchPath("/media/discover/movie/:id", pathname) ||
       matchPath("/media/discover/series/:id", pathname) ||
       matchPath("/media/discover/genre/:kind/:genreId", pathname),
@@ -135,6 +137,26 @@ export function MediaRoutes() {
           <Route
             path="/movie/:id"
             element={<MediaMoviePage media={media} onMediaUpdate={onMediaUpdate} />}
+          />
+          <Route
+            path="/jellyfin/series/:id"
+            element={
+              <MediaSeriesPage
+                media={media}
+                onMediaUpdate={onMediaUpdate}
+                source="jellyfin"
+              />
+            }
+          />
+          <Route
+            path="/jellyfin/movie/:id"
+            element={
+              <MediaMoviePage
+                media={media}
+                onMediaUpdate={onMediaUpdate}
+                source="jellyfin"
+              />
+            }
           />
           <Route
             path="/discover/series/:id"

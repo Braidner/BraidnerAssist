@@ -21,6 +21,7 @@ import {media as ms} from "./shared/mediaStyles.ts";
 import {
 	getMoviePageDetail,
 	getMovieDiscoverDetail,
+	getMediaTitleDetail,
 	addTitle,
 	getMediaPlayUrl,
 	jellyfinPosterUrl,
@@ -29,7 +30,6 @@ import {
 	getDiscoverSimilar,
 	getDiscoverCollection,
 	getTitleTorrents,
-	tmdbResolveTvdb,
 	backdropUrl,
 	type MoviePageDetail,
 	type MediaData,
@@ -51,11 +51,11 @@ type AutoplayLocationState = {
 export function MediaMoviePage({
 	                               media,
 	                               onMediaUpdate,
-	                               source = "library",
+	                               source = "tmdb",
                                }: {
 	media: MediaData;
 	onMediaUpdate: () => void;
-	source?: "library" | "discover";
+	source?: "tmdb" | "jellyfin" | "discover";
 }) {
 	const {id = ""} = useParams();
 	const nav = useNavigate();
@@ -79,11 +79,13 @@ export function MediaMoviePage({
 		nav(backTarget, {replace: true});
 	};
 
-	// discover-карточка резолвится по tmdbId (id = tmdbId), library — по Jellyfin-id.
+	// Основной маршрут использует TMDB id; legacy routes оставлены для старых ссылок.
 	const fetchDetail = () =>
-		source === "discover"
-			? getMovieDiscoverDetail(Number(id))
-			: getMoviePageDetail(id);
+		source === "jellyfin"
+			? getMoviePageDetail(id)
+			: source === "discover"
+				? getMovieDiscoverDetail(Number(id))
+				: getMediaTitleDetail("movie", Number(id));
 
 	useEffect(() => {
 		setD("loading");
@@ -133,18 +135,14 @@ export function MediaMoviePage({
 	}, [detTmdbId]);
 
 	const openTmdb = (it: TmdbItem) => {
-		if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
-		else tmdbResolveTvdb(it.tmdbId).then((tvdb) => {
-			if (tvdb) nav(`/media/discover/series/${tvdb}`);
-			else toast.error("Не удалось открыть сериал: TMDB не вернул tvdbId");
-		});
+		nav(`/media/${it.kind === "movie" ? "movie" : "series"}/${it.tmdbId}`);
 	};
 
 	useEffect(() => {
 		const state = location.state as AutoplayLocationState;
 		const shouldAutoplay =
 			state?.autoplay || searchParams.get("autoplay") === "1";
-		if (source !== "library" || d === "loading" || !d || !shouldAutoplay) return;
+		if (d === "loading" || !d || !shouldAutoplay) return;
 		if (!d.hasFile) return;
 
 		const autoplayId = searchParams.get("play") ?? state?.autoplayItemId ?? id;
@@ -239,7 +237,7 @@ export function MediaMoviePage({
 								{busy ? "…" : "Смотреть"}
 							</button>
 						)}
-						{!det.tmdbId && !det.hasFile && det.tmdbId != null && (
+						{!det.hasFile && det.tmdbId != null && (
 							<button
 								className={ms.button.accentSm}
 								disabled={act === "add"}

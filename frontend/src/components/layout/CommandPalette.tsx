@@ -23,7 +23,6 @@ import {
   getDocker,
   getAdguard,
   getMediaPreferences,
-  tmdbResolveTvdb,
   type DockerData,
   type AdguardData,
   type UnifiedSearchResult,
@@ -205,14 +204,7 @@ export function CommandPalette() {
         label: `Мой список: ${it.title}${it.year ? ` (${it.year})` : ""}`,
         hint: it.kind === "movie" ? "Фильм" : "Сериал",
         run: async () => {
-          if (it.kind === "movie") {
-            navigate(`/media/discover/movie/${it.tmdbId}`);
-            close();
-            return;
-          }
-          const tvdb = it.tvdbId ?? (await tmdbResolveTvdb(it.tmdbId));
-          if (tvdb) navigate(`/media/discover/series/${tvdb}`);
-          else navigate("/media");
+          navigate(`/media/${it.kind === "movie" ? "movie" : "series"}/${it.tmdbId}`);
           close();
         },
       })),
@@ -221,7 +213,11 @@ export function CommandPalette() {
       label: `${it.type === "Series" ? "📺" : "🎬"} ${it.name}${it.year ? ` (${it.year})` : ""}`,
       hint: "В библиотеке",
       run: () => {
-        navigate(`/media/${it.type === "Series" ? "series" : "movie"}/${it.id}`);
+        navigate(
+          it.tmdbId
+            ? `/media/${it.type === "Series" ? "series" : "movie"}/${it.tmdbId}`
+            : `/media/jellyfin/${it.type === "Series" ? "series" : "movie"}/${it.id}`,
+        );
         close();
       },
     })),

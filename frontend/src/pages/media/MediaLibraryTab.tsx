@@ -9,7 +9,7 @@ import {
     jellyfinBackdropUrl,
     getMoviePageDetail,
     getSeriesPageDetail,
-    tmdbResolveTvdb,
+    getMediaTitleDetail,
     type LibraryItem,
     type ResumeItem,
     type MoviePageDetail,
@@ -72,9 +72,13 @@ export function MediaLibraryTab({
 
     const openDetail = (it: LibraryItem, autoplay = false) =>
         nav(
-            `/media/${it.type === "Series" ? "series" : "movie"}/${it.id}${
+            it.tmdbId
+                ? `/media/${it.type === "Series" ? "series" : "movie"}/${it.tmdbId}${
                 autoplay ? `?autoplay=1&play=${encodeURIComponent(it.id)}` : ""
-            }`,
+            }`
+                : `/media/jellyfin/${it.type === "Series" ? "series" : "movie"}/${it.id}${
+                    autoplay ? `?autoplay=1&play=${encodeURIComponent(it.id)}` : ""
+                }`,
             {
                 state: autoplay
                     ? {...returnState(), autoplay: true, autoplayItemId: it.id}
@@ -83,22 +87,9 @@ export function MediaLibraryTab({
         );
 
     const openTorrentTitle = async (item: TorrentRailItem) => {
-        if (item.jellyfinId) {
-            nav(`/media/${item.kind === "series" ? "series" : "movie"}/${item.jellyfinId}`, {
-                state: returnState(),
-            });
-            return;
-        }
-        if (item.kind === "movie") {
-            nav(`/media/discover/movie/${item.tmdbId}`, {state: returnState()});
-            return;
-        }
-        const tvdbId = item.tvdbId ?? await tmdbResolveTvdb(item.tmdbId);
-        if (tvdbId) {
-            nav(`/media/discover/series/${tvdbId}`, {state: returnState()});
-        } else {
-            toast.error("Не удалось открыть карточку: TMDB не вернул tvdbId");
-        }
+        nav(`/media/${item.kind === "series" ? "series" : "movie"}/${item.tmdbId}`, {
+            state: returnState(),
+        });
     };
 
     const sortedLibrary = [...library].sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -201,9 +192,13 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
         if (!heroItem) return;
         setHeroDetail(null);
         if (heroItem.type === "Movie") {
-            getMoviePageDetail(heroItem.id).then(setHeroDetail);
+            heroItem.tmdbId
+                ? getMediaTitleDetail("movie", heroItem.tmdbId).then(setHeroDetail)
+                : getMoviePageDetail(heroItem.id).then(setHeroDetail);
         } else {
-            getSeriesPageDetail(heroItem.id).then(setHeroDetail);
+            heroItem.tmdbId
+                ? getMediaTitleDetail("series", heroItem.tmdbId).then(setHeroDetail)
+                : getSeriesPageDetail(heroItem.id).then(setHeroDetail);
         }
     }, [heroItem?.id]);
 

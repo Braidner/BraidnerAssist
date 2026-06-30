@@ -1167,6 +1167,27 @@ export async function getSeriesPageDetail(
   }
 }
 
+export async function getMediaTitleDetail(
+  kind: "movie",
+  tmdbId: number,
+): Promise<MoviePageDetail | null>;
+export async function getMediaTitleDetail(
+  kind: "series",
+  tmdbId: number,
+): Promise<SeriesPageDetail | null>;
+export async function getMediaTitleDetail(
+  kind: "movie" | "series",
+  tmdbId: number,
+): Promise<MoviePageDetail | SeriesPageDetail | null> {
+  try {
+    const res = await apiFetch(`/api/media/title/${kind}/${tmdbId}`);
+    if (!res.ok) return null;
+    return (await res.json()) as MoviePageDetail | SeriesPageDetail;
+  } catch {
+    return null;
+  }
+}
+
 export async function getMoviePageDetail(
   id: string,
 ): Promise<MoviePageDetail | null> {

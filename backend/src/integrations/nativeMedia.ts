@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { jackettSearchMany } from "./jackett.js";
 import {
   jellyfinRefresh,
+  getMediaTitleDetail,
   qbAddRaw,
   qbittorrentDownloads,
   type DownloadItem,
@@ -393,75 +394,11 @@ export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise
 
 export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPageDetail> {
   const tmdbId = await tmdbFindByTvdb(id).catch(() => null) ?? id;
-  const detail = await tmdbDetails("series", tmdbId);
-  if (!detail) throw new Error("series not found in TMDB");
-  const tvdbId = await tmdbTvToTvdb(tmdbId).catch(() => null);
-  const title = await prisma.mediaTitle.findUnique({ where: { kind_tmdbId: { kind: "series", tmdbId } } }).catch(() => null);
-  const seasonNumbers = await tmdbTvSeasons(tmdbId).catch(() => []);
-  const seasons: DetailSeason[] = [];
-  for (const seasonNumber of seasonNumbers) {
-    const episodes = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
-    seasons.push({
-      seasonNumber,
-      episodes: episodes.map((episode) => ({
-        seasonNumber,
-        episodeNumber: episode.episodeNumber,
-        title: episode.title,
-        airDate: episode.airDate,
-        hasFile: false,
-        quality: null,
-        size: null,
-        jellyfinId: null,
-        played: false,
-      })),
-      fileCount: 0,
-      totalCount: episodes.length,
-      monitored: false,
-    });
-  }
-  return {
-    jellyfinId: title?.jellyfinId ?? "",
-    title: detail.title,
-    year: detail.year,
-    overview: detail.overview,
-    genres: detail.genres,
-    network: null,
-    status: null,
-    runtime: detail.runtime,
-    rating: detail.rating,
-    posterRemote: detail.poster,
-    backdropRemote: detail.backdrop,
-    tmdbId,
-    tvdbId,
-    inMonitor: false,
-    monitored: false,
-    seasons,
-  };
+  return await getMediaTitleDetail("series", tmdbId) as SeriesPageDetail;
 }
 
 export async function nativeMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail> {
-  const detail = await tmdbDetails("movie", tmdbId);
-  if (!detail) throw new Error("movie not found in TMDB");
-  const title = await prisma.mediaTitle.findUnique({ where: { kind_tmdbId: { kind: "movie", tmdbId } } }).catch(() => null);
-  return {
-    jellyfinId: title?.jellyfinId ?? "",
-    title: detail.title,
-    year: detail.year,
-    overview: detail.overview,
-    genres: detail.genres,
-    studio: null,
-    status: null,
-    runtime: detail.runtime,
-    rating: detail.rating,
-    posterRemote: detail.poster,
-    backdropRemote: detail.backdrop,
-    tmdbId,
-    inMonitor: false,
-    monitored: false,
-    hasFile: Boolean(title?.jellyfinId),
-    quality: null,
-    size: null,
-  };
+  return await getMediaTitleDetail("movie", tmdbId) as MoviePageDetail;
 }
 
 export async function registerRawTorrent(urlOrMagnet: string, kind?: MediaKind): Promise<void> {

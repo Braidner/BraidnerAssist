@@ -249,7 +249,7 @@ export function MediaDiscoverTab({
                         <MediaPosterCard key={it.id} title={it.name}
                             subtitle={`сериал${it.year ? ` · ${it.year}` : ""}`}
                             imageUrl={jellyfinPosterUrl(it.id)} seasonCount={it.childCount}
-                            onClick={() => nav(`/media/series/${it.id}`, {state: returnState()})}/>
+                            onClick={() => nav(it.tmdbId ? `/media/series/${it.tmdbId}` : `/media/jellyfin/series/${it.id}`, {state: returnState()})}/>
                     ))}
                 </MediaRail>
             )}
@@ -259,7 +259,7 @@ export function MediaDiscoverTab({
                         <MediaPosterCard key={it.id} title={it.name}
                             subtitle={`фильм${it.year ? ` · ${it.year}` : ""}`}
                             imageUrl={jellyfinPosterUrl(it.id)}
-                            onClick={() => nav(`/media/movie/${it.id}`, {state: returnState()})}/>
+                            onClick={() => nav(it.tmdbId ? `/media/movie/${it.tmdbId}` : `/media/jellyfin/movie/${it.id}`, {state: returnState()})}/>
                     ))}
                 </MediaRail>
             )}

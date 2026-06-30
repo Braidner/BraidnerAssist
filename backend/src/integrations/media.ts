@@ -6,7 +6,7 @@
 
 import { config } from "../config.js";
 import { prisma } from "../db/client.js";
-import { tmdbDetails, tmdbFindByTvdb, tmdbSeason, tmdbTvSeasons } from "./tmdb.js";
+import { tmdbDetails, tmdbFindByTvdb, tmdbSeason, tmdbTvSeasons, tmdbTvToTvdb } from "./tmdb.js";
 import { request } from "undici";
 
 export interface NowPlaying {
@@ -386,6 +386,185 @@ const episodeKey = (seasonNumber: number | null | undefined, episodeNumber: numb
   Number.isFinite(seasonNumber) && Number.isFinite(episodeNumber)
     ? `S${seasonNumber}E${episodeNumber}`
     : null;
+
+async function libraryItemForTitle(
+  kind: "movie" | "series",
+  ids: { tmdbId: number; tvdbId?: number | null },
+): Promise<LibraryItem | null> {
+  if (!config.media.jellyfin.configured) return null;
+  const library = await getLibrary().catch(() => []);
+  const type = kind === "series" ? "Series" : "Movie";
+  return library.find((item) =>
+    item.type === type &&
+    (item.tmdbId === ids.tmdbId || (kind === "series" && ids.tvdbId != null && item.tvdbId === ids.tvdbId)),
+  ) ?? null;
+}
+
+async function registryJellyfinId(
+  kind: "movie" | "series",
+  tmdbId: number,
+): Promise<string | null> {
+  const title = await prisma.mediaTitle.findUnique({
+    where: { kind_tmdbId: { kind, tmdbId } },
+    select: { jellyfinId: true },
+  }).catch(() => null);
+  return title?.jellyfinId ?? null;
+}
+
+async function updateRegistryJellyfinLink(
+  kind: "movie" | "series",
+  tmdbId: number,
+  tvdbId: number | null,
+  jellyfinId: string | null,
+): Promise<void> {
+  if (!jellyfinId) return;
+  await prisma.mediaTitle.updateMany({
+    where: { kind, tmdbId },
+    data: { jellyfinId, ...(kind === "series" ? { tvdbId } : {}) },
+  }).catch(() => {});
+}
+
+async function resolveJellyfinIdForTitle(
+  kind: "movie" | "series",
+  ids: { tmdbId: number; tvdbId?: number | null },
+): Promise<string | null> {
+  const libraryItem = await libraryItemForTitle(kind, ids);
+  if (libraryItem?.id) return libraryItem.id;
+  return registryJellyfinId(kind, ids.tmdbId);
+}
+
+function jellyfinEpisodeMap(jfDetail: SeriesDetail | null): Map<string, SeriesEpisode> {
+  return new Map(
+    (jfDetail?.seasons ?? []).flatMap((s) =>
+      s.episodes.flatMap((e) => {
+        const key = episodeKey(s.seasonNumber, e.episodeNumber);
+        return key ? [[key, e] as const] : [];
+      }),
+    ),
+  );
+}
+
+async function buildTmdbSeasons(
+  tmdbId: number,
+  jellyfinEpisodeByKey: Map<string, SeriesEpisode>,
+): Promise<DetailSeason[]> {
+  const seasonNumbers = await tmdbTvSeasons(tmdbId).catch(() => []);
+  return Promise.all(seasonNumbers.map(async (seasonNumber) => {
+    const eps = await tmdbSeason(tmdbId, seasonNumber).catch(() => []);
+    return {
+      seasonNumber,
+      episodes: eps.map((e) => {
+        const key = episodeKey(seasonNumber, e.episodeNumber);
+        const jfEp = key ? jellyfinEpisodeByKey.get(key) : null;
+        return {
+          seasonNumber,
+          episodeNumber: e.episodeNumber,
+          title: e.title || jfEp?.name || `Episode ${e.episodeNumber}`,
+          airDate: e.airDate,
+          hasFile: Boolean(jfEp),
+          quality: null,
+          size: null,
+          jellyfinId: jfEp?.id ?? null,
+          played: Boolean(jfEp?.played),
+        };
+      }),
+      fileCount: eps.filter((e) => {
+        const key = episodeKey(seasonNumber, e.episodeNumber);
+        return key ? jellyfinEpisodeByKey.has(key) : false;
+      }).length,
+      totalCount: eps.length,
+      monitored: false,
+    };
+  }));
+}
+
+function seasonsFromJellyfinOnly(jfDetail: SeriesDetail | null): DetailSeason[] {
+  return (jfDetail?.seasons ?? []).map((s) => ({
+    seasonNumber: s.seasonNumber,
+    episodes: s.episodes.map((e) => ({
+      seasonNumber: s.seasonNumber,
+      episodeNumber: e.episodeNumber ?? 0,
+      title: e.name,
+      airDate: null,
+      hasFile: true,
+      quality: null,
+      size: null,
+      jellyfinId: e.id,
+      played: e.played,
+    })),
+    fileCount: s.episodes.length,
+    totalCount: s.episodes.length,
+    monitored: false,
+  }));
+}
+
+export async function getMediaTitleDetail(
+  kind: "movie" | "series",
+  tmdbId: number,
+): Promise<MoviePageDetail | SeriesPageDetail> {
+  if (!config.media.tmdb.configured) throw new Error("TMDB не настроен");
+  const detail = await tmdbDetails(kind, tmdbId);
+  if (!detail) throw new Error(`${kind} not found in TMDB`);
+
+  if (kind === "movie") {
+    const jellyfinId = await resolveJellyfinIdForTitle("movie", { tmdbId });
+    const jf = jellyfinId && config.media.jellyfin.configured ? await jellyfinItem(jellyfinId) : null;
+    await updateRegistryJellyfinLink("movie", tmdbId, null, jf?.Type === "Movie" ? jellyfinId : null);
+    return {
+      jellyfinId: jf?.Type === "Movie" && jellyfinId ? jellyfinId : "",
+      title: detail.title,
+      year: detail.year,
+      overview: detail.overview,
+      genres: jf?.Genres?.length ? jf.Genres : detail.genres,
+      studio: jf?.Studios?.[0]?.Name ?? null,
+      status: jf?.Status ?? null,
+      runtime: ticksToMin(jf?.RunTimeTicks) ?? detail.runtime,
+      rating: jf?.CommunityRating ?? detail.rating,
+      posterRemote: detail.poster,
+      backdropRemote: detail.backdrop,
+      tmdbId,
+      inMonitor: false,
+      monitored: false,
+      hasFile: jf?.Type === "Movie",
+      quality: null,
+      size: null,
+    };
+  }
+
+  const tvdbId = await tmdbTvToTvdb(tmdbId).catch(() => null);
+  const jellyfinId = await resolveJellyfinIdForTitle("series", { tmdbId, tvdbId });
+  const [jfItemR, jfEpisodesR] = await Promise.allSettled([
+    jellyfinId && config.media.jellyfin.configured ? jellyfinItem(jellyfinId) : Promise.resolve(null),
+    jellyfinId && config.media.jellyfin.configured ? getSeriesDetail(jellyfinId) : Promise.resolve(null),
+  ]);
+  const jf = jfItemR.status === "fulfilled" ? jfItemR.value : null;
+  const jfDetail = jfEpisodesR.status === "fulfilled" ? jfEpisodesR.value : null;
+  const resolvedTvdbId = tvdbId ?? (Number(jf?.ProviderIds?.Tvdb) || jfDetail?.tvdbId || null);
+  await updateRegistryJellyfinLink("series", tmdbId, resolvedTvdbId, jf?.Type === "Series" && jellyfinId ? jellyfinId : null);
+
+  const jellyfinEpisodes = jellyfinEpisodeMap(jfDetail);
+  let seasons = await buildTmdbSeasons(tmdbId, jellyfinEpisodes);
+  if (seasons.length === 0 && jfDetail?.seasons?.length) seasons = seasonsFromJellyfinOnly(jfDetail);
+
+  return {
+    jellyfinId: jf?.Type === "Series" && jellyfinId ? jellyfinId : "",
+    title: detail.title,
+    year: detail.year ?? jf?.ProductionYear ?? null,
+    overview: detail.overview ?? jf?.Overview ?? null,
+    genres: jf?.Genres?.length ? jf.Genres : detail.genres,
+    network: jf?.Studios?.[0]?.Name ?? null,
+    status: jf?.Status ?? null,
+    runtime: ticksToMin(jf?.RunTimeTicks) ?? detail.runtime,
+    rating: jf?.CommunityRating ?? detail.rating,
+    posterRemote: detail.poster,
+    backdropRemote: detail.backdrop,
+    tmdbId,
+    tvdbId: resolvedTvdbId,
+    inMonitor: false,
+    monitored: false,
+    seasons,
+  };
+}
 
 // Детальная страница сериала: TMDB metadata + Jellyfin episodes/play state.
 export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPageDetail> {

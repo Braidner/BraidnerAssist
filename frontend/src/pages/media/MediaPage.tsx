@@ -19,7 +19,6 @@ import {
   saveMediaPreference,
   discoverSearch,
   tmdbSearch,
-  tmdbResolveTvdb,
   torrserverAdd,
   torrserverList,
   torrserverRemove,
@@ -547,13 +546,13 @@ export function MediaPage({
 
   const playResume = async (it: ResumeItem) => {
     if (it.kind === "movie") {
-      nav(`/media/movie/${it.id}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
+      nav(`/media/jellyfin/movie/${it.id}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
         state: { ...returnState(), autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
       });
       return;
     }
     if (it.seriesId) {
-      nav(`/media/series/${it.seriesId}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
+      nav(`/media/jellyfin/series/${it.seriesId}?autoplay=1&play=${encodeURIComponent(it.id)}&title=${encodeURIComponent(it.title)}`, {
         state: { ...returnState(), autoplay: true, autoplayItemId: it.id, autoplayTitle: it.title },
       });
       return;
@@ -618,29 +617,9 @@ export function MediaPage({
   };
 
   const onAddTmdb = async (it: TmdbItem) => {
-    if (it.kind === "movie") {
-      const item: MediaLookupItem = {
-        kind: "movie",
-        id: it.tmdbId,
-        title: it.title,
-        year: it.year,
-        overview: it.overview,
-        poster: it.poster,
-        added: false,
-      };
-      await onAddTitle(item, "tmdbadd" + it.tmdbId);
-      return;
-    }
-    setBusy("tmdbadd" + it.tmdbId);
-    const tvdb = await tmdbResolveTvdb(it.tmdbId);
-    setBusy(null);
-    if (!tvdb) {
-      toast.error("Не удалось определить tvdbId сериала — можно открыть карточку и выбрать релиз вручную");
-      return;
-    }
     const item: MediaLookupItem = {
-      kind: "series",
-      id: tvdb,
+      kind: it.kind,
+      id: it.tmdbId,
       title: it.title,
       year: it.year,
       overview: it.overview,
@@ -683,21 +662,14 @@ export function MediaPage({
 
   const openDiscover = (it: MediaLookupItem) =>
     nav(
-      `/media/discover/${it.kind === "series" ? "series" : "movie"}/${it.id}`,
+      `/media/${it.kind === "series" ? "series" : "movie"}/${it.id}`,
       { state: returnState() },
     );
 
   const openTmdb = async (it: TmdbItem) => {
-    if (it.kind === "movie") {
-      nav(`/media/discover/movie/${it.tmdbId}`, { state: returnState() });
-      return;
-    }
-    setBusy("tmdb" + it.tmdbId);
-    const tvdb = await tmdbResolveTvdb(it.tmdbId);
-    setBusy(null);
-    if (tvdb) nav(`/media/discover/series/${tvdb}`, { state: returnState() });
-    else
-      toast.error("Не удалось определить tvdbId сериала через TMDB");
+    nav(`/media/${it.kind === "series" ? "series" : "movie"}/${it.tmdbId}`, {
+      state: returnState(),
+    });
   };
 
   // ── Not configured ────────────────────────────────────────────────────────

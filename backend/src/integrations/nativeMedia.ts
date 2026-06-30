@@ -58,7 +58,7 @@ export interface TorrentRailItem {
   state: string;
   dlspeed: number;
   eta: number | null;
-  status: "downloading" | "awaiting_jellyfin";
+  status: "downloading" | "awaiting_jellyfin" | "in_library";
 }
 
 const RELEASE_CACHE_TTL = 10 * 60_000;
@@ -309,6 +309,64 @@ export async function getTorrentRail(): Promise<TorrentRailItem[]> {
   return visible.slice(0, 24);
 }
 
+export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise<TorrentRailItem[]> {
+  await linkMediaTitlesToJellyfin().catch(() => {});
+  const downloads = await qbittorrentDownloads().catch(() => []);
+  const byHash = new Map(downloads.map((download) => [download.hash.toLowerCase(), download]));
+  const title = await prisma.mediaTitle.findUnique({
+    where: { kind_tmdbId: { kind, tmdbId } },
+    include: {
+      torrents: {
+        orderBy: { updatedAt: "desc" },
+        take: 24,
+      },
+    },
+  });
+  if (!title) return [];
+  const rows = title.torrents;
+  const items: TorrentRailItem[] = [];
+  for (const row of rows) {
+    const download = byHash.get(row.infohash.toLowerCase());
+    const progress = download?.progress ?? Math.round(row.progress * 100);
+    const completed = progress >= 100;
+    await prisma.mediaTorrent.update({
+      where: { id: row.id },
+      data: {
+        progress: Math.max(0, Math.min(1, progress / 100)),
+        state: download?.state ?? row.state,
+        lastSeenAt: download ? new Date() : row.lastSeenAt,
+        completedAt: completed && !row.completedAt ? new Date() : row.completedAt,
+        seeders: download?.seeds ?? row.seeders,
+        size: download?.size ?? row.size,
+        savePath: download?.savePath ?? row.savePath,
+      },
+    }).catch(() => {});
+    items.push({
+      kind: title.kind === "series" ? "series" : "movie",
+      tmdbId: title.tmdbId,
+      tvdbId: title.tvdbId,
+      jellyfinId: title.jellyfinId,
+      title: title.title,
+      year: title.year,
+      poster: title.poster,
+      backdrop: title.backdrop,
+      infohash: row.infohash,
+      releaseTitle: row.releaseTitle,
+      indexer: row.indexer,
+      size: download?.size ?? row.size ?? null,
+      seeders: download?.seeds ?? row.seeders ?? null,
+      savePath: download?.savePath ?? row.savePath,
+      seasonNumber: row.seasonNumber,
+      progress,
+      state: download?.state ?? row.state ?? "queued",
+      dlspeed: download?.dlspeed ?? 0,
+      eta: download?.eta ?? null,
+      status: title.jellyfinId ? "in_library" : completed ? "awaiting_jellyfin" : "downloading",
+    });
+  }
+  return items;
+}
+
 export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPageDetail> {
   const tmdbId = await tmdbFindByTvdb(id).catch(() => null) ?? id;
   const detail = await tmdbDetails("series", tmdbId);
@@ -349,6 +407,7 @@ export async function nativeSeriesDiscoverDetail(id: number): Promise<SeriesPage
     rating: detail.rating,
     posterRemote: detail.poster,
     backdropRemote: detail.backdrop,
+    tmdbId,
     tvdbId,
     inMonitor: false,
     monitored: false,

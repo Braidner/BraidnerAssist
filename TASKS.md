@@ -346,7 +346,7 @@
       kind+tmdbId unique) + миграция `20260628082140_media_preferences`; REST
       `GET/POST/DELETE /api/media/preferences`.
 - [x] Smart UI actions: TMDB-карточки/hero в Discovery получили быстрые действия «В список»,
-      «Добавить» (через существующий Radarr/Sonarr pipeline) и «Скрыть»; watchlist показывается
+      «Добавить» (через текущий media add/release picker path) и «Скрыть»; watchlist показывается
       рейлом «Мой список» и в Cmd-K.
 - [x] Discovery UI cleanup: отдельные жанровые чипы с главной вкладки убраны; переходы в
       жанровый хаб перенесены на кликабельные названия жанровых подборок.
@@ -365,9 +365,10 @@
 
 ## Batch v8 — Native media pipeline + Jackett cutover (2026-06-28, commit 5a30a4e)
 
-Цель: убрать Sonarr/Radarr/Prowlarr из production media pipeline. Mission Control теперь сам
-ведёт monitor/import state, ищет релизы через Jackett Torznab, скорит качество и раскладывает
-файлы в Jellyfin layout.
+Цель: убрать Sonarr/Radarr/Prowlarr из production media pipeline. Mission Control начал сам
+вести monitor/import state, искать релизы через Jackett Torznab, скорить качество и раскладывать
+файлы в Jellyfin layout. **Исторический этап**: в Batch v9 этот слой намеренно упрощён и
+заменён прямым qB → Jellyfin folders pipeline.
 
 - [x] Prisma: миграция `20260628140000_native_media_jackett` добавила `MediaQualityProfile`,
       `MediaMonitor`, `MediaMonitorSeason`, `MediaMonitorEpisode`, `MediaReleaseDecision`,
@@ -404,6 +405,50 @@
 - [x] Проверено: `cd backend && npx prisma generate`, `cd backend && npm run build`,
       `cd frontend && npm run build`; grep подтвердил, что реальный Jackett API key не попал
       в репозиторий.
+
+---
+
+## Batch v9 — Simplified media pipeline, keep Discovery preferences (2026-06-30)
+
+Цель: оставить полезную часть медиа-стека, но убрать *arr-like monitor/importer слой. qBittorrent
+качает выбранный релиз сразу в Jellyfin-папки, Jellyfin сам сканирует и объединяет библиотеку,
+а Mission Control хранит только лёгкую registry для прогресса и связи `TMDB → torrent → Jellyfin`.
+
+- [x] Prisma: миграция `20260630120000_simplify_media_pipeline` удаляет активные
+      `MediaMonitor`/season/episode/import/quality-profile таблицы и `MediaTorrentFile`;
+      добавляет `MediaTitle` и упрощённый `MediaTorrent`.
+- [x] Production repair note: первая попытка миграции на сервере упала на duplicate
+      `MediaTitle(kind, tmdbId)`; база восстановлена, дубль слит, индексы досозданы,
+      миграция помечена applied через `prisma migrate resolve`. Бэкап:
+      `/home/braidner/mission-control-db.bak-simplify-media-20260630-021943`.
+- [x] Backend pipeline: `nativeMedia.ts` теперь делает lookup/search/grab и registry only.
+      `POST /media/release/grab` отправляет релиз в qB с category `mc-library` и `savePath`
+      в `MEDIA_ROOT/MEDIA_MOVIES` или `MEDIA_ROOT/MEDIA_TV` (default `/media/movies|/media/tv`).
+- [x] Torrent rails: `GET /api/media/torrent-rail` отдаёт выбранные раздачи, которые скачиваются
+      или ещё не связаны с Jellyfin item. После link по TMDB/TVDB → `jellyfinId` item исчезает
+      из library rail. `GET /api/media/torrents/:kind/:tmdbId` отдаёт все раздачи конкретного
+      TMDB-title для detail-страниц.
+- [x] Discovery preferences сохранены: `MediaPreference` и endpoints
+      `GET/POST/DELETE /api/media/preferences` оставлены; hidden/disliked продолжают фильтровать
+      rails; watchlist остаётся для «Мой список» и Cmd-K.
+- [x] REST cleanup: из активного API удалены native monitor/repair/import/file-picker routes:
+      quality-profiles, repair, monitor, import candidates/execute, calendar, season search,
+      torrent picker. `GET /api/media`, library/detail/playback/discovery/search/release/torrent
+      routes оставлены.
+- [x] MCP cleanup: оставлены `search_releases`, `grab_release`, `get_media_status`,
+      `add_torrent`, `list_jackett_indexers`, `test_jackett_search`, discovery preference tools,
+      devices/play-to/watch-now. Удалены `add_movie`, `add_series`, `list_import_candidates`,
+      `import_release`, `list_media_monitor`, `search_missing_media`, `retry_media_import`,
+      `explain_release_choice` и quality-profile tools. Hermes prompt обновлён: no importer,
+      no hardlinks, no missing queue.
+- [x] Frontend cleanup: в библиотеку добавлен rail «Скачивается / Скоро в библиотеке»;
+      убраны ImportDrawer, Native pipeline/Repair Center, monitor toggles, import badges и
+      пофайловый picker. Discovery actions «В список»/«Скрыть» оставлены.
+- [x] Env/docs: удалены `MEDIA_DOWNLOADS`, `POLL_MEDIA_IMPORTER`, `POLL_MEDIA_MONITOR`;
+      задокументированы `MEDIA_ROOT`, `MEDIA_TV`, `MEDIA_MOVIES`.
+- [x] Проверено: локальный replay всех Prisma migrations через SQLite, `cd backend && npm run build`,
+      `cd frontend && npm run build`, `graphify update .`. На сервере `prisma migrate status`
+      показывает `Database schema is up to date!`, backend `/healthz` отвечает.
 
 ---
 

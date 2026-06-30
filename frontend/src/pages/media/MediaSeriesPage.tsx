@@ -1,7 +1,5 @@
-// Детальная страница сериала (/media/series/:id) — native media detail: шапка с
-// метаданными и monitor/поиском, полный список сезонов/эпизодов (скачано/нет,
-// качество, дата, превью), прогресс по сезону, встроенный плеер, поиск раздач
-// на сезон, bulk-поиск недостающих и ручной импорт застрявшей раздачи.
+// Детальная страница сериала (/media/series/:id) — TMDB/Jellyfin detail: шапка,
+// сезоны/эпизоды, встроенный плеер, поиск релизов и rail привязанных раздач.
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
@@ -9,6 +7,7 @@ import {
   ReleasePicker,
   ProgressBar,
   fmtSize,
+  TorrentRailCard,
 } from "./shared/mediaShared.tsx";
 import {
   DetailBody,
@@ -19,6 +18,7 @@ import {
   type DetailPlayer,
   type QueueItem,
 } from "./shared/mediaDetail.tsx";
+import { MediaRail } from "./shared/mediaRails.tsx";
 import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 import {
@@ -30,12 +30,14 @@ import {
   posterUrl,
   getMediaLibrary,
   getDiscoverSimilar,
+  getTitleTorrents,
   tmdbResolveTvdb,
   backdropUrl,
   type SeriesPageDetail,
   type MediaData,
   type LibraryItem,
   type TmdbItem,
+  type TorrentRailItem,
 } from "@/lib/api.ts";
 import { useToast } from "../../components/ui/Toast.tsx";
 
@@ -88,6 +90,7 @@ export function MediaSeriesPage({
   const [openSeason, setOpenSeason] = useState<number | null>(null);
   const [pickerSeason, setPickerSeason] = useState<number | null>(null);
   const [showAllPicker, setShowAllPicker] = useState(false);
+  const [titleTorrents, setTitleTorrents] = useState<TorrentRailItem[]>([]);
   const autoplayConsumedRef = useRef<string | null>(null);
   const locationState = location.state as AutoplayLocationState;
   const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
@@ -127,6 +130,14 @@ export function MediaSeriesPage({
   // TMDB-похожие для сериала. На входе tvdbId → бэкенд резолвит в TMDB tv id (idType=tvdb).
   const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
   const detTvdbId = d && d !== "loading" ? d.tvdbId : null;
+  const detTmdbId = d && d !== "loading" ? d.tmdbId : null;
+  const refreshTitleTorrents = () => {
+    if (detTmdbId == null) {
+      setTitleTorrents([]);
+      return;
+    }
+    getTitleTorrents("series", detTmdbId).then(setTitleTorrents);
+  };
   useEffect(() => {
     if (!media.tmdb || detTvdbId == null) {
       setTmdbSimilar([]);
@@ -134,6 +145,11 @@ export function MediaSeriesPage({
     }
     getDiscoverSimilar("series", detTvdbId, "tvdb").then(setTmdbSimilar);
   }, [media.tmdb, detTvdbId]);
+
+  useEffect(() => {
+    refreshTitleTorrents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detTmdbId]);
 
   const openTmdb = (it: TmdbItem) => {
     if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
@@ -251,12 +267,12 @@ export function MediaSeriesPage({
   const previousItem = activeIndex > 0 ? episodeQueue[activeIndex - 1] : null;
   const nextItem =
     activeIndex >= 0 ? (episodeQueue[activeIndex + 1] ?? null) : null;
-  const tvdbId = det.tvdbId;
+  const tmdbId = det.tmdbId;
 
   const addToLib = async () => {
-    if (tvdbId == null) return;
+    if (tmdbId == null) return;
     setAct("add");
-    const ok = await addTitle("series", tvdbId);
+    const ok = await addTitle("series", tmdbId);
     setAct(null);
     if (ok) {
       toast.success(`«${det.title}» добавлен в библиотеку — ищем релиз`);
@@ -327,7 +343,7 @@ export function MediaSeriesPage({
                 {busy === watchTarget.jellyfinId ? "…" : watchLabel}
               </button>
             )}
-            {!det.jellyfinId && tvdbId != null && (
+            {!det.jellyfinId && tmdbId != null && (
               <button
                 className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
                 disabled={act === "add"}
@@ -344,7 +360,7 @@ export function MediaSeriesPage({
                 {act === "add" ? "…" : "В библиотеку"}
               </button>
             )}
-            {tvdbId != null && (
+            {tmdbId != null && (
               <button
                 className="flex items-center gap-2 px-[30px] py-[13px] rounded-lg border-none cursor-pointer font-ui text-lead-lg font-bold tracking-2 bg-[var(--bc,var(--accent))] text-white transition-all hover:brightness-[1.18] hover:-translate-y-0.5"
                 title="Поиск всех раздач сериала (включая мультисезонные паки)"
@@ -355,17 +371,19 @@ export function MediaSeriesPage({
             )}
           </div>
 
-          {showAllPicker && tvdbId != null && (
+          {showAllPicker && tmdbId != null && (
             <div style={{ marginTop: 16 }}>
               <div className="font-ui text-label font-extrabold tracking-section uppercase text-muted mb-4">ВСЕ РАЗДАЧИ</div>
               <div className="font-ui text-lead leading-[1.75] text-white/[0.58] m-0" style={{ marginBottom: 8 }}>
                 Включая мультисезонные паки. Выбранный релиз qBittorrent сохранит сразу в папку сериалов.
               </div>
               <ReleasePicker
-                params={{ type: "series", id: tvdbId }}
+                params={{ type: "series", id: tmdbId }}
                 downloads={media.downloads}
                 onGrabbed={() => {
                   onMediaUpdate();
+                  refreshTitleTorrents();
+                  window.setTimeout(refreshTitleTorrents, 2_000);
                 }}
               />
             </div>
@@ -405,10 +423,10 @@ export function MediaSeriesPage({
                     </span>
                       <button
                         className={ms.button.sm}
-                        disabled={tvdbId == null}
+                        disabled={tmdbId == null}
                         title={
-                          tvdbId == null
-                            ? "Нет tvdbId"
+                          tmdbId == null
+                            ? "Нет tmdbId"
                             : "Выбрать раздачу для сезона"
                         }
                         onClick={(e) => {
@@ -443,16 +461,18 @@ export function MediaSeriesPage({
                     </span>
                     </button>
 
-                    {pickerOn && tvdbId != null && (
+                    {pickerOn && tmdbId != null && (
                       <ReleasePicker
                         params={{
                           type: "series",
-                          id: tvdbId,
+                          id: tmdbId,
                           seasonNumber: s.seasonNumber,
                         }}
                         downloads={media.downloads}
                         onGrabbed={() => {
                           onMediaUpdate();
+                          refreshTitleTorrents();
+                          window.setTimeout(refreshTitleTorrents, 2_000);
                         }}
                       />
                     )}
@@ -551,6 +571,14 @@ export function MediaSeriesPage({
                 );
               })}
             </div>
+          )}
+
+          {titleTorrents.length > 0 && (
+            <MediaRail title="РАЗДАЧИ ЭТОГО СЕРИАЛА" countLabel={String(titleTorrents.length)} className="mb-10">
+              {titleTorrents.map((it) => (
+                <TorrentRailCard key={it.infohash} item={it} />
+              ))}
+            </MediaRail>
           )}
 
         </DetailBody>

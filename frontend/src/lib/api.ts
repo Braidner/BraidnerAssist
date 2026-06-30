@@ -663,7 +663,7 @@ export interface TorrentRailItem {
   state: string;
   dlspeed: number;
   eta: number | null;
-  status: "downloading" | "awaiting_jellyfin";
+  status: "downloading" | "awaiting_jellyfin" | "in_library";
 }
 
 export async function getMedia(): Promise<MediaData> {
@@ -692,6 +692,19 @@ export async function getMedia(): Promise<MediaData> {
 export async function getTorrentRail(): Promise<TorrentRailItem[]> {
   try {
     const res = await apiFetch("/api/media/torrent-rail");
+    if (!res.ok) return [];
+    return (await res.json()) as TorrentRailItem[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getTitleTorrents(
+  kind: "movie" | "series",
+  tmdbId: number,
+): Promise<TorrentRailItem[]> {
+  try {
+    const res = await apiFetch(`/api/media/torrents/${kind}/${tmdbId}`);
     if (!res.ok) return [];
     return (await res.json()) as TorrentRailItem[];
   } catch {
@@ -1114,6 +1127,7 @@ export interface SeriesPageDetail {
   rating: number | null;
   posterRemote: string | null;
   backdropRemote: string | null;
+  tmdbId: number | null;
   tvdbId: number | null;
   inMonitor: boolean;
   monitored: boolean;

@@ -10,6 +10,7 @@ import {
   posterUrl,
   type DownloadItem,
   type ReleaseOption,
+  type TorrentRailItem,
 } from "@/lib/api.ts";
 import { getToken } from "@/lib/auth.ts";
 import { useToast } from "@/components/ui/Toast.tsx";
@@ -53,6 +54,68 @@ export function fmtEta(eta?: number | null): string {
   const m = Math.floor((eta % 3600) / 60);
   if (h > 0) return `${h}ч ${m}м`;
   return `${m}м`;
+}
+
+export function TorrentRailCard({ item }: { item: TorrentRailItem }) {
+  const meta = [
+    item.kind === "series" ? "сериал" : "фильм",
+    item.year ? String(item.year) : "",
+    item.seasonNumber != null ? `сезон ${item.seasonNumber}` : "",
+    item.indexer ?? "",
+  ].filter(Boolean).join(" · ");
+  const statusLabel =
+    item.status === "in_library"
+      ? "в Jellyfin"
+      : item.status === "awaiting_jellyfin"
+        ? "ждём Jellyfin"
+        : fmtSpeed(item.dlspeed);
+  const queue = [
+    statusLabel,
+    item.status === "downloading" ? fmtEta(item.eta) : "",
+    item.seeders != null ? `${item.seeders} seed` : "",
+    item.size != null ? fmtSize(item.size) : "",
+  ].filter(Boolean).join(" · ");
+  const badge =
+    item.status === "in_library"
+      ? "ok"
+      : item.status === "awaiting_jellyfin"
+        ? "scan"
+        : `${item.progress}%`;
+
+  return (
+    <div className={cn(media.posterCard, "group cursor-default")}>
+      <div className={media.posterArt}>
+        <div className="absolute inset-0 z-0 bg-[#09090d]" />
+        {item.poster ? (
+          <img
+            src={posterUrl(item.poster)}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 z-[1] size-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : null}
+        <div className="absolute inset-0 z-[2] bg-[linear-gradient(to_top,rgba(0,0,0,0.78)_0%,transparent_62%)]" />
+        <span className={media.posterBadge}>{badge}</span>
+        <div className="absolute bottom-0 left-0 right-0 z-[4] h-1 bg-black/40">
+          <div className="h-full bg-[var(--accent)]" style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }} />
+        </div>
+      </div>
+      <div className={media.posterInfo}>
+        <div className={media.posterTitle}>{item.title}</div>
+        <div className={media.posterSub}>{meta}</div>
+        <div className="mt-2">
+          <ProgressBar pct={item.progress} />
+        </div>
+        <div className={cn(media.posterSub, "mt-1 line-clamp-2")} title={item.releaseTitle}>
+          {item.releaseTitle}
+        </div>
+        <div className={cn(media.posterSub, "mt-1")}>{queue || item.state}</div>
+      </div>
+    </div>
+  );
 }
 
 function releaseTracker(r: ReleaseOption): string {

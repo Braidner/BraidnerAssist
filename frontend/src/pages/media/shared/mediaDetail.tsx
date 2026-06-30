@@ -5,7 +5,6 @@ import {
   jellyfinBackdropUrl,
   jellyfinPosterUrl,
   posterUrl,
-  type DownloadItem,
   type LibraryItem,
   type TmdbItem,
 } from "@/lib/api.ts";
@@ -122,31 +121,6 @@ export function DetailStatusBadges({
         )
       ) : null}
     </div>
-  );
-}
-
-export function StuckImportButtons({
-  items,
-  onSelect,
-  label,
-}: {
-  items: DownloadItem[];
-  onSelect: (item: DownloadItem) => void;
-  label: string;
-}) {
-  return (
-    <>
-      {items.map((item) => (
-        <button
-          key={item.downloadId ?? item.hash}
-          className={cn(ms.button.sm, "self-start text-warn")}
-          title={item.importMessage}
-          onClick={() => onSelect(item)}
-        >
-          {label}
-        </button>
-      ))}
-    </>
   );
 }
 

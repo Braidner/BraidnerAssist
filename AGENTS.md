@@ -112,25 +112,35 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 10. **AdGuard DNS** (opt-in `ADGUARD_URL`/`ADGUARD_USER`/`ADGUARD_PASSWORD`) — `integrations/
     adguard.ts` (basic auth → `/control/stats`). `GET /api/adguard` отдаёт запросы/блокировки/%/
     латентность + топ заблокированных. Карточка на `/system` (Ring по % блокировок).
-11. **Медиа-стек** (opt-in, любой из источников) — текущий основной путь (**Batch v8,
-    2026-06-28**) больше не использует Sonarr/Radarr/Prowlarr как production pipeline.
-    **Source of truth сейчас**: TMDB (метаданные/discovery/calendar) → Jackett Torznab
+11. **Медиа-стек** (opt-in, любой из источников) — текущий основной путь (**Batch v9,
+    2026-06-30**) максимально простой: TMDB (метаданные/discovery) → Jackett Torznab
     (`integrations/jackett.ts`, `JACKETT_URL`/`JACKETT_API_KEY`/`JACKETT_INDEXERS`) →
-    native release parser/scoring (`releaseParse.ts`/`releaseScore.ts`) → qBittorrent
-    category `mc-native` → native importer (`mediaImporter.ts`, `organizeTorrent`) →
-    `/media/movies|tv` → Jellyfin scan/playback/watch-state. Sonarr/Radarr/Prowlarr
-    удалены из production-кода; все REST routes и Hermes MCP смотрят в native-слой
-    (`integrations/nativeMedia.ts`).
-    Мёртвые import-list ручки `/media/recommendations` и `/media/discovery/hero` удалены.
-    `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
-    Native API: `GET /media/quality-profiles`, `GET /media/jackett/health`, `GET /media/repair`,
-    `GET /media/monitor`; `GET /media/search` ищет через Jackett; `POST /media/add`
-    создаёт `MediaMonitor`; `POST /media/release/search|grab` работает через Jackett+
-    preview/grab; `POST /media/import/candidates|execute` использует локальную SQLite-модель
-    и hardlink/copy organizer. Hermes MCP: `add_movie`/`add_series`, `search_releases`/
-    `grab_release`, `list_import_candidates`/`import_release`, `list_jackett_indexers`,
-    `test_jackett_search`, `list_media_monitor`, `search_missing_media`, `retry_media_import`,
-    `explain_release_choice`.
+    release parse/score (`releaseParse.ts`/`releaseScore.ts`) → qBittorrent →
+    Jellyfin library folders (`MEDIA_ROOT` + `MEDIA_MOVIES|MEDIA_TV`, default
+    `/media/movies|/media/tv`) → Jellyfin scan/playback/watch-state.
+    Sonarr/Radarr/Prowlarr, native monitor/missing queue, quality profiles, Repair Center,
+    importer, hardlink/copy organizer and per-file picker are not part of the active pipeline.
+    qB saves the selected release directly into the final Jellyfin folder; Jellyfin is trusted
+    to catalogue movies/series.
+    **Lightweight registry**: SQLite keeps only `MediaTitle` (kind, TMDB/TVDB metadata,
+    optional `jellyfinId`) and `MediaTorrent` (infohash/release/savePath/qB snapshot) to power
+    the library rail "Скачивается / Скоро в библиотеке" and link `TMDB → torrent → Jellyfin`.
+    This registry is not a monitor and does not search for missing episodes.
+    **Discovery preferences survive cleanup**: `MediaPreference` remains the source of truth for
+    `watchlist|hidden|liked|disliked`; endpoints `GET/POST/DELETE /api/media/preferences` stay
+    active, Discovery rails filter hidden/disliked, and Cmd-K "Мой список" reads watchlist.
+    **Active media REST**: `GET /api/media` (qB downloads), `GET /api/media/library`,
+    `GET /api/media/torrent-rail`, `GET /api/media/search` (Jackett fallback),
+    `GET /api/media/lookup`, `POST /api/media/add` (lookup/registry compatibility),
+    `POST /api/media/release/search`, `POST /api/media/release/grab`, `POST /api/media/torrent`,
+    `POST /api/media/torrent/:hash/:action`, `POST /api/media/scan`, Jellyfin playback/detail/
+    devices/play-to routes, and Discovery routes. Removed active endpoints include
+    quality-profiles, repair, monitor, calendar, import candidates/execute and torrent picker.
+    **Hermes MCP active media tools**: `search_releases`, `grab_release`, `get_media_status`,
+    `add_torrent`, `list_jackett_indexers`, `test_jackett_search`, discovery preference tools,
+    `list_devices`, `play_on_device`, `watch_now`. Removed monitor/import tools:
+    `add_movie`, `add_series`, `list_import_candidates`, `import_release`, `list_media_monitor`,
+    `search_missing_media`, `retry_media_import`, `explain_release_choice`, quality-profile tools.
     `GET /api/media`, страница `/media` (`MediaPage.tsx`) + пункт в Sidebar.
     **Встроенный плеер**: библиотека Jellyfin (`GET /media/library`) → клик → HTML5 video
     с HLS (`hls.js`); путь воспроизведения форсит HLS-транскод (пустые DirectPlayProfiles в
@@ -140,9 +150,9 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     **Детальные страницы**: клик по плитке ведёт на отдельную роутовую страницу
     `/media/series/:id` (`MediaSeriesPage`) или `/media/movie/:id` (`MediaMoviePage`), `:id` = Jellyfin item id
     (React Router v6, BrowserRouter + nginx SPA-fallback). Данные — merge `GET /media/detail/{series|movie}/:id`
-    (`getSeriesPageDetail`/`getMoviePageDetail`): локальные `MediaMonitor`-метаданные/TMDB + Jellyfin
-    playback state. Для discovery-страниц без Jellyfin item id используются native detail routes по
-    `tmdbId`/`tvdbId`; флаг присутствия в локальном monitor — `inMonitor`. На странице: cinematic hero-player:
+    (`getSeriesPageDetail`/`getMoviePageDetail`): TMDB/Jellyfin metadata + Jellyfin playback state.
+    Для discovery-страниц без Jellyfin item id используются native detail routes по `tmdbId`/`tvdbId`.
+    На странице: cinematic hero-player:
     клик «Смотреть» запускает HLS-видео прямо в hero-фоне (без модалки), без дополнительного затемнения после
     старта. Из медиабиблиотеки кнопка «Смотреть» и ряд «Продолжить просмотр» открывают detail-route с query
     `?autoplay=1&play=<jellyfinId>&title=...`; старый модальный плеер для resume удалён. Если браузер блокирует
@@ -155,12 +165,11 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     показывает prev/next в player chrome, автозапускает следующую доступную серию по `ended`, а основная
     кнопка «Смотреть» выбирает первый непосмотренный эпизод (`Смотреть с SxEy`/`Продолжить с SxEy`) или
     первую доступную серию, если всё просмотрено. Также есть `ReleasePicker`
-    на сезон/фильм (поиск+force-grab с озвучкой/качеством), игра на устройство (фильм) и кнопка
-    ручного импорта застрявшей раздачи (`ImportDrawer`, если в очереди есть `importPending`-раздача этого тайтла).
+    на сезон/фильм (поиск+grab через Jackett/qB) и игра на устройство (фильм).
     Старый `SeriesDrawer` удалён; общие detail-компоненты (`DetailTopBar`/`DetailHero`/`DetailBody`/
-    `DetailStatusBadges`/`StuckImportButtons`/`SimilarRail`) вынесены в
-    `frontend/src/pages/media/shared/mediaDetail.tsx`; HLS/modal/TorrServer player, `ReleasePicker`,
-    `ImportDrawer` и форматтеры — в `frontend/src/pages/media/shared/mediaShared.tsx`.
+    `DetailStatusBadges`/`SimilarRail`) вынесены в
+    `frontend/src/pages/media/shared/mediaDetail.tsx`; HLS/modal/TorrServer player, `ReleasePicker`
+    и форматтеры — в `frontend/src/pages/media/shared/mediaShared.tsx`.
     (`GET /media/series/:id` — Jellyfin-only seasons — остаётся для обратной
     совместимости.) Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
@@ -172,15 +181,11 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     отдаёт AAAA), а бэкенд ходит по IPv4. Фронт: `posterUrl()`/`jellyfinPosterUrl()` в дравере
     lookup и в сетке библиотеки (битые/отсутствующие постеры прячутся `onError`).
     **Правильный пайплайн в медиатеку**: `GET /media/lookup?type=movie|series&q=` ищет тайтл в TMDB,
-    `POST /media/add {type,id}` создаёт/обновляет `MediaMonitor`, `POST /media/release/search`
-    ищет релизы через Jackett Torznab, `POST /media/release/grab` отправляет выбранный релиз в
-    qBittorrent с категорией `mc-native`, а native importer раскладывает файлы в `MEDIA_MOVIES_DIR`/
-    `MEDIA_TV_DIR` и запускает Jellyfin scan. Фронт: `ReleasePicker` доступен на детальной странице
-    сериала на каждый сезон, на странице фильма и в дравере добавления.
-    **Ручной импорт застрявших раздач**: qBittorrent-загрузки, известные native pipeline и ожидающие
-    раскладки, помечаются `importPending`; `POST /media/import/candidates {type,downloadId}` отдаёт
-    локально распарсенные файлы, `POST /media/import/execute {type,downloadId,fileIds[]}` импортирует
-    выбранные файлы через native organizer. `downloadId` = qB-хеш (`DownloadItem.downloadId`).
+    `POST /media/release/search` ищет релизы через Jackett Torznab, `POST /media/release/grab`
+    отправляет выбранный релиз в qBittorrent с категорией `mc-library` и `savePath` сразу в
+    `/media/movies` или `/media/tv`, затем пишет `MediaTitle`/`MediaTorrent`. Фронт:
+    `ReleasePicker` доступен на детальной странице сериала на каждый сезон, на странице фильма
+    и в дравере добавления.
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent),
     `POST /media/torrent/:hash/:action` (pause|resume|delete), `GET /media/search` (Jackett),
     `POST /media/scan` (`/Library/Refresh`).
@@ -188,15 +193,15 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     `SupportsRemoteControl` (устройства с открытым приложением Jellyfin — напр. Sber TV), `POST /media/play-to
     {sessionId,itemId}` шлёт `PlayNow` в `/Sessions/{id}/Playing`. Фронт: на плитке библиотеки контрол «📺»
     с выпадайкой устройств. Предусловие: на ТВ открыто приложение Jellyfin.
-    **Native media pipeline**: `GET /media/quality-profiles` отдаёт локальные profiles, `GET /media/
-    jackett/health` проверяет Torznab indexers, `GET /media/repair` показывает stuck imports/
-    missing episodes/indexer failures. `MediaSystemTab` рисует Native pipeline summary; `ReleasePicker`
-    показывает score, reasons, warnings, parsed quality/source/codec/HDR/languages. Env:
-    `JELLYFIN_*`/`QBITTORRENT_*`/`JACKETT_*`/`TORRSERVER_*`/`TMDB_API_KEY`/`MEDIA_ROOT`.
-    MCP: `add_movie`/`add_series`, `search_releases`/`grab_release`, `list_import_candidates`/
-    `import_release`, `list_jackett_indexers`, `test_jackett_search`, `list_media_monitor`,
-    `search_missing_media`, `retry_media_import`, `explain_release_choice`, `add_torrent`,
-    `get_media_status`, `list_devices`, `play_on_device`.
+    **Torrent rails**: `GET /media/torrent-rail` показывает выбранные торренты, которые ещё
+    скачиваются или уже скачались, но пока не связались с Jellyfin item. Этот library rail исчезает
+    после `jellyfinId` link. `GET /media/torrents/:kind/:tmdbId` показывает все раздачи конкретного
+    TMDB-title на detail-странице, включая уже связанный с Jellyfin контент. `MediaSystemTab`
+    больше не показывает Native pipeline/Repair Center.
+    Env: `JELLYFIN_*`/`QBITTORRENT_*`/`JACKETT_*`/`TORRSERVER_*`/`TMDB_API_KEY`/`MEDIA_ROOT`/
+    `MEDIA_TV`/`MEDIA_MOVIES`.
+    MCP: `search_releases`/`grab_release`, `list_jackett_indexers`, `test_jackett_search`,
+    `add_torrent`, `get_media_status`, `list_devices`, `play_on_device`, discovery preference tools.
     **Дискавери-таб (LAMPA/ZONA-style подборки на TMDB)** — таб «Дискавери» (`MediaDiscoverTab.tsx`)
     управляется одним вызовом `GET /media/discover/rails` (`getDiscoverHome` в `integrations/discover.ts`):
     cinematic hero на широком `backdrop_path` (отдельно от мелкого `poster_path`) и рейлы
@@ -206,7 +211,7 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
     (`tmdbDiscover` с фильтрами `with_genres`/год/`sort_by`/`vote_average.gte`, `tmdbGenres` кеш 24ч,
     `tmdbSimilar` recommendations→similar, `tmdbHero`, `tmdbMovieCollection`, `tmdbFindByTvdb`). Русские
     тайтлы/описания — `language=ru-RU` (фолбэк на `original_*` при пустом ru). **ID-дисциплина: TMDB tv id
-    ≠ Sonarr/Jellyfin tvdbId** — `tmdbFindByTvdb` (`/find?external_source=tvdb_id`) резолвит перед любым
+    ≠ Jellyfin tvdbId** — `tmdbFindByTvdb` (`/find?external_source=tvdb_id`) резолвит перед любым
     `/tv/{id}`-вызовом. Жанровый хаб `/media/discover/genre/:kind/:genreId` (`MediaGenrePage.tsx`,
     ZONA-style каталог: фильтры год/сортировка + бесконечный скролл через IntersectionObserver);
     фильтры синхронизируются в URL (`year`/`sort`), загрузка stale-safe через request id, сортировки
@@ -240,7 +245,8 @@ IMAGE_TAG=latest docker compose -f docker-compose.prod.yml up -d
 
 На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на
 `/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Jackett, qBittorrent,
-TorrServer. Sonarr/Radarr/Prowlarr заменены native media pipeline внутри Mission Control.
+TorrServer. Sonarr/Radarr/Prowlarr заменены simplified media pipeline внутри Mission Control:
+Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
 Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
 `host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в
 `/srv/stack/.creds` (chmod 600) и в server `.env` дашборда — в гит не коммитятся.
@@ -327,6 +333,12 @@ TorrServer. Sonarr/Radarr/Prowlarr заменены native media pipeline вну
   import state, Jackett Torznab search+health, release parsing/scoring, qB category `mc-native`,
   background importer, Repair Center summary, native Hermes tools и homelab compose без *arr/Prowlarr.
   Builds backend+frontend зелёные. ✅ ГОТОВО
+- **Batch v9 — Simplified media pipeline** (2026-06-30): monitor/importer/*arr-like слой
+  удалён из активного pipeline; qB качает выбранные релизы сразу в Jellyfin folders
+  `/media/movies|/media/tv`; добавлена lightweight registry `MediaTitle`/`MediaTorrent` и
+  library rail «Скачивается / Скоро в библиотеке». Discovery preferences (`MediaPreference`:
+  watchlist/hidden/liked/disliked), Cmd-K «Мой список» и TMDB rails сохранены. MCP/REST очищены от
+  monitor/import tools; Hermes prompt обновлён на no importer/no hardlinks. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); будущий этап удаления Jellyfin
   (свой transcoding/watch-state) — отдельная большая тема.
 

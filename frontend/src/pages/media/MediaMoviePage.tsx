@@ -1,11 +1,11 @@
-// Детальная страница фильма (/media/movie/:id) — native media detail: шапка с
-// метаданными, статус файла (качество/размер или «отсутствует»), встроенный
-// плеер + игра на устройство, поиск раздач и ручной импорт застрявшей раздачи.
+// Детальная страница фильма (/media/movie/:id) — TMDB/Jellyfin detail: шапка с
+// метаданными, встроенный плеер, поиск релизов и rail привязанных раздач.
 
 import {useEffect, useRef, useState} from "react";
 import {useParams, useNavigate, useLocation, useSearchParams} from "react-router-dom";
 import {
 	ReleasePicker,
+	TorrentRailCard,
 } from "./shared/mediaShared.tsx";
 import {
 	DetailBody,
@@ -15,6 +15,7 @@ import {
 	tmdbRailCards,
 	type DetailPlayer,
 } from "./shared/mediaDetail.tsx";
+import {MediaRail} from "./shared/mediaRails.tsx";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {
@@ -27,12 +28,14 @@ import {
 	getMediaLibrary,
 	getDiscoverSimilar,
 	getDiscoverCollection,
+	getTitleTorrents,
 	tmdbResolveTvdb,
 	backdropUrl,
 	type MoviePageDetail,
 	type MediaData,
 	type LibraryItem,
 	type TmdbItem,
+	type TorrentRailItem,
 } from "@/lib/api.ts";
 import {useToast} from "../../components/ui/Toast.tsx";
 
@@ -105,7 +108,15 @@ export function MediaMoviePage({
 	// TMDB-подборки: похожее + франшиза (коллекция). Заводятся как только знаем tmdbId.
 	const [tmdbSimilar, setTmdbSimilar] = useState<TmdbItem[]>([]);
 	const [collection, setCollection] = useState<{ name: string; items: TmdbItem[] } | null>(null);
+	const [titleTorrents, setTitleTorrents] = useState<TorrentRailItem[]>([]);
 	const detTmdbId = d && d !== "loading" ? d.tmdbId : null;
+	const refreshTitleTorrents = () => {
+		if (detTmdbId == null) {
+			setTitleTorrents([]);
+			return;
+		}
+		getTitleTorrents("movie", detTmdbId).then(setTitleTorrents);
+	};
 	useEffect(() => {
 		if (!media.tmdb || detTmdbId == null) {
 			setTmdbSimilar([]);
@@ -115,6 +126,11 @@ export function MediaMoviePage({
 		getDiscoverSimilar("movie", detTmdbId).then(setTmdbSimilar);
 		getDiscoverCollection(detTmdbId).then(setCollection);
 	}, [media.tmdb, detTmdbId]);
+
+	useEffect(() => {
+		refreshTitleTorrents();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [detTmdbId]);
 
 	const openTmdb = (it: TmdbItem) => {
 		if (it.kind === "movie") nav(`/media/discover/movie/${it.tmdbId}`);
@@ -245,11 +261,20 @@ export function MediaMoviePage({
 					{showPicker && det.tmdbId != null && (
 						<ReleasePicker
 							params={{type: "movie", id: det.tmdbId}}
-								downloads={media.downloads}
+							downloads={media.downloads}
 								onGrabbed={() => {
 									onMediaUpdate();
+									refreshTitleTorrents();
+									window.setTimeout(refreshTitleTorrents, 2_000);
 								}}
 							/>
+					)}
+					{titleTorrents.length > 0 && (
+						<MediaRail title="РАЗДАЧИ ЭТОГО ФИЛЬМА" countLabel={String(titleTorrents.length)} className="mt-8">
+							{titleTorrents.map((it) => (
+								<TorrentRailCard key={it.infohash} item={it} />
+							))}
+						</MediaRail>
 					)}
 				</DetailBody>
 			</div>

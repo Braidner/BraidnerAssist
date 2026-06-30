@@ -35,6 +35,7 @@ import {
   nativeSeriesDiscoverDetail,
   nativeMovieDiscoverDetail,
   getTorrentRail,
+  getTitleTorrents,
 } from "../integrations/nativeMedia.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import {
@@ -311,6 +312,17 @@ apiRouter.get("/media/jackett/health", async (req, res) => {
 apiRouter.get("/media/torrent-rail", async (_req, res) => {
   try {
     res.json(await getTorrentRail());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.get("/media/torrents/:kind/:tmdbId", async (req, res) => {
+  const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
+  const tmdbId = Number(req.params.tmdbId);
+  if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
+  try {
+    res.json(await getTitleTorrents(kind, tmdbId));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

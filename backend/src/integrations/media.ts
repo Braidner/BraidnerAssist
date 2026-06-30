@@ -107,6 +107,7 @@ export interface SeriesPageDetail {
   rating: number | null;
   posterRemote: string | null;
   backdropRemote: string | null;
+  tmdbId: number | null;
   tvdbId: number | null;
   inMonitor: boolean;
   monitored: boolean;
@@ -471,6 +472,7 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
     rating: jf?.CommunityRating ?? null,
     posterRemote: null,
     backdropRemote: null,
+    tmdbId,
     tvdbId,
     inMonitor: false,
     monitored: false,

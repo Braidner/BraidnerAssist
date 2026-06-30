@@ -36,6 +36,7 @@ import {
   nativeSeriesDiscoverDetail,
   nativeMovieDiscoverDetail,
   getTorrentRail,
+  getPendingMediaTitles,
   getTitleTorrents,
 } from "../integrations/nativeMedia.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
@@ -313,6 +314,14 @@ apiRouter.get("/media/jackett/health", async (req, res) => {
 apiRouter.get("/media/torrent-rail", async (_req, res) => {
   try {
     res.json(await getTorrentRail());
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.get("/media/pending-titles", async (_req, res) => {
+  try {
+    res.json(await getPendingMediaTitles());
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

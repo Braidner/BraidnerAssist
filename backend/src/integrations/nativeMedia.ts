@@ -62,6 +62,18 @@ export interface TorrentRailItem {
   status: "downloading" | "awaiting_jellyfin" | "in_library";
 }
 
+export interface PendingMediaTitle {
+  kind: MediaKind;
+  tmdbId: number;
+  tvdbId: number | null;
+  title: string;
+  year: number | null;
+  poster: string | null;
+  backdrop: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const RELEASE_CACHE_TTL = 10 * 60_000;
 const LIBRARY_CATEGORY = "mc-library";
 const releaseCache = new Map<string, { at: number; item: SearchResult & { type: MediaKind; tmdbId: number; tvdbId: number | null; titleHint: string; seasonNumber?: number } }>();
@@ -332,6 +344,29 @@ export async function getTorrentRail(): Promise<TorrentRailItem[]> {
     });
   }
   return visible.slice(0, 24);
+}
+
+export async function getPendingMediaTitles(): Promise<PendingMediaTitle[]> {
+  await linkMediaTitlesToJellyfin().catch(() => {});
+  const titles = await prisma.mediaTitle.findMany({
+    where: {
+      jellyfinId: null,
+      torrents: { none: {} },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 24,
+  });
+  return titles.map((title) => ({
+    kind: title.kind === "series" ? "series" : "movie",
+    tmdbId: title.tmdbId,
+    tvdbId: title.tvdbId,
+    title: title.title,
+    year: title.year,
+    poster: title.poster,
+    backdrop: title.backdrop,
+    createdAt: title.createdAt.toISOString(),
+    updatedAt: title.updatedAt.toISOString(),
+  }));
 }
 
 export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise<TorrentRailItem[]> {

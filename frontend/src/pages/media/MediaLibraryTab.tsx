@@ -10,7 +10,9 @@ import {
     getMoviePageDetail,
     getSeriesPageDetail,
     getMediaTitleDetail,
+    posterUrl,
     type LibraryItem,
+    type PendingMediaTitle,
     type ResumeItem,
     type MoviePageDetail,
     type SeriesPageDetail,
@@ -28,6 +30,7 @@ interface MediaLibraryTabProps {
     setLibrary: (l: LibraryItem[]) => void;
     libReady: boolean;
     torrentRail: TorrentRailItem[];
+    pendingTitles: PendingMediaTitle[];
     resume: ResumeItem[];
     onPlayResume: (it: ResumeItem) => void;
 }
@@ -57,6 +60,7 @@ export function MediaLibraryTab({
                                     setLibrary,
                                     libReady,
                                     torrentRail,
+                                    pendingTitles,
                                     resume,
                                     onPlayResume,
                                 }: MediaLibraryTabProps) {
@@ -91,6 +95,11 @@ export function MediaLibraryTab({
             state: returnState(),
         });
     };
+    const openPendingTitle = (item: PendingMediaTitle) => {
+        nav(`/media/${item.kind === "series" ? "series" : "movie"}/${item.tmdbId}`, {
+            state: returnState(),
+        });
+    };
 
     const sortedLibrary = [...library].sort((a, b) => a.name.localeCompare(b.name, "ru"));
     const movieItems = sortedLibrary.filter((it) => it.type === "Movie");
@@ -120,6 +129,20 @@ export function MediaLibraryTab({
                 <MediaRail title="СКАЧИВАЕТСЯ / СКОРО В БИБЛИОТЕКЕ" countLabel={String(torrentRail.length)} className={ms.section}>
                     {torrentRail.map((it) => (
                         <TorrentRailCard key={it.infohash} item={it} onOpen={() => void openTorrentTitle(it)} />
+                    ))}
+                </MediaRail>
+            )}
+
+            {pendingTitles.length > 0 && (
+                <MediaRail title="ДОБАВЛЕНО / ЖДЁТ РЕЛИЗА" countLabel={String(pendingTitles.length)} className={ms.section}>
+                    {pendingTitles.map((it) => (
+                        <MediaPosterCard
+                            key={`${it.kind}:${it.tmdbId}`}
+                            title={it.title}
+                            subtitle={`${it.kind === "series" ? "сериал" : "фильм"} · ожидает релиз${it.year ? ` · ${it.year}` : ""}`}
+                            imageUrl={posterUrl(it.poster)}
+                            onClick={() => openPendingTitle(it)}
+                        />
                     ))}
                 </MediaRail>
             )}

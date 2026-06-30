@@ -282,6 +282,7 @@ export function MediaSeriesPage({
     setAct(null);
     if (ok) {
       toast.success(`«${det.title}» добавлен в библиотеку — ищем релиз`);
+      setShowAllPicker(true);
       onMediaUpdate();
       fetchDetail().then(setD);
     } else toast.error("Не удалось добавить в библиотеку");

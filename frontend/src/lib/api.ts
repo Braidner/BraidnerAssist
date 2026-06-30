@@ -1056,11 +1056,33 @@ export interface LibraryItem {
   unplayed: number;
 }
 
+export interface PendingMediaTitle {
+  kind: "movie" | "series";
+  tmdbId: number;
+  tvdbId: number | null;
+  title: string;
+  year: number | null;
+  poster: string | null;
+  backdrop: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export async function getMediaLibrary(): Promise<LibraryItem[]> {
   try {
     const res = await apiFetch("/api/media/library");
     if (!res.ok) return [];
     return (await res.json()) as LibraryItem[];
+  } catch {
+    return [];
+  }
+}
+
+export async function getPendingMediaTitles(): Promise<PendingMediaTitle[]> {
+  try {
+    const res = await apiFetch("/api/media/pending-titles");
+    if (!res.ok) return [];
+    return (await res.json()) as PendingMediaTitle[];
   } catch {
     return [];
   }

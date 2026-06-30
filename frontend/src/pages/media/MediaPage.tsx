@@ -8,6 +8,7 @@ import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import {
   getMediaLibrary,
   getTorrentRail,
+  getPendingMediaTitles,
   addTorrent,
   torrentAction,
   lookupTitle,
@@ -27,6 +28,7 @@ import {
   type MediaData,
   type DownloadItem,
   type TorrentRailItem,
+  type PendingMediaTitle,
   type LibraryItem,
   type SearchResult,
   type MediaLookupItem,
@@ -443,6 +445,7 @@ export function MediaPage({
   // ── Shared state ──────────────────────────────────────────────────────────
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [torrentRail, setTorrentRail] = useState<TorrentRailItem[]>([]);
+  const [pendingTitles, setPendingTitles] = useState<PendingMediaTitle[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [player, setPlayer] = useState<{
@@ -466,9 +469,12 @@ export function MediaPage({
   useEffect(() => {
     if (!media.configured) return;
     let alive = true;
-    const load = () => getTorrentRail().then((items) => {
-      if (alive) setTorrentRail(items);
-    });
+    const load = () =>
+      Promise.all([getTorrentRail(), getPendingMediaTitles()]).then(([items, pending]) => {
+        if (!alive) return;
+        setTorrentRail(items);
+        setPendingTitles(pending);
+      });
     load();
     const timer = window.setInterval(load, 15_000);
     return () => {
@@ -612,6 +618,7 @@ export function MediaPage({
     if (ok) {
       toast.success(`«${item.title}» добавлен — ищем релиз`);
       onMediaUpdate();
+      getPendingMediaTitles().then(setPendingTitles);
     } else toast.error("Не удалось добавить тайтл");
     return ok;
   };
@@ -717,6 +724,7 @@ export function MediaPage({
           setLibrary={setLibrary}
           libReady={libReady}
           torrentRail={torrentRail}
+          pendingTitles={pendingTitles}
           resume={resume}
           onPlayResume={playResume}
         />

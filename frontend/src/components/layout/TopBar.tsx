@@ -62,7 +62,7 @@ export function TopBar({
 	const backendLabel = backend === "up" ? "Backend online" : backend === "down" ? "Backend offline" : "Backend check";
 
 	return (
-		<header className="sticky top-0 z-40 w-full border-b border-hair bg-page/92 backdrop-blur-xl">
+		<header className="app-topbar sticky top-0 z-40 w-full border-b border-hair bg-page/92 backdrop-blur-xl">
 			<div className="flex h-12 w-full items-center justify-between gap-4 px-4 max-[480px]:px-3">
 				<button
 					type="button"

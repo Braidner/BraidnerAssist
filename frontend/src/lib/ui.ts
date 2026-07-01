@@ -9,7 +9,7 @@ export const ui = {
     "mc min-h-screen flex-col bg-page text-ink antialiased [font-family:var(--font-ui)]",
   content: "flex min-h-0 flex-1",
   main:
-    "flex min-w-0 flex-1 flex-col pb-9 max-mob:gap-[18px] max-mob:pb-[30px]",
+    "app-main flex min-w-0 flex-1 flex-col pb-9 max-mob:gap-[18px] max-mob:pb-[30px]",
   surface:
     "rounded-card border border-hair bg-raise transition-colors duration-150",
   panel:

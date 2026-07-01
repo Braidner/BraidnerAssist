@@ -496,7 +496,7 @@ export function DetailHero({
 
       {player && (
         <div
-          className="absolute inset-x-0 bottom-0 z-10 px-[52px] pb-5 transition-all duration-500 ease-out max-mob:px-5"
+          className="media-player-controls absolute inset-x-0 bottom-0 z-10 px-[52px] pb-5 transition-all duration-500 ease-out max-mob:px-5"
           style={{
             opacity: controlsVisible ? 1 : 0,
             pointerEvents: controlsVisible ? "auto" : "none",

@@ -28,6 +28,23 @@ type Backend = "up" | "down" | "checking";
 export function App() {
   const { theme, toggle } = useTheme();
 
+  useEffect(() => {
+    const syncStandalone = () => {
+      const standalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+      document.documentElement.classList.toggle("is-standalone", standalone);
+    };
+
+    syncStandalone();
+    const mq = window.matchMedia("(display-mode: standalone)");
+    mq.addEventListener?.("change", syncStandalone);
+    return () => {
+      mq.removeEventListener?.("change", syncStandalone);
+      document.documentElement.classList.remove("is-standalone");
+    };
+  }, []);
+
   // ── Auth ──────────────────────────────────────────────────────────
   const [authed, setAuthed] = useState(() => Boolean(getToken()));
   const [user, setUser] = useState<CurrentUser | null>(null);

@@ -60,7 +60,7 @@ export const media = {
   calendarTitle: "min-w-0 flex-1 truncate whitespace-nowrap text-cell",
   calendarEp: "font-mono text-accent",
   calendarWhen: "flex-none font-mono text-data text-muted",
-  libPage: "pb-[72px]",
+  libPage: "media-safe-bottom pb-[72px]",
   libHero: "relative mb-[52px] h-[500px] overflow-hidden",
   libHeroBg: "absolute inset-0",
   libHeroGlow: "pointer-events-none absolute inset-0",
@@ -143,7 +143,7 @@ export const media = {
     "pointer-events-none absolute inset-0 z-[1] animate-[skel-pulse_1.4s_ease-in-out_infinite] bg-[linear-gradient(100deg,transparent_0%,rgba(255,255,255,0.045)_45%,transparent_78%)]",
 
   // Discovery page
-  discPage: "pb-[72px]",
+  discPage: "media-safe-bottom pb-[72px]",
   discHeader: "mb-8 flex items-center gap-4",
   discHeaderIcon:
     "grid size-14 shrink-0 place-items-center rounded-2xl bg-surface text-accent",

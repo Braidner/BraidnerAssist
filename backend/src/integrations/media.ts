@@ -43,6 +43,11 @@ export interface MediaData {
   downloads: DownloadItem[];
 }
 
+export interface MediaUserContext {
+  appUserId?: string | null;
+  allowFallback?: boolean;
+}
+
 export interface LibraryItem {
   id: string;
   name: string;
@@ -205,6 +210,10 @@ function jfHeaders(): Record<string, string> {
   return { "X-Emby-Token": config.media.jellyfin.apiKey! };
 }
 
+function ticksFromSeconds(seconds?: number | null): number {
+  return Math.max(0, Math.round(Number(seconds ?? 0) * 10_000_000));
+}
+
 async function jellyfinNowPlaying(): Promise<NowPlaying[]> {
   if (!config.media.jellyfin.configured) return [];
   const res = await fetch(`${config.media.jellyfin.url}/Sessions`, {
@@ -276,9 +285,9 @@ async function localizedMediaText(
 
 // Каталог библиотеки: все фильмы + все сериалы (сериал — одна плитка, эпизоды
 // видны в drill-down). Movies и Series тащим отдельными запросами через allSettled.
-export async function getLibrary(): Promise<LibraryItem[]> {
+export async function getLibrary(ctx: MediaUserContext = {}): Promise<LibraryItem[]> {
   if (!config.media.jellyfin.configured) return [];
-  const userId = await jellyfinUserId();
+  const userId = await jellyfinUserId(ctx);
   const fetchItems = async (type: "Movie" | "Series"): Promise<LibraryItem[]> => {
     const url = new URL(`${config.media.jellyfin.url}/Items`);
     url.searchParams.set("Recursive", "true");
@@ -320,9 +329,9 @@ export async function getLibrary(): Promise<LibraryItem[]> {
 
 // Сезоны + эпизоды сериала (drill-down). /Shows/{id}/Episodes отдаёт все эпизоды
 // с ParentIndexNumber=сезон, IndexNumber=эпизод. Группируем по сезонам.
-export async function getSeriesDetail(seriesId: string): Promise<SeriesDetail> {
+export async function getSeriesDetail(seriesId: string, ctx: MediaUserContext = {}): Promise<SeriesDetail> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
-  const userId = await jellyfinUserId();
+  const userId = await jellyfinUserId(ctx);
   const url = new URL(`${config.media.jellyfin.url}/Shows/${seriesId}/Episodes`);
   if (userId) url.searchParams.set("UserId", userId);
   url.searchParams.set("Fields", "ProviderIds");
@@ -378,9 +387,9 @@ interface JfFullItem {
   Status?: string;
   UserData?: { Played?: boolean };
 }
-async function jellyfinItem(id: string): Promise<JfFullItem | null> {
+async function jellyfinItem(id: string, ctx: MediaUserContext = {}): Promise<JfFullItem | null> {
   if (!config.media.jellyfin.configured) return null;
-  const userId = await jellyfinUserId();
+  const userId = await jellyfinUserId(ctx);
   const base = userId
     ? `${config.media.jellyfin.url}/Users/${userId}/Items/${id}`
     : `${config.media.jellyfin.url}/Items/${id}`;
@@ -400,9 +409,10 @@ const episodeKey = (seasonNumber: number | null | undefined, episodeNumber: numb
 async function libraryItemForTitle(
   kind: "movie" | "series",
   ids: { tmdbId: number; tvdbId?: number | null },
+  ctx: MediaUserContext = {},
 ): Promise<LibraryItem | null> {
   if (!config.media.jellyfin.configured) return null;
-  const library = await getLibrary().catch(() => []);
+  const library = await getLibrary(ctx).catch(() => []);
   const type = kind === "series" ? "Series" : "Movie";
   return library.find((item) =>
     item.type === type &&
@@ -448,8 +458,9 @@ async function updateRegistryJellyfinLink(
 async function resolveJellyfinIdForTitle(
   kind: "movie" | "series",
   ids: { tmdbId: number; tvdbId?: number | null },
+  ctx: MediaUserContext = {},
 ): Promise<string | null> {
-  const libraryItem = await libraryItemForTitle(kind, ids);
+  const libraryItem = await libraryItemForTitle(kind, ids, ctx);
   if (libraryItem?.id) return libraryItem.id;
   return registryJellyfinId(kind, ids.tmdbId);
 }
@@ -539,6 +550,7 @@ export async function getMediaTitleDetail(
   kind: "movie" | "series",
   id: number,
   opts: { idType?: SeriesTitleIdType } = {},
+  ctx: MediaUserContext = {},
 ): Promise<MoviePageDetail | SeriesPageDetail> {
   if (!config.media.tmdb.configured) throw new Error("TMDB не настроен");
   const tmdbId = kind === "series" ? await resolveSeriesTitleId(id, opts.idType ?? "tmdb") : id;
@@ -546,8 +558,8 @@ export async function getMediaTitleDetail(
   if (!detail) throw new Error(`${kind} not found in TMDB`);
 
   if (kind === "movie") {
-    const jellyfinId = await resolveJellyfinIdForTitle("movie", { tmdbId });
-    const jf = jellyfinId && config.media.jellyfin.configured ? await jellyfinItem(jellyfinId) : null;
+    const jellyfinId = await resolveJellyfinIdForTitle("movie", { tmdbId }, ctx);
+    const jf = jellyfinId && config.media.jellyfin.configured ? await jellyfinItem(jellyfinId, ctx) : null;
     const inRegistry = await registryTitleExists("movie", tmdbId);
     await updateRegistryJellyfinLink("movie", tmdbId, null, jf?.Type === "Movie" ? jellyfinId : null);
     return {
@@ -573,11 +585,11 @@ export async function getMediaTitleDetail(
   }
 
   const tvdbId = await tmdbTvToTvdb(tmdbId).catch(() => null);
-  const jellyfinId = await resolveJellyfinIdForTitle("series", { tmdbId, tvdbId });
+  const jellyfinId = await resolveJellyfinIdForTitle("series", { tmdbId, tvdbId }, ctx);
   const inRegistry = await registryTitleExists("series", tmdbId);
   const [jfItemR, jfEpisodesR] = await Promise.allSettled([
-    jellyfinId && config.media.jellyfin.configured ? jellyfinItem(jellyfinId) : Promise.resolve(null),
-    jellyfinId && config.media.jellyfin.configured ? getSeriesDetail(jellyfinId) : Promise.resolve(null),
+    jellyfinId && config.media.jellyfin.configured ? jellyfinItem(jellyfinId, ctx) : Promise.resolve(null),
+    jellyfinId && config.media.jellyfin.configured ? getSeriesDetail(jellyfinId, ctx) : Promise.resolve(null),
   ]);
   const jf = jfItemR.status === "fulfilled" ? jfItemR.value : null;
   const jfDetail = jfEpisodesR.status === "fulfilled" ? jfEpisodesR.value : null;
@@ -610,11 +622,11 @@ export async function getMediaTitleDetail(
 }
 
 // Детальная страница сериала: TMDB metadata + Jellyfin episodes/play state.
-export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPageDetail> {
+export async function getSeriesPageDetail(jellyfinId: string, ctx: MediaUserContext = {}): Promise<SeriesPageDetail> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
   const [jfItemR, jfEpisodesR] = await Promise.allSettled([
-    jellyfinItem(jellyfinId),
-    getSeriesDetail(jellyfinId),
+    jellyfinItem(jellyfinId, ctx),
+    getSeriesDetail(jellyfinId, ctx),
   ]);
   const jf = jfItemR.status === "fulfilled" ? jfItemR.value : null;
   const jfDetail = jfEpisodesR.status === "fulfilled" ? jfEpisodesR.value : null;
@@ -706,9 +718,9 @@ export async function getSeriesPageDetail(jellyfinId: string): Promise<SeriesPag
 }
 
 // Детальная страница фильма: TMDB metadata + Jellyfin playback state.
-export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageDetail> {
+export async function getMoviePageDetail(jellyfinId: string, ctx: MediaUserContext = {}): Promise<MoviePageDetail> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
-  const jf = await jellyfinItem(jellyfinId);
+  const jf = await jellyfinItem(jellyfinId, ctx);
   const tmdbId = Number(jf?.ProviderIds?.Tmdb) || null;
   const localizedText = await localizedMediaText("movie", { tmdbId });
   const hasJellyfinMovie = jf?.Type === "Movie";
@@ -734,9 +746,9 @@ export async function getMoviePageDetail(jellyfinId: string): Promise<MoviePageD
   };
 }
 
-// Первый userId Jellyfin (нужен PlaybackInfo). Кешируем.
+// Первый userId Jellyfin — legacy fallback только для служебного APP_TOKEN/Hermes.
 let jfUserId: string | null = null;
-async function jellyfinUserId(): Promise<string | null> {
+async function firstJellyfinUserId(): Promise<string | null> {
   if (jfUserId) return jfUserId;
   const res = await fetch(`${config.media.jellyfin.url}/Users`, {
     headers: jfHeaders(),
@@ -748,12 +760,24 @@ async function jellyfinUserId(): Promise<string | null> {
   return jfUserId;
 }
 
+async function jellyfinUserId(ctx: MediaUserContext = {}): Promise<string | null> {
+  const appUserId = ctx.appUserId;
+  if (appUserId && appUserId !== "app-token") {
+    const user = await prisma.appUser.findUnique({
+      where: { id: appUserId },
+      select: { jellyfinUserId: true },
+    }).catch(() => null);
+    return user?.jellyfinUserId ?? null;
+  }
+  return ctx.allowFallback || appUserId === "app-token" ? firstJellyfinUserId() : null;
+}
+
 // DeviceProfile с пустыми DirectPlayProfiles заставляет Jellyfin отдать HLS-транскод,
 // который играется в любом браузере. Возвращаем путь под наш прокси (api_key вырезан —
 // его подставит прокси заголовком).
-export async function getPlaybackPath(itemId: string): Promise<string> {
+export async function getPlaybackPath(itemId: string, ctx: MediaUserContext = {}): Promise<string> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
-  const userId = await jellyfinUserId();
+  const userId = await jellyfinUserId(ctx);
   const url = new URL(`${config.media.jellyfin.url}/Items/${itemId}/PlaybackInfo`);
   if (userId) url.searchParams.set("UserId", userId);
 
@@ -796,6 +820,45 @@ export async function getPlaybackPath(itemId: string): Promise<string> {
   // Вырезаем api_key — прокси подставит токен заголовком.
   const cleaned = transcodingUrl.replace(/([?&])api_key=[^&]*/gi, "$1").replace(/[?&]$/, "");
   return `/api/media/jellyfin${cleaned.startsWith("/") ? "" : "/"}${cleaned}`;
+}
+
+export type PlaybackEventKind = "start" | "progress" | "stop";
+
+export async function reportPlaybackEvent(
+  kind: PlaybackEventKind,
+  input: {
+    itemId: string;
+    positionSeconds?: number | null;
+    durationSeconds?: number | null;
+    isPaused?: boolean;
+  },
+  ctx: MediaUserContext = {},
+): Promise<boolean> {
+  if (!config.media.jellyfin.configured) return false;
+  const userId = await jellyfinUserId(ctx);
+  if (!userId) return false;
+  const path =
+    kind === "start" ? "/Sessions/Playing" :
+    kind === "progress" ? "/Sessions/Playing/Progress" :
+    "/Sessions/Playing/Stopped";
+  const body = {
+    ItemId: input.itemId,
+    UserId: userId,
+    MediaSourceId: input.itemId,
+    PlayMethod: "Transcode",
+    CanSeek: true,
+    IsPaused: Boolean(input.isPaused),
+    PositionTicks: ticksFromSeconds(input.positionSeconds),
+    RunTimeTicks: ticksFromSeconds(input.durationSeconds),
+  };
+  const res = await fetch(`${config.media.jellyfin.url}${path}`, {
+    method: "POST",
+    headers: { ...jfHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`Jellyfin playback ${kind} responded ${res.status}`);
+  return true;
 }
 
 // Триггер скана библиотеки (после докачки торрента).
@@ -1193,17 +1256,17 @@ async function resolveResumeSeriesId(item: {
   Id: string;
   Type?: string;
   SeriesId?: string;
-}): Promise<string | null> {
+}, ctx: MediaUserContext = {}): Promise<string | null> {
   if (item.Type === "Movie") return null;
   if (item.SeriesId) return item.SeriesId;
-  const detail = await jellyfinItem(item.Id);
+  const detail = await jellyfinItem(item.Id, ctx);
   return detail?.SeriesId ?? null;
 }
 
 // «Продолжить просмотр» из Jellyfin — недосмотренные фильмы/эпизоды с позицией.
-export async function getContinueWatching(): Promise<ResumeItem[]> {
+export async function getContinueWatching(ctx: MediaUserContext = {}): Promise<ResumeItem[]> {
   if (!config.media.jellyfin.configured) return [];
-  const userId = await jellyfinUserId();
+  const userId = await jellyfinUserId(ctx);
   if (!userId) return [];
   const url = new URL(`${config.media.jellyfin.url}/Users/${userId}/Items/Resume`);
   url.searchParams.set("Limit", "20");
@@ -1229,7 +1292,7 @@ export async function getContinueWatching(): Promise<ResumeItem[]> {
       kind,
       positionPct: runtime > 0 ? Math.round((pos / runtime) * 100) : 0,
       year: it.ProductionYear ?? null,
-      seriesId: kind === "movie" ? null : await resolveResumeSeriesId(it),
+      seriesId: kind === "movie" ? null : await resolveResumeSeriesId(it, ctx),
     };
   }));
 }
@@ -1244,9 +1307,9 @@ export interface WatchSeed {
   tvdbId: number | null;
 }
 
-export async function getRecentlyWatchedSeeds(limit = 6): Promise<WatchSeed[]> {
+export async function getRecentlyWatchedSeeds(limit = 6, ctx: MediaUserContext = {}): Promise<WatchSeed[]> {
   if (!config.media.jellyfin.configured) return [];
-  const userId = await jellyfinUserId();
+  const userId = await jellyfinUserId(ctx);
   if (!userId) return [];
   const url = new URL(`${config.media.jellyfin.url}/Users/${userId}/Items`);
   url.searchParams.set("Limit", "40");
@@ -1298,10 +1361,10 @@ export interface UnifiedSearch {
 
 // Единый поиск: библиотека Jellyfin. Discovery/release search живут в native API
 // на TMDB + Jackett и вызываются отдельными маршрутами.
-export async function unifiedSearch(q: string): Promise<UnifiedSearch> {
+export async function unifiedSearch(q: string, ctx: MediaUserContext = {}): Promise<UnifiedSearch> {
   const term = q.trim().toLowerCase();
   if (!term) return { inLibrary: [], discover: [], releases: [] };
-  const [lib] = await Promise.allSettled([getLibrary()]);
+  const [lib] = await Promise.allSettled([getLibrary(ctx)]);
   const inLibrary = (lib.status === "fulfilled" ? lib.value : [])
     .filter((it) => it.name.toLowerCase().includes(term))
     .slice(0, 8);

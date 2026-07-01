@@ -8,6 +8,7 @@ import {
   qbAddRaw,
   qbittorrentDownloads,
   type DownloadItem,
+  type MediaUserContext,
   type MoviePageDetail,
   type SearchResult,
   type SeriesPageDetail,
@@ -430,12 +431,16 @@ export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise
 export async function nativeSeriesDiscoverDetail(
   id: number,
   idType: SeriesTitleIdType = "tvdb",
+  ctx: MediaUserContext = {},
 ): Promise<SeriesPageDetail> {
-  return await getMediaTitleDetail("series", id, { idType }) as SeriesPageDetail;
+  return await getMediaTitleDetail("series", id, { idType }, ctx) as SeriesPageDetail;
 }
 
-export async function nativeMovieDiscoverDetail(tmdbId: number): Promise<MoviePageDetail> {
-  return await getMediaTitleDetail("movie", tmdbId) as MoviePageDetail;
+export async function nativeMovieDiscoverDetail(
+  tmdbId: number,
+  ctx: MediaUserContext = {},
+): Promise<MoviePageDetail> {
+  return await getMediaTitleDetail("movie", tmdbId, {}, ctx) as MoviePageDetail;
 }
 
 export async function registerRawTorrent(urlOrMagnet: string, kind?: MediaKind): Promise<void> {

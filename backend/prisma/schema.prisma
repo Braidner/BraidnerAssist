@@ -13,9 +13,12 @@ model AppUser {
   displayName  String?
   passwordHash String
   role         String   @default("media") // admin | media
+  jellyfinUserId String?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([jellyfinUserId])
 }
 
 // Локальная задача (источник "local"). GitLab-задачи не хранятся в БД —

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import type { AppUser } from "@prisma/client";
 import { prisma } from "../db/client.js";
+import { ensureJellyfinUser, setJellyfinPassword } from "../integrations/jellyfinUsers.js";
 
 export type UserRole = "admin" | "media";
 
@@ -9,6 +10,7 @@ export interface PublicUser {
   username: string;
   displayName: string | null;
   role: UserRole;
+  jellyfinUserId: string | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +28,7 @@ export function toPublicUser(user: AppUser): PublicUser {
     username: user.username,
     displayName: user.displayName,
     role: isUserRole(user.role) ? user.role : "media",
+    jellyfinUserId: user.jellyfinUserId,
     active: user.active,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -80,6 +83,10 @@ export async function createUser(input: {
   const username = input.username.trim();
   if (!username) throw new Error("username required");
   if (input.password.length < 6) throw new Error("password must be at least 6 chars");
+  if (await prisma.appUser.findUnique({ where: { username }, select: { id: true } })) {
+    throw new Error("username already exists");
+  }
+  const jellyfinUser = await ensureJellyfinUser({ username, password: input.password });
 
   const user = await prisma.appUser.create({
     data: {
@@ -87,6 +94,7 @@ export async function createUser(input: {
       displayName: input.displayName?.trim() || null,
       passwordHash: await bcrypt.hash(input.password, 10),
       role: input.role,
+      jellyfinUserId: jellyfinUser?.id ?? null,
       active: true,
     },
   });
@@ -100,6 +108,7 @@ export async function updateUser(
     role?: UserRole;
     active?: boolean;
     password?: string;
+    jellyfinUserId?: string | null;
   },
 ): Promise<PublicUser> {
   const current = await prisma.appUser.findUnique({ where: { id } });
@@ -117,11 +126,15 @@ export async function updateUser(
         : {}),
       ...(input.role ? { role: input.role } : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
+      ...(input.jellyfinUserId !== undefined ? { jellyfinUserId: input.jellyfinUserId || null } : {}),
       ...(input.password
         ? { passwordHash: await bcrypt.hash(assertPassword(input.password), 10) }
         : {}),
     },
   });
+  if (input.password && user.jellyfinUserId) {
+    await setJellyfinPassword(user.jellyfinUserId, input.password);
+  }
   return toPublicUser(user);
 }
 

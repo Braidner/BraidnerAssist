@@ -17,6 +17,7 @@ import {
   deleteUser,
   getServicesConfig,
   getUsers,
+  getJellyfinUsers,
   getEnvSettings,
   putServicesConfig,
   putEnvSettings,
@@ -25,6 +26,7 @@ import {
   type EnvField,
   type EnvSettings,
   type EnvUpdateResult,
+  type JellyfinUserRef,
   type ServiceConfig,
 } from "@/lib/api";
 import type { UserRole } from "@/lib/auth";
@@ -243,6 +245,7 @@ function EnvFieldRow({
 
 function UsersTab() {
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [jellyfinUsers, setJellyfinUsers] = useState<JellyfinUserRef[]>([]);
   const [draft, setDraft] = useState({
     username: "",
     displayName: "",
@@ -252,7 +255,10 @@ function UsersTab() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = () => getUsers().then(setUsers);
+  const reload = () => Promise.all([getUsers(), getJellyfinUsers()]).then(([nextUsers, nextJellyfinUsers]) => {
+    setUsers(nextUsers);
+    setJellyfinUsers(nextJellyfinUsers);
+  });
 
   useEffect(() => {
     reload();
@@ -280,9 +286,10 @@ function UsersTab() {
   return (
     <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className={cn(ui.panel, "p-0")}>
-        <div className="grid grid-cols-[minmax(130px,1fr)_120px_110px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
+        <div className="grid grid-cols-[minmax(130px,1fr)_120px_160px_110px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
           <span>Пользователь</span>
           <span>Роль</span>
+          <span>Jellyfin</span>
           <span>Статус</span>
           <span className="text-right">Действия</span>
         </div>
@@ -291,6 +298,7 @@ function UsersTab() {
             <UserRow
               key={user.id}
               user={user}
+              jellyfinUsers={jellyfinUsers}
               busy={busy}
               onUpdate={(input) =>
                 run(user.id, () => updateUser(user.id, input).then(() => undefined))
@@ -343,6 +351,9 @@ function UsersTab() {
               onChange={(role) => setDraft((d) => ({ ...d, role }))}
             />
           </Field>
+          <div className="rounded-[10px] border border-hair bg-groove px-3 py-2 text-cell text-muted">
+            Jellyfin-профиль будет создан или привязан автоматически по логину.
+          </div>
           <Button
             className="mt-1"
             onClick={addUser}
@@ -360,11 +371,13 @@ function UsersTab() {
 
 function UserRow({
   user,
+  jellyfinUsers,
   busy,
   onUpdate,
   onDelete,
 }: {
   user: AppUser;
+  jellyfinUsers: JellyfinUserRef[];
   busy: string | null;
   onUpdate: (input: Parameters<typeof updateUser>[1]) => void;
   onDelete: () => void;
@@ -372,7 +385,7 @@ function UserRow({
   const [password, setPassword] = useState("");
 
   return (
-    <div className="grid grid-cols-[minmax(130px,1fr)_120px_110px_130px] items-center gap-3 px-5 py-4 max-md:grid-cols-1">
+    <div className="grid grid-cols-[minmax(130px,1fr)_120px_160px_110px_130px] items-center gap-3 px-5 py-4 max-md:grid-cols-1">
       <div className="min-w-0">
         <div className="truncate text-body font-semibold text-ink">{user.username}</div>
         <Input
@@ -384,6 +397,12 @@ function UserRow({
       </div>
 
       <RoleSelect value={user.role} onChange={(role) => onUpdate({ role })} />
+
+      <JellyfinUserSelect
+        value={user.jellyfinUserId}
+        users={jellyfinUsers}
+        onChange={(jellyfinUserId) => onUpdate({ jellyfinUserId })}
+      />
 
       <button
         type="button"
@@ -427,6 +446,32 @@ function UserRow({
         </Button>
       </div>
     </div>
+  );
+}
+
+function JellyfinUserSelect({
+  value,
+  users,
+  onChange,
+}: {
+  value: string | null;
+  users: JellyfinUserRef[];
+  onChange: (jellyfinUserId: string | null) => void;
+}) {
+  return (
+    <Select value={value ?? "__none"} onValueChange={(next) => onChange(next === "__none" ? null : next)}>
+      <SelectTrigger className="w-full bg-surface">
+        <SelectValue placeholder="Не привязан" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none">Не привязан</SelectItem>
+        {users.map((user) => (
+          <SelectItem key={user.id} value={user.id}>
+            {user.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

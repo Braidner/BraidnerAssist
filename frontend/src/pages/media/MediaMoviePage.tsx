@@ -102,7 +102,7 @@ export function MediaMoviePage({
 		setBusy(true);
 		const url = await getMediaPlayUrl(playId);
 		setBusy(false);
-		if (url && d && d !== "loading") setPlayer({url, title: d.title});
+		if (url && d && d !== "loading") setPlayer({itemId: playId, url, title: d.title});
 		else toast.error("Не удалось запустить воспроизведение");
 	};
 

@@ -128,7 +128,7 @@ export function MediaSeriesPage({
     const url = await getMediaPlayUrl(jellyfinId);
     setBusy(null);
     if (url) {
-      setPlayer({ url, title });
+      setPlayer({ itemId: jellyfinId, url, title });
       setActiveEpisodeId(jellyfinId);
     } else {
       toast.error("Не удалось запустить воспроизведение");

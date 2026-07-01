@@ -8,6 +8,7 @@ import {
   listUsers,
   updateUser,
 } from "../auth/users.js";
+import { listJellyfinUsers } from "../integrations/jellyfinUsers.js";
 import { getEnvSettings, updateEnvSettings } from "../settings/envSettings.js";
 
 export const settingsRouter = Router();
@@ -38,6 +39,14 @@ settingsRouter.get("/users", async (_req, res) => {
   }
 });
 
+settingsRouter.get("/jellyfin-users", async (_req, res) => {
+  try {
+    res.json(await listJellyfinUsers());
+  } catch (e) {
+    res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
 settingsRouter.post("/users", async (req, res) => {
   const { username, password, displayName, role } = req.body ?? {};
   if (typeof username !== "string" || typeof password !== "string" || !isUserRole(role)) {
@@ -52,7 +61,7 @@ settingsRouter.post("/users", async (req, res) => {
 });
 
 settingsRouter.put("/users/:id", async (req, res) => {
-  const { displayName, role, active, password } = req.body ?? {};
+  const { displayName, role, active, password, jellyfinUserId } = req.body ?? {};
   if (role !== undefined && !isUserRole(role)) {
     return res.status(400).json({ error: "invalid role" });
   }
@@ -62,12 +71,16 @@ settingsRouter.put("/users/:id", async (req, res) => {
   if (password !== undefined && typeof password !== "string") {
     return res.status(400).json({ error: "invalid password" });
   }
+  if (jellyfinUserId !== undefined && typeof jellyfinUserId !== "string" && jellyfinUserId !== null) {
+    return res.status(400).json({ error: "invalid jellyfin user id" });
+  }
   try {
     const user = await updateUser(req.params.id, {
       displayName,
       role,
       active,
       password: password || undefined,
+      jellyfinUserId,
     });
     res.json(user);
   } catch (e) {

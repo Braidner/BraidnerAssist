@@ -201,9 +201,15 @@ export interface AppUser {
   username: string;
   displayName: string | null;
   role: UserRole;
+  jellyfinUserId: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface JellyfinUserRef {
+  id: string;
+  name: string;
 }
 
 export interface EnvField {
@@ -257,6 +263,16 @@ export async function getUsers(): Promise<AppUser[]> {
   }
 }
 
+export async function getJellyfinUsers(): Promise<JellyfinUserRef[]> {
+  try {
+    const res = await apiFetch("/api/settings/jellyfin-users");
+    if (!res.ok) return [];
+    return (await res.json()) as JellyfinUserRef[];
+  } catch {
+    return [];
+  }
+}
+
 export async function createUser(input: {
   username: string;
   password: string;
@@ -276,6 +292,7 @@ export async function updateUser(
   id: string,
   input: Partial<Pick<AppUser, "displayName" | "role" | "active">> & {
     password?: string;
+    jellyfinUserId?: string | null;
   },
 ): Promise<AppUser> {
   const res = await apiFetch(`/api/settings/users/${id}`, {
@@ -1636,6 +1653,26 @@ export async function getMediaPlayUrl(id: string): Promise<string | null> {
     return body.url ?? null;
   } catch {
     return null;
+  }
+}
+
+export async function reportMediaPlayback(
+  kind: "start" | "progress" | "stop",
+  input: {
+    itemId: string;
+    positionSeconds?: number;
+    durationSeconds?: number;
+    isPaused?: boolean;
+  },
+): Promise<void> {
+  try {
+    await apiFetch(`/api/media/playback/${kind}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    // Best-effort: playback must continue even if progress sync fails.
   }
 }
 

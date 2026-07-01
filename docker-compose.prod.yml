@@ -53,6 +53,12 @@ services:
   cloudpub:
     image: cloudpub/cloudpub:latest
     restart: unless-stopped
+    networks:
+      default: {}
+      lan_direct:
+        ipv4_address: 192.168.2.191
+        mac_address: 02:42:c0:a8:02:bf
+        gw_priority: 100
     environment:
       TOKEN: ${CLOUDPUB_TOKEN}
       # Публикуем только frontend: nginx внутри него сам проксирует /api на backend.
@@ -67,6 +73,9 @@ networks:
   homelab:
     external: true
     name: stack_stack
+  lan_direct:
+    external: true
+    name: stack_lan_direct
 
 volumes:
   cloudpub-config:

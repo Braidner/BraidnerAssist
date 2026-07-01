@@ -16,7 +16,7 @@ import {
   type TmdbItem,
   type TmdbGenre,
 } from "./tmdb.js";
-import { getLibrary, getRecentlyWatchedSeeds, type LibraryItem } from "./media.js";
+import { getLibrary, getRecentlyWatchedSeeds, type LibraryItem, type MediaUserContext } from "./media.js";
 import { hiddenMediaKeys, watchlistItems } from "./mediaPreferences.js";
 
 export interface DiscoverRail {
@@ -122,11 +122,11 @@ export async function getDiscoverHome(): Promise<DiscoverHome> {
 
 // «Потому что вы смотрели»: seed из недавно просмотренного (Jellyfin ProviderIds),
 // для каждого — рейл похожих, дедуп против библиотеки и между рейлами.
-export async function getBecauseRails(): Promise<DiscoverRail[]> {
+export async function getBecauseRails(ctx: MediaUserContext = {}): Promise<DiscoverRail[]> {
   if (!config.media.tmdb.configured) return [];
   const [seedsR, libR] = await Promise.allSettled([
-    getRecentlyWatchedSeeds(6),
-    getLibrary(),
+    getRecentlyWatchedSeeds(6, ctx),
+    getLibrary(ctx),
   ]);
   const hidden = await hiddenMediaKeys().catch(() => new Set<string>());
   const seeds = settled(seedsR, []);

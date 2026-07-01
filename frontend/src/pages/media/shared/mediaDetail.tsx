@@ -5,6 +5,7 @@ import {
   jellyfinBackdropUrl,
   jellyfinPosterUrl,
   posterUrl,
+  reportMediaPlayback,
   type LibraryItem,
   type TmdbItem,
 } from "@/lib/api.ts";
@@ -13,7 +14,7 @@ import { media as ms } from "./mediaStyles.ts";
 import { MediaPosterCard, MediaRail } from "./mediaRails.tsx";
 import { fmtSize, useVideoPlayer } from "./mediaShared.tsx";
 
-export type DetailPlayer = { url: string; title: string } | null;
+export type DetailPlayer = { itemId: string; url: string; title: string } | null;
 export type QueueItem = { jellyfinId: string; title: string };
 export type DetailHeroButtonVariant = "primary" | "secondary" | "active";
 
@@ -189,6 +190,7 @@ export function DetailHero({
   const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [seekFeedback, setSeekFeedback] = useState<string | null>(null);
+  const lastPlaybackReportRef = useRef(0);
   const {
     videoRef,
     vidPlaying,
@@ -207,6 +209,20 @@ export function DetailHero({
   const displayTitle = player?.title ?? title;
   const heroBackdropSrc = backdropSrc ?? (jellyfinId ? jellyfinBackdropUrl(jellyfinId) : undefined);
 
+  const reportPlaybackProgress = useCallback((paused?: boolean, force = false) => {
+    if (!player) return;
+    const video = videoRef.current;
+    const now = Date.now();
+    if (!force && now - lastPlaybackReportRef.current < 10_000) return;
+    lastPlaybackReportRef.current = now;
+    void reportMediaPlayback("progress", {
+      itemId: player.itemId,
+      positionSeconds: video?.currentTime ?? vidTime,
+      durationSeconds: video?.duration ?? vidDuration,
+      isPaused: paused ?? video?.paused ?? !vidPlaying,
+    });
+  }, [player, videoRef, vidDuration, vidPlaying, vidTime]);
+
   const revealControls = useCallback(() => {
     setControlsVisible(true);
     if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
@@ -216,10 +232,19 @@ export function DetailHero({
   }, [vidPlaying]);
 
   const stopPlayer = useCallback(() => {
+    if (player) {
+      const video = videoRef.current;
+      void reportMediaPlayback("stop", {
+        itemId: player.itemId,
+        positionSeconds: video?.currentTime ?? vidTime,
+        durationSeconds: video?.duration ?? vidDuration,
+        isPaused: true,
+      });
+    }
     onClosePlayer();
     setControlsVisible(true);
     setSeekFeedback(null);
-  }, [onClosePlayer]);
+  }, [onClosePlayer, player, videoRef, vidDuration, vidTime]);
 
   const flashSeekFeedback = useCallback((label: string) => {
     setSeekFeedback(label);
@@ -234,8 +259,17 @@ export function DetailHero({
   }, [onPlayQueueItem, revealControls]);
 
   const playNextItem = useCallback(() => {
+    if (player) {
+      const video = videoRef.current;
+      void reportMediaPlayback("stop", {
+        itemId: player.itemId,
+        positionSeconds: video?.currentTime ?? vidTime,
+        durationSeconds: video?.duration ?? vidDuration,
+        isPaused: false,
+      });
+    }
     playQueueItem(nextItem);
-  }, [nextItem, playQueueItem]);
+  }, [nextItem, playQueueItem, player, videoRef, vidDuration, vidTime]);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) {
@@ -245,6 +279,26 @@ export function DetailHero({
     }
     revealControls();
   };
+
+  useEffect(() => {
+    if (!player) return;
+    lastPlaybackReportRef.current = 0;
+    void reportMediaPlayback("start", {
+      itemId: player.itemId,
+      positionSeconds: 0,
+      durationSeconds: vidDuration,
+      isPaused: false,
+    });
+    return () => {
+      const video = videoRef.current;
+      void reportMediaPlayback("stop", {
+        itemId: player.itemId,
+        positionSeconds: video?.currentTime ?? vidTime,
+        durationSeconds: video?.duration ?? vidDuration,
+        isPaused: true,
+      });
+    };
+  }, [player?.itemId]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -333,10 +387,20 @@ export function DetailHero({
           className="absolute inset-0 size-full object-cover"
           style={{ opacity: player ? 1 : 0, transition: "opacity 1.2s ease" }}
           onPlay={() => setVidPlaying(true)}
-          onPause={() => setVidPlaying(false)}
+          onPause={() => {
+            setVidPlaying(false);
+            reportPlaybackProgress(true, true);
+          }}
           onVolumeChange={(e) => setVidMuted(e.currentTarget.muted)}
           onDurationChange={(e) => setVidDuration(e.currentTarget.duration)}
-          onTimeUpdate={(e) => setVidTime(e.currentTarget.currentTime)}
+          onTimeUpdate={(e) => {
+            setVidTime(e.currentTarget.currentTime);
+            reportPlaybackProgress(e.currentTarget.paused);
+          }}
+          onSeeked={(e) => {
+            setVidTime(e.currentTarget.currentTime);
+            reportPlaybackProgress(e.currentTarget.paused, true);
+          }}
           onEnded={playNextItem}
         />
       </div>

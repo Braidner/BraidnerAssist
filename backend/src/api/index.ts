@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { Readable } from "node:stream";
 import { prisma } from "../db/client.js";
 import { config } from "../config.js";
@@ -25,7 +25,9 @@ import {
   qbAdd,
   qbAction,
   getContinueWatching,
+  reportPlaybackEvent,
   unifiedSearch,
+  type MediaUserContext,
 } from "../integrations/media.js";
 import {
   nativeLookup,
@@ -67,6 +69,11 @@ import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integr
 import { log, getEntries } from "../logger.js";
 
 export const apiRouter = Router();
+
+function mediaUserContext(res: { locals: { user?: { id?: string } } }): MediaUserContext {
+  const appUserId = res.locals.user?.id ?? null;
+  return { appUserId, allowFallback: appUserId === "app-token" };
+}
 
 // Request logger — captures slow/failed requests into the in-memory ring buffer.
 apiRouter.use((req, _res, next) => {
@@ -365,7 +372,7 @@ apiRouter.get("/media/torrents/:kind/:tmdbId", async (req, res) => {
 apiRouter.get("/media/library", async (_req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json(await getLibrary());
+    res.json(await getLibrary(mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -375,7 +382,7 @@ apiRouter.get("/media/library", async (_req, res) => {
 apiRouter.get("/media/series/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json(await getSeriesDetail(req.params.id));
+    res.json(await getSeriesDetail(req.params.id, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -385,7 +392,7 @@ apiRouter.get("/media/series/:id", async (req, res) => {
 apiRouter.get("/media/detail/series/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json(await getSeriesPageDetail(req.params.id));
+    res.json(await getSeriesPageDetail(req.params.id, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -395,7 +402,7 @@ apiRouter.get("/media/detail/series/:id", async (req, res) => {
 apiRouter.get("/media/detail/movie/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json(await getMoviePageDetail(req.params.id));
+    res.json(await getMoviePageDetail(req.params.id, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -408,7 +415,7 @@ apiRouter.get("/media/title/:kind/:tmdbId", async (req, res) => {
   if (!config.media.tmdb.configured) return res.status(503).json({ configured: false });
   const idType = req.query.idType === "tvdb" || req.query.idType === "auto" ? req.query.idType : "tmdb";
   try {
-    res.json(await getMediaTitleDetail(kind, id, { idType }));
+    res.json(await getMediaTitleDetail(kind, id, { idType }, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -435,7 +442,7 @@ apiRouter.get("/media/discover/detail/series/:id", async (req, res) => {
   if (!Number.isFinite(tvdbId) || tvdbId <= 0) return res.status(400).json({ error: "id required" });
   const idType = req.query.idType === "tmdb" || req.query.idType === "auto" ? req.query.idType : "tvdb";
   try {
-    res.json(await nativeSeriesDiscoverDetail(tvdbId, idType));
+    res.json(await nativeSeriesDiscoverDetail(tvdbId, idType, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -447,7 +454,7 @@ apiRouter.get("/media/discover/detail/movie/:id", async (req, res) => {
   const tmdbId = Number(req.params.id);
   if (!Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "id required" });
   try {
-    res.json(await nativeMovieDiscoverDetail(tmdbId));
+    res.json(await nativeMovieDiscoverDetail(tmdbId, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -457,10 +464,49 @@ apiRouter.get("/media/discover/detail/movie/:id", async (req, res) => {
 apiRouter.get("/media/play/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json({ url: await getPlaybackPath(req.params.id) });
+    res.json({ url: await getPlaybackPath(req.params.id, mediaUserContext(res)) });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
+});
+
+async function handlePlaybackEvent(
+  kind: "start" | "progress" | "stop",
+  req: Request,
+  res: Response,
+) {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  const { itemId, positionSeconds, durationSeconds, isPaused } = req.body ?? {};
+  if (typeof itemId !== "string" || !itemId) {
+    return res.status(400).json({ error: "itemId required" });
+  }
+  try {
+    const linked = await reportPlaybackEvent(
+      kind,
+      {
+        itemId,
+        positionSeconds: Number.isFinite(Number(positionSeconds)) ? Number(positionSeconds) : 0,
+        durationSeconds: Number.isFinite(Number(durationSeconds)) ? Number(durationSeconds) : 0,
+        isPaused: Boolean(isPaused),
+      },
+      mediaUserContext(res),
+    );
+    res.json({ ok: true, linked });
+  } catch (e) {
+    res.status(502).json({ error: String(e) });
+  }
+}
+
+apiRouter.post("/media/playback/start", (req, res) => {
+  void handlePlaybackEvent("start", req, res);
+});
+
+apiRouter.post("/media/playback/progress", (req, res) => {
+  void handlePlaybackEvent("progress", req, res);
+});
+
+apiRouter.post("/media/playback/stop", (req, res) => {
+  void handlePlaybackEvent("stop", req, res);
 });
 
 // Скан библиотеки Jellyfin (после докачки торрента).
@@ -687,7 +733,7 @@ apiRouter.get("/media/discover/tmdb-detail/:kind/:id", async (req, res) => {
 // «Потому что вы смотрели» — персональные рейлы (seed из Jellyfin watch history).
 apiRouter.get("/media/discover/because", async (_req, res) => {
   try {
-    res.json(await getBecauseRails());
+    res.json(await getBecauseRails(mediaUserContext(res)));
   } catch (e) {
     res.json([]); // персонализация необязательна — не валим
   }
@@ -829,7 +875,7 @@ apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
 apiRouter.get("/media/continue", async (_req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json(await getContinueWatching());
+    res.json(await getContinueWatching(mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -841,7 +887,7 @@ apiRouter.get("/media/unified", async (req, res) => {
   const q = String(req.query.q ?? "").trim();
   if (!q) return res.json({ inLibrary: [], discover: [], releases: [] });
   try {
-    res.json(await unifiedSearch(q));
+    res.json(await unifiedSearch(q, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

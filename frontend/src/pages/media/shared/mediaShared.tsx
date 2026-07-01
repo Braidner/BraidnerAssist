@@ -19,6 +19,13 @@ import { ui } from "@/lib/ui.ts";
 import { media } from "./mediaStyles.ts";
 import { MediaRail } from "./mediaRails.tsx";
 
+type WebKitPresentationMode = "inline" | "fullscreen" | "picture-in-picture";
+type WebKitVideoElement = HTMLVideoElement & {
+  webkitPresentationMode?: WebKitPresentationMode;
+  webkitSupportsPresentationMode?: (mode: WebKitPresentationMode) => boolean;
+  webkitSetPresentationMode?: (mode: WebKitPresentationMode) => void;
+};
+
 export function ProgressBar({ pct }: { pct: number }) {
   const color = pct >= 100 ? "var(--ok)" : "var(--accent)";
   return (
@@ -374,7 +381,7 @@ export function Player({
 
 // ── Hook: manages HLS/direct video in a <video> ref ─────────────────────
 export function useVideoPlayer(url: string | null, direct = false) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<WebKitVideoElement>(null);
   const [vidPlaying, setVidPlaying] = useState(false);
   const [vidMuted, setVidMuted] = useState(false);
   const [vidDuration, setVidDuration] = useState(0);
@@ -410,19 +417,27 @@ export function useVideoPlayer(url: string | null, direct = false) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const supportsPip =
+    const supportsStandardPip =
       "pictureInPictureEnabled" in document &&
       Boolean(document.pictureInPictureEnabled) &&
       "requestPictureInPicture" in video;
-    setPipSupported(supportsPip);
+    const supportsWebKitPip = Boolean(
+      video.webkitSupportsPresentationMode?.("picture-in-picture"),
+    );
+    setPipSupported(supportsStandardPip || supportsWebKitPip);
 
     const handleEnter = () => setPipActive(true);
     const handleLeave = () => setPipActive(false);
+    const handleWebKitPresentationMode = () => {
+      setPipActive(video.webkitPresentationMode === "picture-in-picture");
+    };
     video.addEventListener("enterpictureinpicture", handleEnter);
     video.addEventListener("leavepictureinpicture", handleLeave);
+    video.addEventListener("webkitpresentationmodechanged", handleWebKitPresentationMode);
     return () => {
       video.removeEventListener("enterpictureinpicture", handleEnter);
       video.removeEventListener("leavepictureinpicture", handleLeave);
+      video.removeEventListener("webkitpresentationmodechanged", handleWebKitPresentationMode);
     };
   }, []);
 
@@ -452,14 +467,38 @@ export function useVideoPlayer(url: string | null, direct = false) {
     setVidMuted(v.muted);
   };
 
-  const togglePiP = () => {
+  const togglePiP = async () => {
     const v = videoRef.current;
     if (!v || !pipSupported) return;
+    const supportsWebKitPip = Boolean(v.webkitSupportsPresentationMode?.("picture-in-picture"));
+    const useWebKitPip = () => {
+      if (!supportsWebKitPip || !v.webkitSetPresentationMode) return false;
+      const nextMode = v.webkitPresentationMode === "picture-in-picture"
+        ? "inline"
+        : "picture-in-picture";
+      v.webkitSetPresentationMode(nextMode);
+      setPipActive(nextMode === "picture-in-picture");
+      return true;
+    };
+
     if (document.pictureInPictureElement === v) {
-      void document.exitPictureInPicture?.();
-    } else {
-      void v.requestPictureInPicture?.().catch(() => {});
+      await document.exitPictureInPicture?.().catch(() => {});
+      return;
     }
+
+    if (v.webkitPresentationMode === "picture-in-picture") {
+      useWebKitPip();
+      return;
+    }
+
+    if ("requestPictureInPicture" in v && document.pictureInPictureEnabled) {
+      await v.requestPictureInPicture?.().catch(() => {
+        useWebKitPip();
+      });
+      return;
+    }
+
+    useWebKitPip();
   };
 
   return {

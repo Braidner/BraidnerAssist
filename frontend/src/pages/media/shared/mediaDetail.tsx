@@ -621,6 +621,7 @@ export function DetailHero({
         ) : null}
         <video
           ref={videoRef}
+          playsInline
           className="absolute inset-0 size-full object-cover"
           style={{ opacity: player ? 1 : 0, transition: "opacity 1.2s ease" }}
           onPlay={() => setVidPlaying(true)}

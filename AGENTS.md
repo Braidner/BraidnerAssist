@@ -194,12 +194,18 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     совместимости.) Стрим идёт через бэкенд-реверс-прокси
     `ALL /api/media/jellyfin/*` — токен Jellyfin инжектится заголовком и НЕ утекает в браузер;
     `.m3u8` переписывается (вырезается `api_key`), hls.js `xhrSetup` цепляет JWT приложения.
-    **Постер-прокси** (`api/poster.ts`, `GET /api/poster?url=<tmdb>|jf=<id>`): `<img>` не может
-    слать bearer → маршрут вынесен из-под `jwtAuth` (публичный, LAN-only), но жёстко ограничен
-    анти-SSRF (только `image.tmdb.org`, даунсайз `original→w342`; или Jellyfin по hex-id с
-    инжектом токена). Решает таймаут постеров: у клиентов нет IPv6-egress до BunnyCDN (TMDB
-    отдаёт AAAA), а бэкенд ходит по IPv4. Фронт: `posterUrl()`/`jellyfinPosterUrl()` в дравере
-    lookup и в сетке библиотеки (битые/отсутствующие постеры прячутся `onError`).
+    **Постер-прокси и кэш** (`api/poster.ts`, `GET /api/poster?url=<tmdb>|jf=<id>`):
+    `<img>` не может слать bearer → маршрут вынесен из-под `jwtAuth` (публичный, LAN-only), но
+    жёстко ограничен анти-SSRF (только `image.tmdb.org`, `artworks.thetvdb.com`,
+    `kinozal.tv/i/poster` или Jellyfin по hex-id с инжектом токена). Бэкенд ходит за
+    TMDB/TVDB/Jellyfin сам и хранит disk cache в `/data/poster-cache`
+    (`integrations/posterCache.ts`, sidecar metadata, LRU cleanup, stale/fresh HIT,
+    `GET/DELETE /api/poster-cache`, карточка на `/system`). PWA кэширует `/api/poster`
+    через Workbox `CacheFirst` (`poster-cache`), остальные `/api/*` остаются `NetworkFirst`.
+    TMDB-постеры по умолчанию режутся до `w342`, backend даунсайзит старые запросы без
+    `&w=`, а `backdropUrl()` берёт широкие `w1280`. Фронт: `posterUrl()`/
+    `jellyfinPosterUrl()` в дравере lookup и сетках (битые/отсутствующие постеры прячутся
+    `onError`).
     **Правильный пайплайн в медиатеку**: `GET /media/lookup?type=movie|series&q=` ищет тайтл в TMDB,
     `POST /media/release/search` ищет релизы через Jackett Torznab, `POST /media/release/grab`
     отправляет выбранный релиз в qBittorrent с категорией `mc-library` и `savePath` сразу в
@@ -248,8 +254,12 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     favorites и не команды *arr. Discovery-карточки дают действия «В список»/«Добавить»/«Скрыть»,
     Cmd-K показывает «Мой список». `/media/discover/rails` **graceful**: TMDB off → `200 {configured:false,…}` (виджет не
     падает). Общий рейл-компонент — `CardRail` + адаптеры `libraryRailCards`/`tmdbRailCards` в
-    `shared/mediaDetail.tsx` (бывший `SimilarRail` обобщён под Jellyfin- и TMDB-постеры). Постер-прокси
-    `api/poster.ts` получил `&w=` (`w342|w780|w1280|original`) — бэкдропы тащатся широким кропом.
+    `shared/mediaDetail.tsx` (бывший `SimilarRail` обобщён под Jellyfin- и TMDB-постеры).
+    `MediaRail` (`shared/mediaRails.tsx`) lazy-монтирует rail через IntersectionObserver
+    (`rootMargin≈900px`) и дорендеривает горизонтальные карточки пачками (8 mobile / 12 desktop
+    на старте, затем +8 по свайпу), чтобы Discovery/Library/detail не создавали все карточки и
+    `<img>` сразу после reload. Постер-прокси `api/poster.ts` получил `&w=`
+    (`w342|w780|w1280|original`) — бэкдропы тащатся широким кропом.
     Фронт: `getDiscoverRails`/`getDiscoverGenre`/`getDiscoverSimilar`/`getDiscoverBecause`/
     `getDiscoverCollection`/`getTmdbDetail`/preferences helpers + `backdropUrl()` в `lib/api.ts`.
     Detail pages показывают трейлер/жанры/runtime/episodeCount из TMDB и graceful toast, если
@@ -294,6 +304,13 @@ Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
   в TopBar и работает как burger без hover-эффекта. `Sidebar` без лого: на desktop по умолчанию
   узкая колонка иконок (`76px`), по burger расширяется до подписей; на mobile полностью скрыт
   и открывается fullscreen-меню с body-lock.
+- **PWA / iPhone safe-area**: manifest `display: standalone`; iOS meta
+  `apple-mobile-web-app-capable=yes`, `apple-mobile-web-app-status-bar-style=black-translucent`,
+  viewport `viewport-fit=cover`. `App.tsx` ставит `.is-standalone` по `display-mode`/
+  `navigator.standalone`; CSS tokens `--safe-top`/`--safe-bottom` используют
+  `env(safe-area-inset-*)`. `TopBar` получает top safe padding только в standalone, media pages
+  и hero-player controls учитывают bottom safe area. Цель — edge-to-edge PWA под status bar,
+  но iOS часы/батарея/Dynamic Island не скрываются.
 - **StatStrip**: одна горизонтальная полоса мини-тайлов с прокруткой — погода (широкий) +
   один объединённый Proxmox-тайл (CPU/RAM/DISK гейджи в ряд, диск/RAM в ГБ) + по тайлу на
   каждую VM/LXC (cpu/ram/статус) + по тайлу на каждый сервис. Панель «Статус системы»
@@ -360,6 +377,10 @@ Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
   library rail «Скачивается / Скоро в библиотеке». Discovery preferences (`MediaPreference`:
   watchlist/hidden/liked/disliked), Cmd-K «Мой список» и TMDB rails сохранены. MCP/REST очищены от
   monitor/import tools; Hermes prompt обновлён на no importer/no hardlinks. ✅ ГОТОВО
+- **Mobile/PWA media performance pass** (2026-07-01): серверный disk cache постеров
+  `/data/poster-cache` + `/api/poster-cache/status|DELETE`, Workbox `CacheFirst` для
+  `/api/poster`, TMDB poster default `w342` (backend fallback для старых URL), virtualized
+  `MediaRail` и iPhone standalone safe-area/edge-to-edge polish. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); будущий этап удаления Jellyfin
   (свой transcoding/watch-state) — отдельная большая тема.
 

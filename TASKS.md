@@ -117,6 +117,8 @@
 
 - [x] PWA (vite-plugin-pwa: manifest + service worker, иконки, установка на телефон)
 - [x] Настройки из UI (Settings modal ⚙ в TopBar — редактор списка сервисов вместо ручного services.json)
+- [x] iPhone PWA polish: `viewport-fit=cover`, `black-translucent` status bar, standalone class
+      (`display-mode`/`navigator.standalone`), safe-area CSS для TopBar/media/player controls.
 - [ ] Drag-and-drop виджетов (react-grid-layout, persist order) — отложено
 
 ## Proxmox + StatStrip rework (2026-06-03)  ✅ ГОТОВО
@@ -451,6 +453,23 @@
 - [x] Проверено: локальный replay всех Prisma migrations через SQLite, `cd backend && npm run build`,
       `cd frontend && npm run build`, `graphify update .`. На сервере `prisma migrate status`
       показывает `Database schema is up to date!`, backend `/healthz` отвечает.
+
+## Mobile/PWA media performance pass (2026-07-01) ✅ ГОТОВО
+
+- [x] Poster proxy получил серверный disk cache в `/data/poster-cache`:
+      `integrations/posterCache.ts`, sidecar metadata, LRU cleanup, stale/fresh HIT, status/purge
+      API `GET /api/poster-cache/status` и `DELETE /api/poster-cache`, карточка на `/system`.
+- [x] PWA Workbox: `/api/poster` вынесен в отдельный `CacheFirst` cache `poster-cache`
+      (до 90 дней), остальные `/api/*` оставлены `NetworkFirst`.
+- [x] TMDB poster optimization: `posterUrl()` по умолчанию просит `w342`; backend даунсайзит
+      TMDB `original` до `w342` даже для старых URL без `&w=`; `backdropUrl()` оставлен широким.
+- [x] Media rails virtualization: общий `MediaRail` lazy-монтирует rail через
+      `IntersectionObserver`, показывает skeleton-strip ниже viewport и дорендеривает
+      горизонтальные карточки пачками (8 mobile / 12 desktop, затем +8 по свайпу).
+- [x] iPhone edge-to-edge PWA: `viewport-fit=cover`, `.is-standalone`, `--safe-top`/
+      `--safe-bottom`, safe-area отступы для TopBar, media pages и hero-player controls.
+- [x] Проверено и задеплоено: frontend/backend builds зелёные, GHCR images обновлены,
+      `hermes.lan` на `ab7aea4`, backend `/healthz` отвечает.
 
 ---
 

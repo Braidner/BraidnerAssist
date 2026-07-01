@@ -22,6 +22,8 @@ import { MediaRail } from "./mediaRails.tsx";
 type WebKitPresentationMode = "inline" | "fullscreen" | "picture-in-picture";
 type WebKitVideoElement = HTMLVideoElement & {
   webkitPresentationMode?: WebKitPresentationMode;
+  webkitEnterFullscreen?: () => void;
+  webkitExitFullscreen?: () => void;
   webkitSupportsPresentationMode?: (mode: WebKitPresentationMode) => boolean;
   webkitSetPresentationMode?: (mode: WebKitPresentationMode) => void;
 };
@@ -481,6 +483,11 @@ export function useVideoPlayer(url: string | null, direct = false) {
       return true;
     };
 
+    if (supportsWebKitPip) {
+      useWebKitPip();
+      return;
+    }
+
     if (document.pictureInPictureElement === v) {
       await document.exitPictureInPicture?.().catch(() => {});
       return;
@@ -501,6 +508,24 @@ export function useVideoPlayer(url: string | null, direct = false) {
     useWebKitPip();
   };
 
+  const enterNativeFullscreen = () => {
+    const v = videoRef.current;
+    if (!v) return false;
+    try {
+      if (v.webkitSupportsPresentationMode?.("fullscreen") && v.webkitSetPresentationMode) {
+        v.webkitSetPresentationMode("fullscreen");
+        return true;
+      }
+      if (v.webkitEnterFullscreen) {
+        v.webkitEnterFullscreen();
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  };
+
   return {
     videoRef,
     vidPlaying,
@@ -518,6 +543,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
     pipSupported,
     pipActive,
     togglePiP,
+    enterNativeFullscreen,
   };
 }
 

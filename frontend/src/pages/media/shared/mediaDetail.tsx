@@ -331,6 +331,7 @@ export function DetailHero({
     pipSupported,
     pipActive,
     togglePiP,
+    enterNativeFullscreen,
   } = useVideoPlayer(player?.url ?? null);
   const displayTitle = player?.title ?? title;
   const heroBackdropSrc = backdropSrc ?? (jellyfinId ? jellyfinBackdropUrl(jellyfinId) : undefined);
@@ -408,7 +409,14 @@ export function DetailHero({
     if (document.fullscreenElement) {
       void document.exitFullscreen();
     } else {
-      void heroRef.current?.requestFullscreen();
+      const requestFullscreen = heroRef.current?.requestFullscreen;
+      if (!requestFullscreen) {
+        enterNativeFullscreen();
+      } else {
+        void requestFullscreen.call(heroRef.current).catch(() => {
+          enterNativeFullscreen();
+        });
+      }
     }
     revealControls();
   };

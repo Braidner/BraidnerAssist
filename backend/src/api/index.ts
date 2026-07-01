@@ -464,7 +464,7 @@ apiRouter.get("/media/discover/detail/movie/:id", async (req, res) => {
 apiRouter.get("/media/play/:id", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
-    res.json({ url: await getPlaybackPath(req.params.id, mediaUserContext(res)) });
+    res.json(await getPlaybackPath(req.params.id, mediaUserContext(res)));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -476,22 +476,24 @@ async function handlePlaybackEvent(
   res: Response,
 ) {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
-  const { itemId, positionSeconds, durationSeconds, isPaused } = req.body ?? {};
+  const { itemId, playSessionId, mediaSourceId, positionSeconds, durationSeconds, isPaused } = req.body ?? {};
   if (typeof itemId !== "string" || !itemId) {
     return res.status(400).json({ error: "itemId required" });
   }
   try {
-    const linked = await reportPlaybackEvent(
+    const result = await reportPlaybackEvent(
       kind,
       {
         itemId,
+        playSessionId: typeof playSessionId === "string" ? playSessionId : null,
+        mediaSourceId: typeof mediaSourceId === "string" ? mediaSourceId : null,
         positionSeconds: Number.isFinite(Number(positionSeconds)) ? Number(positionSeconds) : 0,
         durationSeconds: Number.isFinite(Number(durationSeconds)) ? Number(durationSeconds) : 0,
         isPaused: Boolean(isPaused),
       },
       mediaUserContext(res),
     );
-    res.json({ ok: true, linked });
+    res.json({ ok: true, ...result });
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

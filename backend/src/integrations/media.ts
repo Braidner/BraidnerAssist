@@ -6,6 +6,7 @@
 
 import { config } from "../config.js";
 import { prisma } from "../db/client.js";
+import { jellyfinUserHeaders } from "./jellyfinUsers.js";
 import { tmdbDetails, tmdbFindByTvdb, tmdbSeason, tmdbTvSeasons, tmdbTvToTvdb } from "./tmdb.js";
 import { request } from "undici";
 
@@ -46,6 +47,24 @@ export interface MediaData {
 export interface MediaUserContext {
   appUserId?: string | null;
   allowFallback?: boolean;
+}
+
+export interface JellyfinPlaybackContext {
+  userId: string;
+  accessToken: string | null;
+}
+
+export interface PlaybackPathInfo {
+  url: string;
+  playSessionId: string | null;
+  mediaSourceId: string | null;
+  linked: boolean;
+  reason?: "jellyfin_user_required" | "jellyfin_auth_required";
+}
+
+export interface PlaybackReportResult {
+  linked: boolean;
+  reason?: "jellyfin_user_required" | "jellyfin_auth_required";
 }
 
 export interface LibraryItem {
@@ -772,12 +791,28 @@ async function jellyfinUserId(ctx: MediaUserContext = {}): Promise<string | null
   return ctx.allowFallback || appUserId === "app-token" ? firstJellyfinUserId() : null;
 }
 
+async function jellyfinPlaybackContext(ctx: MediaUserContext = {}): Promise<JellyfinPlaybackContext | null> {
+  const appUserId = ctx.appUserId;
+  if (appUserId && appUserId !== "app-token") {
+    const user = await prisma.appUser.findUnique({
+      where: { id: appUserId },
+      select: { jellyfinUserId: true, jellyfinAccessToken: true },
+    }).catch(() => null);
+    return user?.jellyfinUserId
+      ? { userId: user.jellyfinUserId, accessToken: user.jellyfinAccessToken ?? null }
+      : null;
+  }
+  const userId = ctx.allowFallback || appUserId === "app-token" ? await firstJellyfinUserId() : null;
+  return userId ? { userId, accessToken: null } : null;
+}
+
 // DeviceProfile с пустыми DirectPlayProfiles заставляет Jellyfin отдать HLS-транскод,
 // который играется в любом браузере. Возвращаем путь под наш прокси (api_key вырезан —
 // его подставит прокси заголовком).
-export async function getPlaybackPath(itemId: string, ctx: MediaUserContext = {}): Promise<string> {
+export async function getPlaybackPath(itemId: string, ctx: MediaUserContext = {}): Promise<PlaybackPathInfo> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
-  const userId = await jellyfinUserId(ctx);
+  const playbackContext = await jellyfinPlaybackContext(ctx);
+  const userId = playbackContext?.userId ?? null;
   const url = new URL(`${config.media.jellyfin.url}/Items/${itemId}/PlaybackInfo`);
   if (userId) url.searchParams.set("UserId", userId);
 
@@ -803,12 +838,19 @@ export async function getPlaybackPath(itemId: string, ctx: MediaUserContext = {}
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { ...jfHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(deviceProfile),
+    headers: {
+      ...(playbackContext?.accessToken ? jellyfinUserHeaders(playbackContext.accessToken) : jfHeaders()),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...deviceProfile,
+      ...(userId ? { UserId: userId } : {}),
+    }),
     signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`Jellyfin PlaybackInfo responded ${res.status}`);
   const info = (await res.json()) as {
+    PlaySessionId?: string;
     MediaSources?: { TranscodingUrl?: string; Id?: string }[];
   };
   const src = info.MediaSources?.[0];
@@ -819,7 +861,17 @@ export async function getPlaybackPath(itemId: string, ctx: MediaUserContext = {}
   }
   // Вырезаем api_key — прокси подставит токен заголовком.
   const cleaned = transcodingUrl.replace(/([?&])api_key=[^&]*/gi, "$1").replace(/[?&]$/, "");
-  return `/api/media/jellyfin${cleaned.startsWith("/") ? "" : "/"}${cleaned}`;
+  return {
+    url: `/api/media/jellyfin${cleaned.startsWith("/") ? "" : "/"}${cleaned}`,
+    playSessionId: info.PlaySessionId ?? null,
+    mediaSourceId: src?.Id ?? itemId,
+    linked: Boolean(playbackContext?.accessToken),
+    reason: !playbackContext?.userId
+      ? "jellyfin_user_required"
+      : !playbackContext.accessToken
+        ? "jellyfin_auth_required"
+        : undefined,
+  };
 }
 
 export type PlaybackEventKind = "start" | "progress" | "stop";
@@ -828,23 +880,26 @@ export async function reportPlaybackEvent(
   kind: PlaybackEventKind,
   input: {
     itemId: string;
+    playSessionId?: string | null;
+    mediaSourceId?: string | null;
     positionSeconds?: number | null;
     durationSeconds?: number | null;
     isPaused?: boolean;
   },
   ctx: MediaUserContext = {},
-): Promise<boolean> {
-  if (!config.media.jellyfin.configured) return false;
-  const userId = await jellyfinUserId(ctx);
-  if (!userId) return false;
+): Promise<PlaybackReportResult> {
+  if (!config.media.jellyfin.configured) return { linked: false, reason: "jellyfin_user_required" };
+  const playbackContext = await jellyfinPlaybackContext(ctx);
+  if (!playbackContext?.userId) return { linked: false, reason: "jellyfin_user_required" };
+  if (!playbackContext.accessToken) return { linked: false, reason: "jellyfin_auth_required" };
   const path =
     kind === "start" ? "/Sessions/Playing" :
     kind === "progress" ? "/Sessions/Playing/Progress" :
     "/Sessions/Playing/Stopped";
   const body = {
     ItemId: input.itemId,
-    UserId: userId,
-    MediaSourceId: input.itemId,
+    MediaSourceId: input.mediaSourceId ?? input.itemId,
+    PlaySessionId: input.playSessionId ?? undefined,
     PlayMethod: "Transcode",
     CanSeek: true,
     IsPaused: Boolean(input.isPaused),
@@ -853,12 +908,12 @@ export async function reportPlaybackEvent(
   };
   const res = await fetch(`${config.media.jellyfin.url}${path}`, {
     method: "POST",
-    headers: { ...jfHeaders(), "Content-Type": "application/json" },
+    headers: { ...jellyfinUserHeaders(playbackContext.accessToken), "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(8_000),
   });
   if (!res.ok && res.status !== 204) throw new Error(`Jellyfin playback ${kind} responded ${res.status}`);
-  return true;
+  return { linked: true };
 }
 
 // Триггер скана библиотеки (после докачки торрента).

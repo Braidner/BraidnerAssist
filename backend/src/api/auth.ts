@@ -4,7 +4,9 @@ import { config } from "../config.js";
 import { jwtAuth } from "../middleware/jwtAuth.js";
 import {
   createFirstAdmin,
+  getActiveUser,
   hasUsers,
+  refreshUserJellyfinTokenOnLogin,
   toPublicUser,
   verifyUserCredentials,
 } from "../auth/users.js";
@@ -63,10 +65,12 @@ authRouter.post("/login", async (req, res) => {
   if (!user) {
     return res.status(401).json({ error: "invalid credentials" });
   }
+  await refreshUserJellyfinTokenOnLogin(user, password);
+  const refreshedUser = await getActiveUser(user.id);
 
   const token = issueToken(user);
 
-  res.json({ token, user: toPublicUser(user) });
+  res.json({ token, user: toPublicUser(refreshedUser ?? user) });
 });
 
 authRouter.get("/me", jwtAuth, (req, res) => {

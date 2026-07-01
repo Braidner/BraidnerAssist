@@ -125,10 +125,19 @@ export function MediaSeriesPage({
 
   const play = async (jellyfinId: string, title: string) => {
     setBusy(jellyfinId);
-    const url = await getMediaPlayUrl(jellyfinId);
+    const playInfo = await getMediaPlayUrl(jellyfinId);
     setBusy(null);
-    if (url) {
-      setPlayer({ itemId: jellyfinId, url, title });
+    if (playInfo) {
+      if (playInfo.reason === "jellyfin_auth_required") {
+        toast.error("Jellyfin не принял учётку для сохранения прогресса. Перелогинься или обнови пароль в настройках.");
+      }
+      setPlayer({
+        itemId: jellyfinId,
+        url: playInfo.url,
+        title,
+        playSessionId: playInfo.playSessionId,
+        mediaSourceId: playInfo.mediaSourceId,
+      });
       setActiveEpisodeId(jellyfinId);
     } else {
       toast.error("Не удалось запустить воспроизведение");

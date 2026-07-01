@@ -100,9 +100,20 @@ export function MediaMoviePage({
 			return;
 		}
 		setBusy(true);
-		const url = await getMediaPlayUrl(playId);
+		const playInfo = await getMediaPlayUrl(playId);
 		setBusy(false);
-		if (url && d && d !== "loading") setPlayer({itemId: playId, url, title: d.title});
+		if (playInfo && d && d !== "loading") {
+			if (playInfo.reason === "jellyfin_auth_required") {
+				toast.error("Jellyfin не принял учётку для сохранения прогресса. Перелогинься или обнови пароль в настройках.");
+			}
+			setPlayer({
+				itemId: playId,
+				url: playInfo.url,
+				title: d.title,
+				playSessionId: playInfo.playSessionId,
+				mediaSourceId: playInfo.mediaSourceId,
+			});
+		}
 		else toast.error("Не удалось запустить воспроизведение");
 	};
 

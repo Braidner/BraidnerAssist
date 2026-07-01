@@ -202,6 +202,7 @@ export interface AppUser {
   displayName: string | null;
   role: UserRole;
   jellyfinUserId: string | null;
+  jellyfinAuthStatus: "not_linked" | "token_ok" | "needs_auth";
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -1645,12 +1646,20 @@ export function jellyfinBackdropUrl(id: string): string {
 }
 
 // Получить HLS-путь (под бэкенд-прокси) для воспроизведения элемента.
-export async function getMediaPlayUrl(id: string): Promise<string | null> {
+export interface MediaPlayInfo {
+  url: string;
+  playSessionId: string | null;
+  mediaSourceId: string | null;
+  linked: boolean;
+  reason?: "jellyfin_user_required" | "jellyfin_auth_required";
+}
+
+export async function getMediaPlayUrl(id: string): Promise<MediaPlayInfo | null> {
   try {
     const res = await apiFetch(`/api/media/play/${encodeURIComponent(id)}`);
     if (!res.ok) return null;
-    const body = (await res.json()) as { url?: string };
-    return body.url ?? null;
+    const body = (await res.json()) as MediaPlayInfo;
+    return body.url ? body : null;
   } catch {
     return null;
   }
@@ -1660,6 +1669,8 @@ export async function reportMediaPlayback(
   kind: "start" | "progress" | "stop",
   input: {
     itemId: string;
+    playSessionId?: string | null;
+    mediaSourceId?: string | null;
     positionSeconds?: number;
     durationSeconds?: number;
     isPaused?: boolean;

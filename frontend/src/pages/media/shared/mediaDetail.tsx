@@ -14,7 +14,13 @@ import { media as ms } from "./mediaStyles.ts";
 import { MediaPosterCard, MediaRail } from "./mediaRails.tsx";
 import { fmtSize, useVideoPlayer } from "./mediaShared.tsx";
 
-export type DetailPlayer = { itemId: string; url: string; title: string } | null;
+export type DetailPlayer = {
+  itemId: string;
+  url: string;
+  title: string;
+  playSessionId?: string | null;
+  mediaSourceId?: string | null;
+} | null;
 export type QueueItem = { jellyfinId: string; title: string };
 export type DetailHeroButtonVariant = "primary" | "secondary" | "active";
 
@@ -217,6 +223,8 @@ export function DetailHero({
     lastPlaybackReportRef.current = now;
     void reportMediaPlayback("progress", {
       itemId: player.itemId,
+      playSessionId: player.playSessionId,
+      mediaSourceId: player.mediaSourceId,
       positionSeconds: video?.currentTime ?? vidTime,
       durationSeconds: video?.duration ?? vidDuration,
       isPaused: paused ?? video?.paused ?? !vidPlaying,
@@ -236,6 +244,8 @@ export function DetailHero({
       const video = videoRef.current;
       void reportMediaPlayback("stop", {
         itemId: player.itemId,
+        playSessionId: player.playSessionId,
+        mediaSourceId: player.mediaSourceId,
         positionSeconds: video?.currentTime ?? vidTime,
         durationSeconds: video?.duration ?? vidDuration,
         isPaused: true,
@@ -263,6 +273,8 @@ export function DetailHero({
       const video = videoRef.current;
       void reportMediaPlayback("stop", {
         itemId: player.itemId,
+        playSessionId: player.playSessionId,
+        mediaSourceId: player.mediaSourceId,
         positionSeconds: video?.currentTime ?? vidTime,
         durationSeconds: video?.duration ?? vidDuration,
         isPaused: false,
@@ -285,6 +297,8 @@ export function DetailHero({
     lastPlaybackReportRef.current = 0;
     void reportMediaPlayback("start", {
       itemId: player.itemId,
+      playSessionId: player.playSessionId,
+      mediaSourceId: player.mediaSourceId,
       positionSeconds: 0,
       durationSeconds: vidDuration,
       isPaused: false,
@@ -293,6 +307,8 @@ export function DetailHero({
       const video = videoRef.current;
       void reportMediaPlayback("stop", {
         itemId: player.itemId,
+        playSessionId: player.playSessionId,
+        mediaSourceId: player.mediaSourceId,
         positionSeconds: video?.currentTime ?? vidTime,
         durationSeconds: video?.duration ?? vidDuration,
         isPaused: true,

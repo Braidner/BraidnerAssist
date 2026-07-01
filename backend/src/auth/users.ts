@@ -1,7 +1,13 @@
 import bcrypt from "bcryptjs";
 import type { AppUser } from "@prisma/client";
 import { prisma } from "../db/client.js";
-import { ensureJellyfinUser, setJellyfinPassword } from "../integrations/jellyfinUsers.js";
+import {
+  authenticateJellyfinUser,
+  ensureJellyfinUser,
+  jellyfinUsernameById,
+  refreshJellyfinAccessTokenForUser,
+  setJellyfinPassword,
+} from "../integrations/jellyfinUsers.js";
 
 export type UserRole = "admin" | "media";
 
@@ -11,6 +17,7 @@ export interface PublicUser {
   displayName: string | null;
   role: UserRole;
   jellyfinUserId: string | null;
+  jellyfinAuthStatus: "not_linked" | "token_ok" | "needs_auth";
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +36,11 @@ export function toPublicUser(user: AppUser): PublicUser {
     displayName: user.displayName,
     role: isUserRole(user.role) ? user.role : "media",
     jellyfinUserId: user.jellyfinUserId,
+    jellyfinAuthStatus: !user.jellyfinUserId
+      ? "not_linked"
+      : user.jellyfinAccessToken
+        ? "token_ok"
+        : "needs_auth",
     active: user.active,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -87,6 +99,9 @@ export async function createUser(input: {
     throw new Error("username already exists");
   }
   const jellyfinUser = await ensureJellyfinUser({ username, password: input.password });
+  const jellyfinAuth = jellyfinUser
+    ? await authenticateJellyfinUser({ username: jellyfinUser.name, password: input.password })
+    : null;
 
   const user = await prisma.appUser.create({
     data: {
@@ -94,7 +109,8 @@ export async function createUser(input: {
       displayName: input.displayName?.trim() || null,
       passwordHash: await bcrypt.hash(input.password, 10),
       role: input.role,
-      jellyfinUserId: jellyfinUser?.id ?? null,
+      jellyfinUserId: jellyfinAuth?.userId ?? jellyfinUser?.id ?? null,
+      jellyfinAccessToken: jellyfinAuth?.accessToken ?? null,
       active: true,
     },
   });
@@ -118,6 +134,26 @@ export async function updateUser(
   const nextActive = input.active ?? current.active;
   await assertKeepsActiveAdmin(current.id, nextRole, nextActive);
 
+  let nextJellyfinAccessToken: string | null | undefined;
+  let nextJellyfinUserId: string | null | undefined;
+  if (input.jellyfinUserId !== undefined) {
+    nextJellyfinUserId = input.jellyfinUserId || null;
+    nextJellyfinAccessToken = null;
+  }
+
+  if (input.password && (nextJellyfinUserId ?? current.jellyfinUserId)) {
+    const jellyfinUserId = nextJellyfinUserId ?? current.jellyfinUserId;
+    if (jellyfinUserId) {
+      await setJellyfinPassword(jellyfinUserId, input.password);
+      const jellyfinUsername = await jellyfinUsernameById(jellyfinUserId);
+      const auth = jellyfinUsername
+        ? await authenticateJellyfinUser({ username: jellyfinUsername, password: input.password })
+        : null;
+      nextJellyfinUserId = auth?.userId ?? jellyfinUserId;
+      nextJellyfinAccessToken = auth?.accessToken ?? null;
+    }
+  }
+
   const user = await prisma.appUser.update({
     where: { id },
     data: {
@@ -126,16 +162,18 @@ export async function updateUser(
         : {}),
       ...(input.role ? { role: input.role } : {}),
       ...(input.active !== undefined ? { active: input.active } : {}),
-      ...(input.jellyfinUserId !== undefined ? { jellyfinUserId: input.jellyfinUserId || null } : {}),
+      ...(nextJellyfinUserId !== undefined ? { jellyfinUserId: nextJellyfinUserId } : {}),
+      ...(nextJellyfinAccessToken !== undefined ? { jellyfinAccessToken: nextJellyfinAccessToken } : {}),
       ...(input.password
         ? { passwordHash: await bcrypt.hash(assertPassword(input.password), 10) }
         : {}),
     },
   });
-  if (input.password && user.jellyfinUserId) {
-    await setJellyfinPassword(user.jellyfinUserId, input.password);
-  }
   return toPublicUser(user);
+}
+
+export async function refreshUserJellyfinTokenOnLogin(user: AppUser, password: string): Promise<void> {
+  await refreshJellyfinAccessTokenForUser({ appUserId: user.id, password }).catch(() => {});
 }
 
 export async function deleteUser(id: string): Promise<void> {

@@ -286,10 +286,11 @@ function UsersTab() {
   return (
     <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className={cn(ui.panel, "p-0")}>
-        <div className="grid grid-cols-[minmax(130px,1fr)_120px_160px_110px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
+        <div className="grid grid-cols-[minmax(130px,1fr)_110px_150px_110px_100px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
           <span>Пользователь</span>
           <span>Роль</span>
           <span>Jellyfin</span>
+          <span>Токен</span>
           <span>Статус</span>
           <span className="text-right">Действия</span>
         </div>
@@ -385,7 +386,7 @@ function UserRow({
   const [password, setPassword] = useState("");
 
   return (
-    <div className="grid grid-cols-[minmax(130px,1fr)_120px_160px_110px_130px] items-center gap-3 px-5 py-4 max-md:grid-cols-1">
+    <div className="grid grid-cols-[minmax(130px,1fr)_110px_150px_110px_100px_130px] items-center gap-3 px-5 py-4 max-md:grid-cols-1">
       <div className="min-w-0">
         <div className="truncate text-body font-semibold text-ink">{user.username}</div>
         <Input
@@ -403,6 +404,7 @@ function UserRow({
         users={jellyfinUsers}
         onChange={(jellyfinUserId) => onUpdate({ jellyfinUserId })}
       />
+      <JellyfinAuthBadge status={user.jellyfinAuthStatus} />
 
       <button
         type="button"
@@ -447,6 +449,16 @@ function UserRow({
       </div>
     </div>
   );
+}
+
+function JellyfinAuthBadge({ status }: { status: AppUser["jellyfinAuthStatus"] }) {
+  const map = {
+    not_linked: { label: "не привязан", variant: "outline" as const },
+    token_ok: { label: "token ok", variant: "ok" as const },
+    needs_auth: { label: "нужен вход", variant: "warn" as const },
+  };
+  const item = map[status] ?? map.not_linked;
+  return <Badge variant={item.variant}>{item.label}</Badge>;
 }
 
 function JellyfinUserSelect({

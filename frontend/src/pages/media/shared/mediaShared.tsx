@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Hls from "hls.js";
-import { Check, Download } from "lucide-react";
+import { Check, Download, Search } from "lucide-react";
 import {
   searchReleaseOptions,
   grabRelease,
@@ -711,30 +711,37 @@ export function ReleasePicker({
   downloads?: DownloadItem[];
 }) {
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
+  const [releaseQuery, setReleaseQuery] = useState("");
+  const [debouncedReleaseQuery, setDebouncedReleaseQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [grabbedHashes, setGrabbedHashes] = useState<Record<string, string>>({});
   const toast = useToast();
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedReleaseQuery(releaseQuery.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [releaseQuery]);
+
+  useEffect(() => {
     let alive = true;
     setReleases(null);
     setError(null);
     setGrabbedHashes({});
-    searchReleaseOptions(params).then((r) => {
+    searchReleaseOptions({
+      ...params,
+      query: debouncedReleaseQuery || undefined,
+      limit: 50,
+    }).then((r) => {
       if (!alive) return;
-      setReleases([...r.items].sort((a, b) => {
-        const ak = releaseTracker(a).toLowerCase() === "kinozal" ? 0 : 1;
-        const bk = releaseTracker(b).toLowerCase() === "kinozal" ? 0 : 1;
-        return ak - bk;
-      }));
+      setReleases(r.items);
       setError(r.error);
     });
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.type, params.id, params.seasonNumber]);
+  }, [params.type, params.id, params.seasonNumber, debouncedReleaseQuery]);
 
   // Грабим один релиз и помечаем карточку как отправленную.
   const grabOne = async (r: ReleaseOption): Promise<{ ok: boolean; error: string | null }> => {
@@ -761,39 +768,56 @@ export function ReleasePicker({
     } else toast.error(res.error ?? "Не удалось отправить раздачу");
   };
 
-  if (releases === null)
-    return <div className={cn(media.empty, "mt-2.5")}>Ищем раздачи…</div>;
-  if (error)
-    return <div className={cn(media.empty, "mt-2.5 text-bad")}>{error}</div>;
-  if (releases.length === 0)
-    return <div className={cn(media.empty, "mt-2.5")}>Раздачи не найдены.</div>;
-
-
   return (
-    <MediaRail
-      title="Релизы"
-      count={releases.length}
-      countLabel={`${releases.length} раздач`}
-      className="mt-3"
-    >
-      {releases.map((r) => {
-        const download = findReleaseDownload(downloads, grabbedHashes[r.guid]);
-        const grabbed = Boolean(grabbedHashes[r.guid]);
-        const pending = grabbed && !download;
-        const complete = Boolean(download && download.progress >= 100);
-        return (
-          <TorrentCard
-            key={r.guid}
-            release={r}
-            fallbackPosterSrc={fallbackPosterSrc}
-            busy={busyGuid === r.guid || pending}
-            done={complete}
-            disabled={busyGuid === r.guid || grabbed}
-            download={download}
-            onGrab={() => onGrab(r)}
+    <div className="mt-3">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={15}
+            strokeWidth={1.8}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
           />
-        );
-      })}
-    </MediaRail>
+          <input
+            className={cn(media.input, "w-full pl-9")}
+            value={releaseQuery}
+            placeholder="Фильтр раздач: 1080p, WEB-DL, LostFilm"
+            onChange={(event) => setReleaseQuery(event.target.value)}
+          />
+        </div>
+      </div>
+
+      {releases === null ? (
+        <div className={media.empty}>Ищем раздачи…</div>
+      ) : error ? (
+        <div className={cn(media.empty, "text-bad")}>{error}</div>
+      ) : releases.length === 0 ? (
+        <div className={media.empty}>Раздачи не найдены.</div>
+      ) : (
+        <MediaRail
+          title="Релизы"
+          count={releases.length}
+          countLabel={`${releases.length} раздач · по сидам`}
+        >
+          {releases.map((r) => {
+            const download = findReleaseDownload(downloads, grabbedHashes[r.guid]);
+            const grabbed = Boolean(grabbedHashes[r.guid]);
+            const pending = grabbed && !download;
+            const complete = Boolean(download && download.progress >= 100);
+            return (
+              <TorrentCard
+                key={r.guid}
+                release={r}
+                fallbackPosterSrc={fallbackPosterSrc}
+                busy={busyGuid === r.guid || pending}
+                done={complete}
+                disabled={busyGuid === r.guid || grabbed}
+                download={download}
+                onGrab={() => onGrab(r)}
+              />
+            );
+          })}
+        </MediaRail>
+      )}
+    </div>
   );
 }

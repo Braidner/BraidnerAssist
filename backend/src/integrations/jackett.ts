@@ -228,7 +228,13 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
 
 export async function jackettSearch(
   query: string,
-  opts: { kind?: "movie" | "series" | "manual"; profileName?: string | null; profile?: ReleaseQualityProfile } = {},
+  opts: {
+    kind?: "movie" | "series" | "manual";
+    profileName?: string | null;
+    profile?: ReleaseQualityProfile;
+    sortBy?: "score" | "seeders";
+    limit?: number;
+  } = {},
 ): Promise<SearchResult[]> {
 
   const cfg = config.media.jackett;
@@ -245,6 +251,15 @@ export async function jackettSearch(
     const key = releaseDedupKey(r);
     if (!dedup.has(key)) dedup.set(key, { ...r, query });
   }
+  const sortBy = opts.sortBy ?? "score";
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  const sortResults = (a: SearchResult, b: SearchResult): number => {
+    const bySeeders = (b.seeders ?? 0) - (a.seeders ?? 0);
+    const byScore = (b.score ?? 0) - (a.score ?? 0);
+    return sortBy === "seeders"
+      ? bySeeders || byScore
+      : byScore || bySeeders;
+  };
   const scored = [...dedup.values()]
     .map((r) => {
       const scored = scoreRelease({ ...r, query, kind: opts.kind === "manual" ? undefined : opts.kind, profile });
@@ -257,14 +272,20 @@ export async function jackettSearch(
         studioHint: scored.parsed.studioHint,
       };
     })
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0))
-    .slice(0, 50);
-  return enrichDetails(scored);
+    .sort(sortResults)
+    .slice(0, limit);
+  return (await enrichDetails(scored)).sort(sortResults);
 }
 
 export async function jackettSearchMany(
   queries: string[],
-  opts: { kind?: "movie" | "series" | "manual"; profileName?: string | null; profile?: ReleaseQualityProfile } = {},
+  opts: {
+    kind?: "movie" | "series" | "manual";
+    profileName?: string | null;
+    profile?: ReleaseQualityProfile;
+    sortBy?: "score" | "seeders";
+    limit?: number;
+  } = {},
 ): Promise<SearchResult[]> {
   const seenQueries = new Set<string>();
   const dedup = new Map<string, SearchResult>();
@@ -275,7 +296,9 @@ export async function jackettSearchMany(
     seenQueries.add(queryKey);
     uniqueQueries.push(query);
   }
-  const batches = await Promise.allSettled(uniqueQueries.map((query) => jackettSearch(query, opts)));
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  const sortBy = opts.sortBy ?? "score";
+  const batches = await Promise.allSettled(uniqueQueries.map((query) => jackettSearch(query, { ...opts, limit })));
   if (batches.length > 0 && batches.every((b) => b.status === "rejected")) {
     const first = batches[0];
     throw new Error(first.status === "rejected" ? String(first.reason) : "Jackett search failed");
@@ -286,12 +309,21 @@ export async function jackettSearchMany(
     for (const r of results) {
       const key = releaseDedupKey(r);
       const prev = dedup.get(key);
-      if (!prev || (r.score ?? 0) > (prev.score ?? 0)) dedup.set(key, r);
+      const better = sortBy === "seeders"
+        ? (r.seeders ?? 0) > (prev?.seeders ?? -1) || ((r.seeders ?? 0) === (prev?.seeders ?? -1) && (r.score ?? 0) > (prev?.score ?? -1))
+        : (r.score ?? 0) > (prev?.score ?? -1) || ((r.score ?? 0) === (prev?.score ?? -1) && (r.seeders ?? 0) > (prev?.seeders ?? -1));
+      if (!prev || better) dedup.set(key, r);
     }
   }
   return [...dedup.values()]
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0))
-    .slice(0, 50);
+    .sort((a, b) => {
+      const bySeeders = (b.seeders ?? 0) - (a.seeders ?? 0);
+      const byScore = (b.score ?? 0) - (a.score ?? 0);
+      return sortBy === "seeders"
+        ? bySeeders || byScore
+        : byScore || bySeeders;
+    })
+    .slice(0, limit);
 }
 
 export async function jackettHealth(force = false): Promise<JackettIndexerHealth[]> {

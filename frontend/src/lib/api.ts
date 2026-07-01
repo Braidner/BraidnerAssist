@@ -1583,6 +1583,8 @@ export async function searchReleaseOptions(p: {
   type: "movie" | "series";
   id: number;
   seasonNumber?: number;
+  query?: string;
+  limit?: number;
 }): Promise<MediaSearchResponse<ReleaseOption>> {
   try {
     const res = await apiFetch("/api/media/release/search", {

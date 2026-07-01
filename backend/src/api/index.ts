@@ -567,8 +567,11 @@ apiRouter.post("/media/release/search", async (req, res) => {
   const id = Number(req.body?.id);
   if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "id required" });
   const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
+  const query = String(req.body?.query ?? "").trim();
+  const limitValue = Number(req.body?.limit ?? 50);
+  const limit = Number.isFinite(limitValue) ? Math.max(1, Math.min(Math.floor(limitValue), 100)) : 50;
   try {
-    res.json(await nativeReleaseSearch(kind, id, seasonNumber));
+    res.json(await nativeReleaseSearch(kind, id, seasonNumber, { query, limit }));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }

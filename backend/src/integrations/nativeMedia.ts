@@ -123,7 +123,7 @@ export function titleSavePath(kind: MediaKind, title: { title: string; year: num
   return path.join(root, canonicalFolderName(kind, title, detail));
 }
 
-function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: number): string[] {
+function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: number, filter?: string): string[] {
   const titles = [title, detail?.originalTitle]
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
@@ -131,10 +131,11 @@ function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: n
     .map((key) => titles.find((v) => v.toLowerCase() === key)!)
     .filter(Boolean);
   const season = seasonNumber != null ? ` S${String(seasonNumber).padStart(2, "0")}` : "";
+  const suffix = String(filter ?? "").trim();
   return unique.flatMap((titleValue) => [
     `${titleValue}${season}`,
     ...(detail?.year ? [`${titleValue} ${detail.year}${season}`] : []),
-  ]);
+  ]).map((query) => [query, suffix].filter(Boolean).join(" "));
 }
 
 async function resolveTmdbId(kind: MediaKind, id: number): Promise<{ tmdbId: number; tvdbId: number | null }> {
@@ -209,12 +210,17 @@ export async function nativeAdd(kind: MediaKind, id: number): Promise<{ title: s
   return { title: title.title, titleId: title.id, alreadyInLibrary: Boolean(title.jellyfinId) };
 }
 
-export async function nativeReleaseSearch(kind: MediaKind, id: number, seasonNumber?: number): Promise<SearchResult[]> {
+export async function nativeReleaseSearch(
+  kind: MediaKind,
+  id: number,
+  seasonNumber?: number,
+  opts: { query?: string; limit?: number } = {},
+): Promise<SearchResult[]> {
   keepCacheFresh();
   const title = await ensureTitle(kind, id);
   const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
-  const queries = releaseQueries(detail, title.title, kind === "series" ? seasonNumber : undefined);
-  const releases = await jackettSearchMany(queries, { kind });
+  const queries = releaseQueries(detail, title.title, kind === "series" ? seasonNumber : undefined, opts.query);
+  const releases = await jackettSearchMany(queries, { kind, sortBy: "seeders", limit: opts.limit });
   for (const release of releases) {
     const item = {
       ...release,

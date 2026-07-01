@@ -913,7 +913,42 @@ export async function reportPlaybackEvent(
     signal: AbortSignal.timeout(8_000),
   });
   if (!res.ok && res.status !== 204) throw new Error(`Jellyfin playback ${kind} responded ${res.status}`);
+  await updateJellyfinUserDataProgress(
+    playbackContext.userId,
+    playbackContext.accessToken,
+    input.itemId,
+    input.positionSeconds,
+    input.durationSeconds,
+  );
   return { linked: true };
+}
+
+async function updateJellyfinUserDataProgress(
+  userId: string,
+  accessToken: string,
+  itemId: string,
+  positionSeconds?: number | null,
+  durationSeconds?: number | null,
+): Promise<void> {
+  const positionTicks = ticksFromSeconds(positionSeconds);
+  const duration = Number(durationSeconds ?? 0);
+  const position = Number(positionSeconds ?? 0);
+  const playedPercentage = duration > 0 ? Math.max(0, Math.min(100, (position / duration) * 100)) : null;
+  const played = Boolean(playedPercentage != null && playedPercentage >= 90);
+  const body = {
+    ItemId: itemId,
+    PlaybackPositionTicks: played ? 0 : positionTicks,
+    ...(playedPercentage != null ? { PlayedPercentage: played ? 100 : playedPercentage } : {}),
+    Played: played,
+    LastPlayedDate: new Date().toISOString(),
+  };
+  const res = await fetch(`${config.media.jellyfin.url}/UserItems/${encodeURIComponent(itemId)}/UserData?userId=${encodeURIComponent(userId)}`, {
+    method: "POST",
+    headers: { ...jellyfinUserHeaders(accessToken), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) throw new Error(`Jellyfin UserData progress responded ${res.status}`);
 }
 
 // Триггер скана библиотеки (после докачки торрента).

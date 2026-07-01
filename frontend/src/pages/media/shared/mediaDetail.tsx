@@ -56,6 +56,7 @@ type TrickplayTile = {
   url: string;
   start: number;
   duration: number;
+  frameDuration: number;
   frameWidth: number;
   frameHeight: number;
   columns: number;
@@ -69,6 +70,7 @@ type TrickplayPreview = {
   frameWidth: number;
   frameHeight: number;
   columns: number;
+  rows: number;
   frameIndex: number;
 } | null;
 
@@ -117,6 +119,7 @@ function parseTrickplayPlaylist(
   let frameHeight = 180;
   let columns = 1;
   let rows = 1;
+  let frameDuration = 0;
   let pendingDuration: number | null = null;
   let cursor = 0;
 
@@ -125,10 +128,12 @@ function parseTrickplayPlaylist(
       const attrs = parseHlsAttributes(line.slice("#EXT-X-TILES:".length));
       const [w, h] = (attrs.RESOLUTION ?? "").split("x").map((value) => Number(value));
       const [cols, rowCount] = (attrs.LAYOUT ?? "").split("x").map((value) => Number(value));
+      const tileDuration = Number(attrs.DURATION);
       if (Number.isFinite(w) && w > 0) frameWidth = w;
       if (Number.isFinite(h) && h > 0) frameHeight = h;
       if (Number.isFinite(cols) && cols > 0) columns = cols;
       if (Number.isFinite(rowCount) && rowCount > 0) rows = rowCount;
+      if (Number.isFinite(tileDuration) && tileDuration > 0) frameDuration = tileDuration;
       continue;
     }
 
@@ -145,6 +150,7 @@ function parseTrickplayPlaylist(
       url: absolutizeTrickplayUrl(line, itemId, mediaSourceId, frameWidth),
       start: cursor,
       duration,
+      frameDuration: frameDuration || (duration / Math.max(1, columns * rows)),
       frameWidth,
       frameHeight,
       columns,
@@ -430,15 +436,15 @@ export function DetailHero({
         frameWidth: 160,
         frameHeight: 90,
         columns: 1,
+        rows: 1,
         frameIndex: 0,
       });
       return;
     }
 
     const totalFrames = Math.max(1, tile.columns * tile.rows);
-    const frameDuration = tile.duration / totalFrames;
-    const frameIndex = frameDuration > 0
-      ? Math.max(0, Math.min(totalFrames - 1, Math.floor((time - tile.start) / frameDuration)))
+    const frameIndex = tile.frameDuration > 0
+      ? Math.max(0, Math.min(totalFrames - 1, Math.floor((time - tile.start) / tile.frameDuration)))
       : 0;
     setTrickplayPreview({
       url: tile.url,
@@ -447,6 +453,7 @@ export function DetailHero({
       frameWidth: tile.frameWidth,
       frameHeight: tile.frameHeight,
       columns: tile.columns,
+      rows: tile.rows,
       frameIndex,
     });
   }, [player, trickplayTiles, vidDuration]);
@@ -693,10 +700,9 @@ export function DetailHero({
 
       <div
         className="relative z-[1] flex h-full items-end gap-9 px-[52px] pb-11 transition-all duration-500 ease-out max-mob:gap-[18px] max-mob:px-5 max-mob:pb-8"
-        onClick={(e) => e.stopPropagation()}
         style={{
           opacity: player && !controlsVisible ? 0 : 1,
-          pointerEvents: player && !controlsVisible ? "none" : "auto",
+          pointerEvents: player ? "none" : "auto",
           transform: player && !controlsVisible ? "translateY(34px)" : "translateY(0)",
         }}
       >
@@ -877,12 +883,14 @@ export function DetailHero({
                     }}
                   >
                     {trickplayPreviewImage ? (
-                      <div
-                        className="size-full bg-no-repeat"
+                      <img
+                        src={trickplayPreviewImage}
+                        alt=""
+                        className="block max-w-none"
                         style={{
-                          backgroundImage: `url("${trickplayPreviewImage}")`,
-                          backgroundSize: `${trickplayPreview.columns * 160}px auto`,
-                          backgroundPosition: `-${(trickplayPreview.frameIndex % trickplayPreview.columns) * 160}px -${Math.floor(trickplayPreview.frameIndex / trickplayPreview.columns) * Math.max(72, Math.round((160 / trickplayPreview.frameWidth) * trickplayPreview.frameHeight))}px`,
+                          width: trickplayPreview.columns * 160,
+                          height: trickplayPreview.rows * Math.max(72, Math.round((160 / trickplayPreview.frameWidth) * trickplayPreview.frameHeight)),
+                          transform: `translate(-${(trickplayPreview.frameIndex % trickplayPreview.columns) * 160}px, -${Math.floor(trickplayPreview.frameIndex / trickplayPreview.columns) * Math.max(72, Math.round((160 / trickplayPreview.frameWidth) * trickplayPreview.frameHeight))}px)`,
                         }}
                       />
                     ) : null}

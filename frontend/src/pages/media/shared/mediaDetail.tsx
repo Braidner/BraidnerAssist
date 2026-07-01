@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  getMediaTrickplayPlaylist,
+  getMediaTrickplayTileBlobUrl,
   jellyfinBackdropUrl,
   jellyfinPosterUrl,
   posterUrl,
@@ -48,6 +50,111 @@ function fmtPlayerTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+type TrickplayTile = {
+  url: string;
+  start: number;
+  duration: number;
+  frameWidth: number;
+  frameHeight: number;
+  columns: number;
+  rows: number;
+};
+
+type TrickplayPreview = {
+  url: string | null;
+  time: number;
+  leftPct: number;
+  frameWidth: number;
+  frameHeight: number;
+  columns: number;
+  frameIndex: number;
+} | null;
+
+function parseHlsAttributes(line: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  for (const part of line.split(",")) {
+    const [key, ...rest] = part.split("=");
+    if (!key || rest.length === 0) continue;
+    attrs[key.trim().toUpperCase()] = rest.join("=").replace(/^"|"$/g, "").trim();
+  }
+  return attrs;
+}
+
+function absolutizeTrickplayUrl(uri: string, itemId: string, mediaSourceId?: string | null, width = 320): string {
+  if (uri.startsWith("/api/")) return uri;
+  if (/^https?:\/\//i.test(uri)) {
+    try {
+      const parsed = new URL(uri);
+      parsed.searchParams.delete("api_key");
+      const proxied = `/api/media/jellyfin${parsed.pathname}${parsed.search}`;
+      if (!mediaSourceId || parsed.searchParams.has("mediaSourceId")) return proxied;
+      const sep = proxied.includes("?") ? "&" : "?";
+      return `${proxied}${sep}mediaSourceId=${encodeURIComponent(mediaSourceId)}`;
+    } catch {
+      return uri;
+    }
+  }
+  const cleanUri = uri.replace(/^\/+/, "");
+  const path = cleanUri.startsWith("Videos/")
+    ? cleanUri
+    : `Videos/${encodeURIComponent(itemId)}/Trickplay/${cleanUri.includes("/") ? cleanUri : `${width}/${cleanUri}`}`;
+  const url = `/api/media/jellyfin/${path}`;
+  if (!mediaSourceId) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}mediaSourceId=${encodeURIComponent(mediaSourceId)}`;
+}
+
+function parseTrickplayPlaylist(
+  playlist: string,
+  itemId: string,
+  mediaSourceId?: string | null,
+): TrickplayTile[] {
+  const lines = playlist.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const tiles: TrickplayTile[] = [];
+  let frameWidth = 320;
+  let frameHeight = 180;
+  let columns = 1;
+  let rows = 1;
+  let pendingDuration: number | null = null;
+  let cursor = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("#EXT-X-TILES:")) {
+      const attrs = parseHlsAttributes(line.slice("#EXT-X-TILES:".length));
+      const [w, h] = (attrs.RESOLUTION ?? "").split("x").map((value) => Number(value));
+      const [cols, rowCount] = (attrs.LAYOUT ?? "").split("x").map((value) => Number(value));
+      if (Number.isFinite(w) && w > 0) frameWidth = w;
+      if (Number.isFinite(h) && h > 0) frameHeight = h;
+      if (Number.isFinite(cols) && cols > 0) columns = cols;
+      if (Number.isFinite(rowCount) && rowCount > 0) rows = rowCount;
+      continue;
+    }
+
+    if (line.startsWith("#EXTINF:")) {
+      const raw = line.slice("#EXTINF:".length).split(",")[0];
+      const parsed = Number(raw);
+      pendingDuration = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      continue;
+    }
+
+    if (line.startsWith("#")) continue;
+    const duration = pendingDuration ?? 0;
+    tiles.push({
+      url: absolutizeTrickplayUrl(line, itemId, mediaSourceId, frameWidth),
+      start: cursor,
+      duration,
+      frameWidth,
+      frameHeight,
+      columns,
+      rows,
+    });
+    cursor += duration;
+    pendingDuration = null;
+  }
+
+  return tiles;
 }
 
 export function DetailTopBar({
@@ -194,8 +301,12 @@ export function DetailHero({
   const heroRef = useRef<HTMLDivElement>(null);
   const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trickplayTileUrlsRef = useRef<Record<string, string>>({});
   const [controlsVisible, setControlsVisible] = useState(true);
   const [seekFeedback, setSeekFeedback] = useState<string | null>(null);
+  const [trickplayTiles, setTrickplayTiles] = useState<TrickplayTile[]>([]);
+  const [trickplayPreview, setTrickplayPreview] = useState<TrickplayPreview>(null);
+  const [trickplayTileUrls, setTrickplayTileUrls] = useState<Record<string, string>>({});
   const lastPlaybackReportRef = useRef(0);
   const {
     videoRef,
@@ -211,9 +322,13 @@ export function DetailHero({
     toggleMute,
     seekTo,
     seekBy,
+    pipSupported,
+    pipActive,
+    togglePiP,
   } = useVideoPlayer(player?.url ?? null);
   const displayTitle = player?.title ?? title;
   const heroBackdropSrc = backdropSrc ?? (jellyfinId ? jellyfinBackdropUrl(jellyfinId) : undefined);
+  const trickplayPreviewImage = trickplayPreview?.url ? trickplayTileUrls[trickplayPreview.url] : null;
 
   const reportPlaybackProgress = useCallback((paused?: boolean, force = false) => {
     if (!player) return;
@@ -292,6 +407,50 @@ export function DetailHero({
     revealControls();
   };
 
+  const toggleSurfacePlay = useCallback(() => {
+    if (!player) return;
+    togglePlay();
+    revealControls();
+  }, [player, revealControls, togglePlay]);
+
+  const updateTrickplayPreview = useCallback((clientX: number, rect: DOMRect) => {
+    if (!player || vidDuration <= 0 || rect.width <= 0) return;
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const time = pct * vidDuration;
+    const tile =
+      trickplayTiles.find((candidate) => (
+        time >= candidate.start && time < candidate.start + candidate.duration
+      )) ?? trickplayTiles[trickplayTiles.length - 1];
+
+    if (!tile || tile.duration <= 0) {
+      setTrickplayPreview({
+        url: null,
+        time,
+        leftPct: pct * 100,
+        frameWidth: 160,
+        frameHeight: 90,
+        columns: 1,
+        frameIndex: 0,
+      });
+      return;
+    }
+
+    const totalFrames = Math.max(1, tile.columns * tile.rows);
+    const frameDuration = tile.duration / totalFrames;
+    const frameIndex = frameDuration > 0
+      ? Math.max(0, Math.min(totalFrames - 1, Math.floor((time - tile.start) / frameDuration)))
+      : 0;
+    setTrickplayPreview({
+      url: tile.url,
+      time,
+      leftPct: pct * 100,
+      frameWidth: tile.frameWidth,
+      frameHeight: tile.frameHeight,
+      columns: tile.columns,
+      frameIndex,
+    });
+  }, [player, trickplayTiles, vidDuration]);
+
   useEffect(() => {
     if (!player) return;
     lastPlaybackReportRef.current = 0;
@@ -315,6 +474,55 @@ export function DetailHero({
       });
     };
   }, [player?.itemId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTrickplayPreview(null);
+    setTrickplayTiles([]);
+    setTrickplayTileUrls((current) => {
+      Object.values(current).forEach((url) => URL.revokeObjectURL(url));
+      trickplayTileUrlsRef.current = {};
+      return {};
+    });
+    if (!player) return () => {
+      cancelled = true;
+    };
+
+    void getMediaTrickplayPlaylist(player.itemId, player.mediaSourceId).then((playlist) => {
+      if (cancelled || !playlist) return;
+      setTrickplayTiles(parseTrickplayPlaylist(playlist, player.itemId, player.mediaSourceId));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [player?.itemId, player?.mediaSourceId]);
+
+  useEffect(() => {
+    if (!trickplayPreview?.url || trickplayTileUrls[trickplayPreview.url]) return;
+    let cancelled = false;
+    const sourceUrl = trickplayPreview.url;
+    void getMediaTrickplayTileBlobUrl(sourceUrl).then((blobUrl) => {
+      if (!blobUrl) return;
+      if (cancelled) {
+        URL.revokeObjectURL(blobUrl);
+        return;
+      }
+      setTrickplayTileUrls((current) => {
+        if (current[sourceUrl]) {
+          URL.revokeObjectURL(blobUrl);
+          return current;
+        }
+        const next = { ...current, [sourceUrl]: blobUrl };
+        trickplayTileUrlsRef.current = next;
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trickplayPreview?.url, trickplayTileUrls]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -375,6 +583,8 @@ export function DetailHero({
     () => {
       if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
       if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+      Object.values(trickplayTileUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      trickplayTileUrlsRef.current = {};
     }
   ), []);
 
@@ -382,7 +592,11 @@ export function DetailHero({
     <div
       ref={heroRef}
       className="relative h-[56vh] min-h-[460px] overflow-hidden max-mob:h-[50vh] max-mob:min-h-[300px] fullscreen:h-screen fullscreen:min-h-screen fullscreen:w-screen"
-      style={{ animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both" }}
+      style={{
+        animation: "detIn 0.38s 0.06s cubic-bezier(.22,.61,.36,1) both",
+        cursor: player && vidPlaying && !controlsVisible ? "none" : undefined,
+      }}
+      onClick={player ? toggleSurfacePlay : undefined}
       onMouseMove={player ? revealControls : undefined}
       onTouchStart={player ? revealControls : undefined}
     >
@@ -439,6 +653,7 @@ export function DetailHero({
 
       <div
         className="absolute inset-x-0 top-0 z-[2] flex items-center justify-between gap-4 px-[52px] py-5 transition-all duration-500 ease-out max-mob:px-5 max-mob:py-4"
+        onClick={(e) => e.stopPropagation()}
         style={{
           opacity: player && !controlsVisible ? 0 : 1,
           pointerEvents: player && !controlsVisible ? "none" : "auto",
@@ -478,6 +693,7 @@ export function DetailHero({
 
       <div
         className="relative z-[1] flex h-full items-end gap-9 px-[52px] pb-11 transition-all duration-500 ease-out max-mob:gap-[18px] max-mob:px-5 max-mob:pb-8"
+        onClick={(e) => e.stopPropagation()}
         style={{
           opacity: player && !controlsVisible ? 0 : 1,
           pointerEvents: player && !controlsVisible ? "none" : "auto",
@@ -577,6 +793,7 @@ export function DetailHero({
       {player && (
         <div
           className="media-player-controls absolute inset-x-0 bottom-0 z-10 px-[52px] pb-5 transition-all duration-500 ease-out max-mob:px-5"
+          onClick={(e) => e.stopPropagation()}
           style={{
             opacity: controlsVisible ? 1 : 0,
             pointerEvents: controlsVisible ? "auto" : "none",
@@ -632,14 +849,52 @@ export function DetailHero({
               {vidDuration > 0 ? ` / ${fmtPlayerTime(vidDuration)}` : ""}
             </span>
             <div
-              className="h-1 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/18"
+              className="relative flex h-8 flex-1 cursor-pointer items-center"
               onClick={(e) => {
                 const r = e.currentTarget.getBoundingClientRect();
                 seekTo((e.clientX - r.left) / r.width);
                 revealControls();
               }}
+              onPointerMove={(e) => {
+                updateTrickplayPreview(e.clientX, e.currentTarget.getBoundingClientRect());
+                revealControls();
+              }}
+              onPointerLeave={() => setTrickplayPreview(null)}
             >
-              <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: vidDuration > 0 ? `${(vidTime / vidDuration) * 100}%` : "0%" }} />
+              {trickplayPreview && (
+                <div
+                  className="pointer-events-none absolute bottom-[28px] z-20 overflow-hidden rounded-[10px] border border-white/14 bg-black/70 p-1.5 shadow-[0_18px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+                  style={{
+                    left: `${trickplayPreview.leftPct}%`,
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  <div
+                    className="overflow-hidden rounded-[7px] bg-white/8"
+                    style={{
+                      width: 160,
+                      height: Math.max(72, Math.round((160 / trickplayPreview.frameWidth) * trickplayPreview.frameHeight)),
+                    }}
+                  >
+                    {trickplayPreviewImage ? (
+                      <div
+                        className="size-full bg-no-repeat"
+                        style={{
+                          backgroundImage: `url("${trickplayPreviewImage}")`,
+                          backgroundSize: `${trickplayPreview.columns * 160}px auto`,
+                          backgroundPosition: `-${(trickplayPreview.frameIndex % trickplayPreview.columns) * 160}px -${Math.floor(trickplayPreview.frameIndex / trickplayPreview.columns) * Math.max(72, Math.round((160 / trickplayPreview.frameWidth) * trickplayPreview.frameHeight))}px`,
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="pt-1 text-center font-mono text-[10px] font-bold tabular-nums text-white/80">
+                    {fmtPlayerTime(trickplayPreview.time)}
+                  </div>
+                </div>
+              )}
+              <div className="h-1 w-full overflow-hidden rounded-full bg-white/18">
+                <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: vidDuration > 0 ? `${(vidTime / vidDuration) * 100}%` : "0%" }} />
+              </div>
             </div>
             {nextItem && (
               <span
@@ -671,6 +926,24 @@ export function DetailHero({
                 </svg>
               )}
             </button>
+            {pipSupported && (
+              <button
+                className={cn(
+                  "grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white",
+                  pipActive && "border-accent/70 bg-accent/20 text-white",
+                )}
+                onClick={() => {
+                  togglePiP();
+                  revealControls();
+                }}
+                title={pipActive ? "Закрыть PiP" : "Картинка в картинке"}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <rect x="12" y="12" width="6" height="4" rx="1" />
+                </svg>
+              </button>
+            )}
             <button
               className="grid size-9 flex-none place-items-center rounded-full border border-white/15 bg-white/10 text-white/70 transition-all hover:bg-white/20 hover:text-white"
               onClick={toggleFullscreen}

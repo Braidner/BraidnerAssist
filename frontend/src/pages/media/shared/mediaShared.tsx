@@ -379,6 +379,8 @@ export function useVideoPlayer(url: string | null, direct = false) {
   const [vidMuted, setVidMuted] = useState(false);
   const [vidDuration, setVidDuration] = useState(0);
   const [vidTime, setVidTime] = useState(0);
+  const [pipSupported, setPipSupported] = useState(false);
+  const [pipActive, setPipActive] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -404,6 +406,25 @@ export function useVideoPlayer(url: string | null, direct = false) {
     }
     return () => { hls?.destroy(); };
   }, [url, direct]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const supportsPip =
+      "pictureInPictureEnabled" in document &&
+      Boolean(document.pictureInPictureEnabled) &&
+      "requestPictureInPicture" in video;
+    setPipSupported(supportsPip);
+
+    const handleEnter = () => setPipActive(true);
+    const handleLeave = () => setPipActive(false);
+    video.addEventListener("enterpictureinpicture", handleEnter);
+    video.addEventListener("leavepictureinpicture", handleLeave);
+    return () => {
+      video.removeEventListener("enterpictureinpicture", handleEnter);
+      video.removeEventListener("leavepictureinpicture", handleLeave);
+    };
+  }, []);
 
   const togglePlay = () => {
     const v = videoRef.current;
@@ -431,7 +452,34 @@ export function useVideoPlayer(url: string | null, direct = false) {
     setVidMuted(v.muted);
   };
 
-  return { videoRef, vidPlaying, setVidPlaying, vidMuted, setVidMuted, vidDuration, setVidDuration, vidTime, setVidTime, togglePlay, toggleMute, seekTo, seekBy };
+  const togglePiP = () => {
+    const v = videoRef.current;
+    if (!v || !pipSupported) return;
+    if (document.pictureInPictureElement === v) {
+      void document.exitPictureInPicture?.();
+    } else {
+      void v.requestPictureInPicture?.().catch(() => {});
+    }
+  };
+
+  return {
+    videoRef,
+    vidPlaying,
+    setVidPlaying,
+    vidMuted,
+    setVidMuted,
+    vidDuration,
+    setVidDuration,
+    vidTime,
+    setVidTime,
+    togglePlay,
+    toggleMute,
+    seekTo,
+    seekBy,
+    pipSupported,
+    pipActive,
+    togglePiP,
+  };
 }
 
 // ── Интерактивный выбор раздачи (Jackett Torznab + native scoring) ─────

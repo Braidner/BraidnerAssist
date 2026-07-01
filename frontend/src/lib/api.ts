@@ -1665,6 +1665,36 @@ export async function getMediaPlayUrl(id: string): Promise<MediaPlayInfo | null>
   }
 }
 
+export async function getMediaTrickplayPlaylist(
+  itemId: string,
+  mediaSourceId?: string | null,
+  width = 320,
+): Promise<string | null> {
+  try {
+    const query = new URLSearchParams();
+    if (mediaSourceId) query.set("mediaSourceId", mediaSourceId);
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    const res = await apiFetch(
+      `/api/media/jellyfin/Videos/${encodeURIComponent(itemId)}/Trickplay/${width}/tiles.m3u8${suffix}`,
+    );
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text.trim() ? text : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getMediaTrickplayTileBlobUrl(url: string): Promise<string | null> {
+  try {
+    const res = await apiFetch(url);
+    if (!res.ok) return null;
+    return URL.createObjectURL(await res.blob());
+  } catch {
+    return null;
+  }
+}
+
 export async function reportMediaPlayback(
   kind: "start" | "progress" | "stop",
   input: {

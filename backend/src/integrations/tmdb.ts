@@ -60,9 +60,26 @@ async function tmdbGet(path: string, params: Record<string, string> = {}): Promi
   url.searchParams.set("api_key", c.apiKey!);
   url.searchParams.set("language", "ru-RU");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
-  if (!res.ok) throw new Error(`TMDB ${path} ${res.status}`);
-  return res.json();
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+  } catch (e) {
+    throw new Error(`TMDB ${path} network failed`, { cause: e });
+  }
+  if (!res.ok) {
+    let body = "";
+    try {
+      body = (await res.text()).slice(0, 500);
+    } catch {
+      body = "";
+    }
+    throw new Error(`TMDB ${path} ${res.status}${body ? `: ${body}` : ""}`);
+  }
+  try {
+    return await res.json();
+  } catch (e) {
+    throw new Error(`TMDB ${path} invalid json`, { cause: e });
+  }
 }
 
 const yearOf = (d?: string): number | null => (d && d.length >= 4 ? Number(d.slice(0, 4)) : null);

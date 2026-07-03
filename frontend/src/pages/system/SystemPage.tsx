@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "../../components/ui/Card.tsx";
 import { Ring } from "../../components/ui/Ring.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
+import { BackendLogsCard } from "./BackendLogsCard.tsx";
 import { cn } from "../../lib/cn.ts";
 import { ui } from "../../lib/ui.ts";
 import type {
@@ -502,6 +503,9 @@ export function SystemPage() {
 
           {/* AdGuard DNS */}
           <AdguardCard adguard={adguard} />
+
+          {/* Backend diagnostics */}
+          <BackendLogsCard />
 
           {/* Poster cache */}
           <PosterCacheCard cache={posterCache} onRefresh={setPosterCache} />

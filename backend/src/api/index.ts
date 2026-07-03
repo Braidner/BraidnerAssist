@@ -66,13 +66,31 @@ import {
 } from "../integrations/mediaPreferences.js";
 import { clearPosterCache, getPosterCacheStatus } from "../integrations/posterCache.js";
 import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integrations/files.js";
-import { log, getEntries } from "../logger.js";
+import { log, getEntries, errorDetail } from "../logger.js";
 
 export const apiRouter = Router();
 
 function mediaUserContext(res: { locals: { user?: { id?: string } } }): MediaUserContext {
   const appUserId = res.locals.user?.id ?? null;
   return { appUserId, allowFallback: appUserId === "app-token" };
+}
+
+function logRouteError(
+  ctx: string,
+  req: Request,
+  e: unknown,
+  extra?: Record<string, unknown>,
+): void {
+  log.error(
+    ctx,
+    `${req.method} ${req.path} failed`,
+    errorDetail(e, {
+      originalUrl: req.originalUrl,
+      params: req.params,
+      query: req.query,
+      ...extra,
+    }),
+  );
 }
 
 // Request logger — captures slow/failed requests into the in-memory ring buffer.
@@ -295,40 +313,45 @@ apiRouter.post("/docker/containers/:id/:action", async (req, res) => {
     await containerAction(id, action);
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("docker", req, e, { id, action });
     res.status(502).json({ error: String(e) });
   }
 });
 
 // AdGuard Home — DNS-статистика.
-apiRouter.get("/adguard", async (_req, res) => {
+apiRouter.get("/adguard", async (req, res) => {
   try {
     res.json(await getAdguard());
   } catch (e) {
+    logRouteError("adguard", req, e);
     res.status(502).json({ configured: false, error: String(e) });
   }
 });
 
 // Медиа-стек — что играет + очередь загрузок.
-apiRouter.get("/media", async (_req, res) => {
+apiRouter.get("/media", async (req, res) => {
   try {
     res.json(await getMedia());
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ configured: false, error: String(e) });
   }
 });
 
-apiRouter.get("/poster-cache/status", async (_req, res) => {
+apiRouter.get("/poster-cache/status", async (req, res) => {
   try {
     res.json(await getPosterCacheStatus());
   } catch (e) {
+    logRouteError("poster", req, e);
     res.status(500).json({ error: String(e) });
   }
 });
 
-apiRouter.delete("/poster-cache", async (_req, res) => {
+apiRouter.delete("/poster-cache", async (req, res) => {
   try {
     res.json(await clearPosterCache());
   } catch (e) {
+    logRouteError("poster", req, e);
     res.status(500).json({ error: String(e) });
   }
 });
@@ -337,22 +360,25 @@ apiRouter.get("/media/jackett/health", async (req, res) => {
   try {
     res.json(await jackettHealth(req.query.force === "1"));
   } catch (e) {
+    logRouteError("jackett", req, e);
     res.status(502).json({ configured: config.media.jackett.configured, error: String(e) });
   }
 });
 
-apiRouter.get("/media/torrent-rail", async (_req, res) => {
+apiRouter.get("/media/torrent-rail", async (req, res) => {
   try {
     res.json(await getTorrentRail());
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
 
-apiRouter.get("/media/pending-titles", async (_req, res) => {
+apiRouter.get("/media/pending-titles", async (req, res) => {
   try {
     res.json(await getPendingMediaTitles());
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -364,16 +390,18 @@ apiRouter.get("/media/torrents/:kind/:tmdbId", async (req, res) => {
   try {
     res.json(await getTitleTorrents(kind, tmdbId));
   } catch (e) {
+    logRouteError("media", req, e, { kind, tmdbId });
     res.status(502).json({ error: String(e) });
   }
 });
 
 // Библиотека Jellyfin — недавно добавленные элементы.
-apiRouter.get("/media/library", async (_req, res) => {
+apiRouter.get("/media/library", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     res.json(await getLibrary(mediaUserContext(res)));
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -384,6 +412,7 @@ apiRouter.get("/media/series/:id", async (req, res) => {
   try {
     res.json(await getSeriesDetail(req.params.id, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -394,6 +423,7 @@ apiRouter.get("/media/detail/series/:id", async (req, res) => {
   try {
     res.json(await getSeriesPageDetail(req.params.id, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -404,6 +434,7 @@ apiRouter.get("/media/detail/movie/:id", async (req, res) => {
   try {
     res.json(await getMoviePageDetail(req.params.id, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -417,6 +448,7 @@ apiRouter.get("/media/title/:kind/:tmdbId", async (req, res) => {
   try {
     res.json(await getMediaTitleDetail(kind, id, { idType }, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("media", req, e, { kind, id, idType });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -431,6 +463,7 @@ apiRouter.get("/media/discover/search", async (req, res) => {
   try {
     res.json(await nativeLookupAll(q));
   } catch (e) {
+    logRouteError("tmdb", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -444,6 +477,7 @@ apiRouter.get("/media/discover/detail/series/:id", async (req, res) => {
   try {
     res.json(await nativeSeriesDiscoverDetail(tvdbId, idType, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("tmdb", req, e, { tvdbId, idType });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -456,6 +490,7 @@ apiRouter.get("/media/discover/detail/movie/:id", async (req, res) => {
   try {
     res.json(await nativeMovieDiscoverDetail(tmdbId, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("tmdb", req, e, { tmdbId });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -466,6 +501,7 @@ apiRouter.get("/media/play/:id", async (req, res) => {
   try {
     res.json(await getPlaybackPath(req.params.id, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -495,6 +531,7 @@ async function handlePlaybackEvent(
     );
     res.json({ ok: true, ...result });
   } catch (e) {
+    logRouteError("jellyfin", req, e, { playbackEvent: kind });
     res.status(502).json({ error: String(e) });
   }
 }
@@ -512,12 +549,13 @@ apiRouter.post("/media/playback/stop", (req, res) => {
 });
 
 // Скан библиотеки Jellyfin (после докачки торрента).
-apiRouter.post("/media/scan", async (_req, res) => {
+apiRouter.post("/media/scan", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     await jellyfinRefresh();
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -530,6 +568,7 @@ apiRouter.get("/media/search", async (req, res) => {
   try {
     res.json(await jackettSearch(q, { kind: "manual" }));
   } catch (e) {
+    logRouteError("jackett", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -543,6 +582,7 @@ apiRouter.get("/media/lookup", async (req, res) => {
   try {
     res.json(await nativeLookup(kind, q));
   } catch (e) {
+    logRouteError("tmdb", req, e, { kind });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -556,6 +596,7 @@ apiRouter.post("/media/add", async (req, res) => {
   try {
     res.json({ ok: true, ...(await nativeAdd(kind, id)) });
   } catch (e) {
+    logRouteError("tmdb", req, e, { kind, id });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -573,6 +614,7 @@ apiRouter.post("/media/release/search", async (req, res) => {
   try {
     res.json(await nativeReleaseSearch(kind, id, seasonNumber, { query, limit }));
   } catch (e) {
+    logRouteError("jackett", req, e, { kind, id, seasonNumber, query, limit });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -587,16 +629,18 @@ apiRouter.post("/media/release/grab", async (req, res) => {
   try {
     res.json(await nativeGrabRelease(kind, guid, indexerId));
   } catch (e) {
+    logRouteError("jackett", req, e, { kind, guid, indexerId });
     res.status(502).json({ error: String(e) });
   }
 });
 
 // Устройства Jellyfin, которыми можно управлять (цели для «играть на ТВ»).
-apiRouter.get("/media/devices", async (_req, res) => {
+apiRouter.get("/media/devices", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     res.json(await jellyfinSessions());
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -611,6 +655,7 @@ apiRouter.post("/media/play-to", async (req, res) => {
     await jellyfinPlayTo(sessionId, itemId);
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("jellyfin", req, e, { sessionId, itemId });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -624,6 +669,7 @@ apiRouter.post("/media/torrent", async (req, res) => {
     await qbAdd(url);
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("qbittorrent", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -636,6 +682,7 @@ apiRouter.get("/media/tmdb/search", async (req, res) => {
   try {
     res.json(await tmdbSearch(q));
   } catch (e) {
+    logRouteError("tmdb", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -647,6 +694,7 @@ apiRouter.get("/media/tmdb/trending", async (req, res) => {
     if (kind === "movie" || kind === "series") res.json(await tmdbPopular(kind));
     else res.json(await tmdbTrending());
   } catch (e) {
+    logRouteError("tmdb", req, e, { kind });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -659,16 +707,18 @@ apiRouter.get("/media/tmdb/resolve", async (req, res) => {
   try {
     res.json({ tvdbId: await tmdbTvToTvdb(tmdbId) });
   } catch (e) {
+    logRouteError("tmdb", req, e, { tmdbId });
     res.status(502).json({ error: String(e) });
   }
 });
 
 // ── Discover (LAMPA/ZONA-style подборки на TMDB) ───────────────────────
 // Домашняя страница дискавери одним вызовом. Graceful: TMDB off → 200 {configured:false}.
-apiRouter.get("/media/discover/rails", async (_req, res) => {
+apiRouter.get("/media/discover/rails", async (req, res) => {
   try {
     res.json(await getDiscoverHome());
   } catch (e) {
+    logRouteError("discover", req, e);
     // Никогда не валим виджет — отдаём пустую, но валидную форму.
     res.json({ configured: false, hero: null, genres: { movie: [], series: [] }, rails: [], error: String(e) });
   }
@@ -690,6 +740,7 @@ apiRouter.get("/media/discover/genre/:kind/:genreId", async (req, res) => {
     });
     res.json(items.filter((i) => !hidden.has(`${i.kind}:${i.tmdbId}`)));
   } catch (e) {
+    logRouteError("discover", req, e, { kind, genreId });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -701,6 +752,7 @@ apiRouter.get("/media/discover/genres", async (req, res) => {
   try {
     res.json(await tmdbGenres(kind));
   } catch (e) {
+    logRouteError("tmdb", req, e, { kind });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -715,6 +767,7 @@ apiRouter.get("/media/discover/similar/:kind/:id", async (req, res) => {
   try {
     res.json(await getSimilarRail(kind, id, idType));
   } catch (e) {
+    logRouteError("discover", req, e, { kind, id, idType });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -731,15 +784,17 @@ apiRouter.get("/media/discover/tmdb-detail/:kind/:id", async (req, res) => {
     if (!detail) return res.status(404).json({ error: "not found" });
     res.json(detail);
   } catch (e) {
+    logRouteError("tmdb", req, e, { kind, id, idType });
     res.status(502).json({ error: String(e) });
   }
 });
 
 // «Потому что вы смотрели» — персональные рейлы (seed из Jellyfin watch history).
-apiRouter.get("/media/discover/because", async (_req, res) => {
+apiRouter.get("/media/discover/because", async (req, res) => {
   try {
     res.json(await getBecauseRails(mediaUserContext(res)));
   } catch (e) {
+    logRouteError("discover", req, e);
     res.json([]); // персонализация необязательна — не валим
   }
 });
@@ -754,6 +809,7 @@ apiRouter.get("/media/discover/collection/:tmdbId", async (req, res) => {
     if (!rail) return res.status(204).end();
     res.json(rail);
   } catch (e) {
+    logRouteError("discover", req, e, { tmdbId });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -768,6 +824,7 @@ apiRouter.get("/media/preferences", async (req, res) => {
   try {
     res.json(await listMediaPreferences(status));
   } catch (e) {
+    logRouteError("media", req, e, { status });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -795,6 +852,7 @@ apiRouter.post("/media/preferences", async (req, res) => {
     });
     res.status(201).json(pref);
   } catch (e) {
+    logRouteError("media", req, e, { kind, tmdbId, status });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -807,6 +865,7 @@ apiRouter.delete("/media/preferences/:kind/:tmdbId", async (req, res) => {
     await removeMediaPreference(kind, tmdbId);
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("media", req, e, { kind, tmdbId });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -872,16 +931,18 @@ apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
     await qbAction(hash, action);
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("qbittorrent", req, e, { hash, action });
     res.status(502).json({ error: String(e) });
   }
 });
 
 // «Продолжить просмотр» из Jellyfin (недосмотренное с позицией).
-apiRouter.get("/media/continue", async (_req, res) => {
+apiRouter.get("/media/continue", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
     res.json(await getContinueWatching(mediaUserContext(res)));
   } catch (e) {
+    logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -894,6 +955,7 @@ apiRouter.get("/media/unified", async (req, res) => {
   try {
     res.json(await unifiedSearch(q, mediaUserContext(res)));
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -914,12 +976,13 @@ apiRouter.post("/media/torrserver/add", async (req, res) => {
       files: info.files.map((f) => ({ ...f, playable: isBrowserPlayable(f.path) })),
     });
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
 
 // Активные раздачи TorrServer.
-apiRouter.get("/media/torrserver/list", async (_req, res) => {
+apiRouter.get("/media/torrserver/list", async (req, res) => {
   if (!config.media.torrserver.configured) return res.status(503).json({ configured: false });
   try {
     const list = await torrserverList();
@@ -934,6 +997,7 @@ apiRouter.get("/media/torrserver/list", async (_req, res) => {
       }),
     );
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -945,6 +1009,7 @@ apiRouter.delete("/media/torrserver/:hash", async (req, res) => {
     await torrserverRemove(req.params.hash);
     res.json({ ok: true });
   } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -974,6 +1039,7 @@ apiRouter.all("/media/jellyfin/*", async (req, res) => {
     if (!upstream.body) return res.end();
     Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
   } catch (e) {
+    logRouteError("jellyfin", req, e, { subpath });
     res.status(502).json({ error: String(e) });
   }
 });
@@ -991,7 +1057,7 @@ apiRouter.post("/adguard/protection", async (req, res) => {
   }
 });
 
-// Backend logs — in-memory ring buffer, newest first, max 200 entries.
+// Backend logs — in-memory ring buffer, newest first, max 500 entries.
 apiRouter.get("/logs", (_req, res) => {
   res.json({ entries: getEntries() });
 });

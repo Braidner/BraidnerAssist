@@ -18,6 +18,7 @@ import {
 } from "./tmdb.js";
 import { getLibrary, getRecentlyWatchedSeeds, type LibraryItem, type MediaUserContext } from "./media.js";
 import { hiddenMediaKeys, watchlistItems } from "./mediaPreferences.js";
+import { log, errorDetail } from "../logger.js";
 
 export interface DiscoverRail {
   key: string;
@@ -45,6 +46,12 @@ const HOME_MOVIE_GENRES: { id: number; label: string }[] = [
 
 const settled = <T,>(r: PromiseSettledResult<T>, fb: T): T =>
   r.status === "fulfilled" ? r.value : fb;
+
+function logRejected(name: string, result: PromiseSettledResult<unknown>): void {
+  if (result.status === "rejected") {
+    log.warn("discover", `${name} failed`, errorDetail(result.reason));
+  }
+}
 
 // Ключ дедупликации тайтла против библиотеки/других рейлов.
 const tmdbKey = (i: TmdbItem) => `${i.kind}:${i.tmdbId}`;
@@ -90,6 +97,19 @@ export async function getDiscoverHome(): Promise<DiscoverHome> {
     hiddenMediaKeys(),
     ...HOME_MOVIE_GENRES.map((g) => tmdbDiscover("movie", { genreId: g.id })),
   ]);
+
+  logRejected("hero", heroR);
+  logRejected("trending", trendR);
+  logRejected("topRated", topRatedR);
+  logRejected("fresh", freshR);
+  logRejected("popularSeries", popTvR);
+  logRejected("movieGenres", gMovieR);
+  logRejected("seriesGenres", gTvR);
+  logRejected("watchlist", watchlistR);
+  logRejected("hiddenPreferences", hiddenR);
+  genreRailsR.forEach((r, i) => {
+    logRejected(`genre:${HOME_MOVIE_GENRES[i]?.label ?? i}`, r);
+  });
 
   const rails: DiscoverRail[] = [];
   const hidden = settled(hiddenR, new Set<string>());

@@ -16,6 +16,7 @@ import {
   type PosterCacheDescriptor,
   type PosterCacheSource,
 } from "../integrations/posterCache.js";
+import { log, errorDetail } from "../logger.js";
 
 export const posterRouter = Router();
 
@@ -111,7 +112,11 @@ posterRouter.get("/", async (req, res) => {
     } else {
       Readable.fromWeb(upstream.body as never).pipe(res);
     }
-  } catch {
+  } catch (e) {
+    log.error("poster", `${req.method} ${req.path} failed`, errorDetail(e, {
+      originalUrl: req.originalUrl,
+      query: req.query,
+    }));
     if (!res.headersSent) res.status(502).end();
   }
 });

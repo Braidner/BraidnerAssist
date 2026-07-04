@@ -41,26 +41,84 @@ const buttonVariants = cva(
   }
 )
 
+type PromiseAwareClickHandler = (
+  event: React.MouseEvent<HTMLButtonElement>,
+) => void | Promise<unknown>
+
+type ButtonProps = Omit<
+  React.ComponentProps<"button">,
+  "disabled" | "onClick"
+> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+    autoLoading?: boolean
+    disabled?: boolean
+    loading?: boolean
+    loadingLabel?: React.ReactNode
+    onClick?: PromiseAwareClickHandler
+  }
+
+function LoadingSpinner() {
+  return (
+    <span
+      aria-hidden="true"
+      className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-current/30 border-t-current"
+    />
+  )
+}
+
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+  return Boolean(
+    value &&
+      (typeof value === "object" || typeof value === "function") &&
+      "then" in value &&
+      typeof (value as Promise<unknown>).then === "function",
+  )
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  autoLoading = true,
+  children,
+  disabled,
+  loading = false,
+  loadingLabel,
+  onClick,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
+}: ButtonProps) {
   const Comp = asChild ? Slot.Root : "button"
+  const [internalPending, setInternalPending] = React.useState(false)
+  const isLoading = loading || internalPending
+  const isDisabled = disabled || isLoading
+
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!onClick || isDisabled) return
+    const result = onClick(event)
+    if (!autoLoading || !isPromiseLike(result)) return
+    setInternalPending(true)
+    void Promise.resolve(result).finally(() => {
+      setInternalPending(false)
+    })
+  }
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-loading={isLoading ? "" : undefined}
+      aria-busy={isLoading}
+      disabled={isDisabled}
+      onClick={handleClick}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {isLoading ? <LoadingSpinner /> : null}
+      {isLoading && loadingLabel != null ? loadingLabel : children}
+    </Comp>
   )
 }
 

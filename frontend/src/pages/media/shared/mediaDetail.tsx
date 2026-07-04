@@ -757,7 +757,7 @@ export function DetailHero({
           )}
           {actions && (
             <div
-              className="mb-4 pt-5 flex flex-wrap gap-3 overflow-hidden transition-all duration-700 ease-out"
+              className="mb-4 flex flex-wrap gap-3 overflow-visible py-5 transition-all duration-700 ease-out"
               style={{
                 maxHeight: player ? 0 : 96,
                 opacity: player ? 0 : 1,

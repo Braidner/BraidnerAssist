@@ -15,6 +15,7 @@ import {
     type DiscoverRail,
 } from "@/lib/api.ts";
 import {cn} from "../../lib/cn.ts";
+import {Button} from "../../components/ui/button.tsx";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {MediaHero} from "./shared/MediaHero.tsx";
 import {MediaPosterCard, MediaRail} from "./shared/mediaRails.tsx";
@@ -31,11 +32,11 @@ interface MediaDiscoverTabProps {
     because: DiscoverRail[];
     homeLoading: boolean;
     busy: string | null;
-    onRefresh: () => void;
+    onRefresh: () => void | Promise<unknown>;
     onOpenDiscover: (it: MediaLookupItem) => void;
     onOpenTmdb: (it: TmdbItem) => void;
-    onAddTmdb: (it: TmdbItem) => void;
-    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void;
+    onAddTmdb: (it: TmdbItem) => void | Promise<unknown>;
+    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void | Promise<unknown>;
 }
 
 /* ─── Shuffle SVG ─── */
@@ -82,9 +83,9 @@ function TmdbRail({rail, onOpenTmdb, onPreference, ranked}: {
 
 /* ─── Cinematic TMDB hero with wide backdrop ─── */
 function DiscoverHero({hero, loading, onRefresh, onOpen, onAddTmdb, onPreference}: {
-    hero: TmdbItem | null; loading: boolean; onRefresh: () => void; onOpen: (it: TmdbItem) => void;
-    onAddTmdb: (it: TmdbItem) => void;
-    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void;
+    hero: TmdbItem | null; loading: boolean; onRefresh: () => void | Promise<unknown>; onOpen: (it: TmdbItem) => void;
+    onAddTmdb: (it: TmdbItem) => void | Promise<unknown>;
+    onPreference: (it: TmdbItem, status: "watchlist" | "hidden" | "liked" | "disliked") => void | Promise<unknown>;
 }) {
     if (!hero) return null;
     const bg = backdropUrl(hero.backdrop) ?? posterUrl(hero.poster, "w780");
@@ -106,31 +107,32 @@ function DiscoverHero({hero, loading, onRefresh, onOpen, onAddTmdb, onPreference
             badges={["TMDB", hero.rating != null && hero.rating >= 7 ? "Высокий рейтинг" : "Популярное"]}
             actions={
                 <>
-                    <button
+                    <Button
                         className={ms.playButton}
                         onClick={(e) => { e.stopPropagation(); onOpen(hero); }}
                     >
                         Подробнее
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         className={ms.heroGhostBtn}
-                        onClick={(e) => { e.stopPropagation(); onAddTmdb(hero); }}
+                        onClick={(e) => { e.stopPropagation(); return onAddTmdb(hero); }}
                     >
                         Добавить
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         className={ms.heroGhostBtn}
-                        onClick={(e) => { e.stopPropagation(); onPreference(hero, "watchlist"); }}
+                        onClick={(e) => { e.stopPropagation(); return onPreference(hero, "watchlist"); }}
                     >
                         В список
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         className={ms.heroGhostBtn}
-                        disabled={loading}
-                        onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+                        loading={loading}
+                        loadingLabel="Обновляем"
+                        onClick={(e) => { e.stopPropagation(); return onRefresh(); }}
                     >
-                        <ShuffleIcon size={15}/> {loading ? "Обновляем…" : "Другой"}
-                    </button>
+                        <ShuffleIcon size={15}/> Другой
+                    </Button>
                 </>
             }
         />
@@ -221,7 +223,7 @@ export function MediaDiscoverTab({
                         value={dq}
                         onChange={(e) => setDq(e.target.value)}
                     />
-                    {dq && <button className={ms.button.iconSm} title="Очистить" onClick={() => setDq("")}>✕</button>}
+                    {dq && <Button className={ms.button.iconSm} title="Очистить" onClick={() => setDq("")}>✕</Button>}
                 </div>
             )}
             {searchOpen && dq.trim() && (

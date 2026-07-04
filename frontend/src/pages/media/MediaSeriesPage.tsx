@@ -15,7 +15,7 @@ import {
   type DetailPlayer,
   type QueueItem,
 } from "./shared/mediaDetail.tsx";
-import { MediaRail } from "./shared/mediaRails.tsx";
+import { MediaDetailPageSkeleton, MediaRail } from "./shared/mediaRails.tsx";
 import { cn } from "../../lib/cn.ts";
 import { media as ms } from "./shared/mediaStyles.ts";
 import {
@@ -37,6 +37,7 @@ import {
   type TorrentRailItem,
 } from "@/lib/api.ts";
 import { useToast } from "../../components/ui/Toast.tsx";
+import { Button } from "../../components/ui/button.tsx";
 
 type AutoplayLocationState = {
   from?: string;
@@ -124,9 +125,13 @@ export function MediaSeriesPage({
   }, [d, id, location.search, location.state, nav, source]);
 
   const play = async (jellyfinId: string, title: string) => {
-    setBusy(jellyfinId);
-    const playInfo = await getMediaPlayUrl(jellyfinId);
-    setBusy(null);
+    let playInfo = null;
+    try {
+      setBusy(jellyfinId);
+      playInfo = await getMediaPlayUrl(jellyfinId);
+    } finally {
+      setBusy(null);
+    }
     if (playInfo) {
       if (playInfo.reason === "jellyfin_auth_required") {
         toast.error("Jellyfin не принял учётку для сохранения прогресса. Перелогинься или обнови пароль в настройках.");
@@ -216,7 +221,7 @@ export function MediaSeriesPage({
   if (d === "loading")
     return (
       <div className={ms.page}>
-        <div className={cn(ms.empty, "mt-10")}>Загружаем…</div>
+        <MediaDetailPageSkeleton rows={3} />
       </div>
     );
   if (!d)
@@ -285,9 +290,13 @@ export function MediaSeriesPage({
 
   const addToLib = async () => {
     if (tmdbId == null) return;
-    setAct("add");
-    const ok = await addTitle("series", tmdbId);
-    setAct(null);
+    let ok = false;
+    try {
+      setAct("add");
+      ok = await addTitle("series", tmdbId);
+    } finally {
+      setAct(null);
+    }
     if (ok) {
       toast.success(`«${det.title}» добавлен в библиотеку — ищем релиз`);
       setShowAllPicker(true);
@@ -329,13 +338,12 @@ export function MediaSeriesPage({
           genres={det.genres}
           actions={
             <>
-              {watchTarget && (
-
-                <button
+                <Button
                   className={ms.playButton}
-                  disabled={busy === watchTarget.jellyfinId}
-                  title={watchTarget.title}
-                  onClick={() => play(watchTarget.jellyfinId, watchTarget.title)}
+                  disabled={!watchTarget}
+                  loading={Boolean(watchTarget && busy === watchTarget.jellyfinId)}
+                  title={watchTarget?.title}
+                  onClick={() => watchTarget ? play(watchTarget.jellyfinId, watchTarget.title) : undefined}
                 >
                   <svg
                     width="16"
@@ -345,13 +353,13 @@ export function MediaSeriesPage({
                   >
                     <polygon points="6,3 21,12 6,21" />
                   </svg>
-                  {busy === watchTarget.jellyfinId ? "…" : watchLabel}
-                </button>
-              )}
+                  {watchLabel}
+                </Button>
               {!inLibrary && tmdbId != null && (
-                <button
+                <Button
                   className={ms.playButton}
-                  disabled={act === "add"}
+                  loading={act === "add"}
+                  loadingLabel="Добавляем"
                   onClick={addToLib}
                 >
                   <svg
@@ -362,27 +370,27 @@ export function MediaSeriesPage({
                   >
                     <polygon points="6,3 21,12 6,21" />
                   </svg>
-                  {act === "add" ? "…" : "В библиотеку"}
-                </button>
+                  В библиотеку
+                </Button>
               )}
-              {inLibrary && (
-                <button
-                  className={ms.heroGhostBtn}
-                  type="button"
-                  title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
-                >
-                  <span className="size-2 rounded-full bg-accent shadow-[0_0_18px_rgba(229,51,51,0.75)]" />
-                  В библиотеке
-                </button>
-              )}
-              {tmdbId != null && (watchTarget || !inLibrary) && (
-                <button
+              {/*{inLibrary && (*/}
+              {/*  <button*/}
+              {/*    className={ms.heroGhostBtn}*/}
+              {/*    type="button"*/}
+              {/*    title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."*/}
+              {/*  >*/}
+              {/*    <span className="size-2 rounded-full bg-accent shadow-[0_0_18px_rgba(229,51,51,0.75)]" />*/}
+              {/*    В библиотеке*/}
+              {/*  </button>*/}
+              {/*)}*/}
+              {tmdbId != null && (
+                <Button
                   className={ms.heroGhostBtn}
                   title="Поиск всех раздач сериала (включая мультисезонные паки)"
                   onClick={() => setShowAllPicker((v) => !v)}
                 >
                   {showAllPicker ? "Скрыть поиск" : "Найти"}
-                </button>
+                </Button>
               )}
             </>
           }

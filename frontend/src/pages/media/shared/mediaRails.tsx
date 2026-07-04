@@ -18,22 +18,79 @@ function initialRailCount(total: number): number {
   return Math.min(mobile ? MOBILE_INITIAL_COUNT : DESKTOP_INITIAL_COUNT, total);
 }
 
-function RailSkeletonStrip() {
+export function MediaPosterCardSkeleton() {
+  return (
+    <div className={ms.posterCard} aria-hidden="true">
+      <div className={cn(ms.posterArt, "media-skeleton border border-white/[0.045]")} />
+      <div className="media-skeleton mt-2 h-3 w-28 rounded" />
+      <div className="media-skeleton mt-2 h-2 w-16 rounded" />
+    </div>
+  );
+}
+
+export function ContinueWatchingCardSkeleton() {
+  return (
+    <div className={ms.watchCard} aria-hidden="true">
+      <div className={cn(ms.watchThumb, "media-skeleton border border-white/[0.045]")} />
+      <div className="media-skeleton mt-2 h-3 w-36 rounded" />
+      <div className="media-skeleton mt-2 h-2 w-24 rounded" />
+    </div>
+  );
+}
+
+export function MediaRailSkeletonStrip({ count = 8 }: { count?: number }) {
   return (
     <>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className={ms.posterCard} aria-hidden="true">
-          <div
-            className={cn(
-              ms.posterArt,
-              "animate-[skel-pulse_1.4s_ease-in-out_infinite] border border-white/[0.045]",
-            )}
-          />
-          <div className="mt-2 h-3 w-28 rounded bg-white/[0.045]" />
-          <div className="mt-2 h-2 w-16 rounded bg-white/[0.035]" />
-        </div>
+      {Array.from({ length: count }).map((_, i) => (
+        <MediaPosterCardSkeleton key={i} />
       ))}
     </>
+  );
+}
+
+export function MediaDetailPageSkeleton({
+  rows = 2,
+  withHero = true,
+}: {
+  rows?: number;
+  withHero?: boolean;
+}) {
+  return (
+    <div className={ms.libPage} aria-busy="true">
+      {withHero ? (
+        <div className={cn(ms.libHero, "bg-[#09090d]")}>
+          <div className="media-skeleton absolute inset-0" />
+          <div className={ms.libHeroVignette} />
+          <div className={ms.libHeroBody}>
+            <div className="media-skeleton mb-4 h-3 w-36 rounded-full" />
+            <div className="media-skeleton mb-4 h-16 w-[min(520px,82vw)] rounded-xl max-mob:h-12" />
+            <div className="mb-5 flex flex-wrap gap-2">
+              <div className="media-skeleton h-6 w-16 rounded-full" />
+              <div className="media-skeleton h-6 w-24 rounded-full" />
+              <div className="media-skeleton h-6 w-20 rounded-full" />
+            </div>
+            <div className="media-skeleton mb-3 h-3 w-[min(420px,72vw)] rounded" />
+            <div className="media-skeleton mb-6 h-3 w-[min(340px,64vw)] rounded" />
+            <div className="flex flex-wrap gap-3">
+              <div className="media-skeleton h-12 w-32 rounded-[7px]" />
+              <div className="media-skeleton h-12 w-28 rounded-[7px]" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {Array.from({ length: rows }).map((_, row) => (
+        <section key={row} className={ms.discSection}>
+          <div className={cn(ms.discSecHead, ms.railHeaderInset)}>
+            <div className="media-skeleton h-6 w-36 rounded" />
+            <div className={ms.discSecLine} />
+            <div className="media-skeleton h-3 w-16 rounded" />
+          </div>
+          <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
+            <MediaRailSkeletonStrip count={8} />
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -121,7 +178,7 @@ export function MediaRail({
         className={cn(ms.hTrack, ms.posterRow, ms.railInset)}
         onScroll={maybeGrow}
       >
-        {mounted ? visibleChildren : <RailSkeletonStrip />}
+        {mounted ? visibleChildren : <MediaRailSkeletonStrip />}
       </div>
     </section>
   );
@@ -149,19 +206,30 @@ export function MediaPosterCard({
   onWatchlist?: () => void;
 }) {
   const hasActions = Boolean(onHide || onWatchlist);
+  const [imageLoading, setImageLoading] = useState(Boolean(imageUrl));
+
+  useEffect(() => {
+    setImageLoading(Boolean(imageUrl));
+  }, [imageUrl]);
 
   return (
     <div className={cn(ms.posterCard, "group")} onClick={onClick}>
       <div className={ms.posterArt}>
         <div className="absolute inset-0 z-0 bg-[#09090d]" />
+        {imageLoading ? <div className="media-skeleton absolute inset-0 z-[1]" /> : null}
         {imageUrl ? (
           <img
             src={imageUrl}
             alt=""
             loading="lazy"
-            className="absolute inset-0 z-[1] size-full object-cover"
+            className={cn(
+              "absolute inset-0 z-[1] size-full object-cover transition-opacity duration-500",
+              imageLoading ? "opacity-0" : "opacity-100",
+            )}
+            onLoad={() => setImageLoading(false)}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
+              setImageLoading(false);
             }}
           />
         ) : null}
@@ -230,17 +298,28 @@ export function ContinueWatchingCard({
 }) {
   const colors = ["#cc3300", "#0077dd", "#00aaee", "#8833ff", "#ffaa00", "#00b8ae"];
   const accent = colors[item.title.charCodeAt(0) % colors.length];
+  const [imageLoading, setImageLoading] = useState(Boolean(imageUrl));
+
+  useEffect(() => {
+    setImageLoading(Boolean(imageUrl));
+  }, [imageUrl]);
 
   return (
     <div className={cn(ms.watchCard, "group")} onClick={onClick}>
       <div className={ms.watchThumb}>
+        {imageLoading ? <div className="media-skeleton absolute inset-0 z-[1]" /> : null}
         <div className="absolute inset-0">
           <img
             src={imageUrl}
             alt=""
-            className="size-full object-cover"
+            className={cn(
+              "size-full object-cover transition-opacity duration-500",
+              imageLoading ? "opacity-0" : "opacity-100",
+            )}
+            onLoad={() => setImageLoading(false)}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
+              setImageLoading(false);
             }}
           />
         </div>

@@ -19,10 +19,15 @@ import {
     type TorrentRailItem,
 } from "@/lib/api.ts";
 import {useToast} from "../../components/ui/Toast.tsx";
-import {cn} from "../../lib/cn.ts";
+import {Button} from "../../components/ui/button.tsx";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {MediaHero} from "./shared/MediaHero.tsx";
-import {ContinueWatchingCard, MediaPosterCard, MediaRail} from "./shared/mediaRails.tsx";
+import {
+    ContinueWatchingCard,
+    MediaDetailPageSkeleton,
+    MediaPosterCard,
+    MediaRail,
+} from "./shared/mediaRails.tsx";
 import {TorrentRailCard} from "./shared/mediaShared.tsx";
 
 interface MediaLibraryTabProps {
@@ -112,17 +117,20 @@ export function MediaLibraryTab({
     }
     const heroItem = heroRef.current;
 
-    const scan = () => {
-        refreshJellyfin().then(() =>
-          getMediaLibrary().then((l) => {
+    const scan = async () => {
+        await refreshJellyfin();
+        await getMediaLibrary().then((l) => {
               setLibrary(l);
               toast.success("Скан библиотеки запущен");
-          }),
-        )
+        });
     }
 
     return (
         <div id="libraryContainer" className={ms.libPage}>
+            {!libReady ? <MediaDetailPageSkeleton rows={2} /> : null}
+
+            {libReady ? (
+            <>
             <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail} scan={scan}/>
 
             {torrentRail.length > 0 && (
@@ -160,13 +168,7 @@ export function MediaLibraryTab({
                 </MediaRail>
             )}
 
-            {!libReady ? (
-                <div className={cn(ms.hTrack, ms.posterRow, ms.railInset)}>
-                    {Array.from({length: 8}).map((_, i) => (
-                        <div key={i} style={{flex: "0 0 auto", width: 160, aspectRatio: "2/3", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)"}}/>
-                    ))}
-                </div>
-            ) : library.length === 0 ? (
+            {library.length === 0 ? (
                 <div className={ms.railHeaderInset} style={{paddingTop: 24, paddingBottom: 24, color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
                     Библиотека пуста или ещё не отсканирована.
                 </div>
@@ -204,6 +206,8 @@ export function MediaLibraryTab({
                     )}
                 </>
             )}
+            </>
+            ) : null}
         </div>
     );
 }
@@ -260,7 +264,7 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
             onOpen={() => openDetail(heroItem)}
             actions={
                 <>
-                    <button
+                    <Button
                         className={ms.playButton}
                         onClick={(e) => { e.stopPropagation(); openDetail(heroItem, true); }}
                     >
@@ -268,8 +272,8 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
                             <polygon points="6,3 21,12 6,21"/>
                         </svg>
                         Смотреть
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         className={ms.heroGhostBtn}
                         onClick={(e) => { e.stopPropagation(); openDetail(heroItem); }}
                     >
@@ -278,16 +282,17 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
                             <path d="M12 8h.01M11 12h1v4h1"/>
                         </svg>
                         Подробнее
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       className={ms.heroGhostBtn}
-                      onClick={(e) => { e.stopPropagation(); scan(); }}
+                      loadingLabel="Сканируем"
+                      onClick={(e) => { e.stopPropagation(); return scan(); }}
                     >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                             <path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3M3 12h18"/>
                         </svg>
                         Сканировать
-                    </button>
+                    </Button>
                 </>
             }
         />

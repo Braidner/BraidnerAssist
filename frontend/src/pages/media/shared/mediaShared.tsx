@@ -757,9 +757,13 @@ export function ReleasePicker({
   };
 
   const onGrab = async (r: ReleaseOption) => {
-    setBusyGuid(r.guid);
-    const res = await grabOne(r);
-    setBusyGuid(null);
+    let res: { ok: boolean; error: string | null } = { ok: false, error: null };
+    try {
+      setBusyGuid(r.guid);
+      res = await grabOne(r);
+    } finally {
+      setBusyGuid(null);
+    }
     if (res.ok) {
       toast.success("Раздача отправлена на загрузку");
       onGrabbed?.();

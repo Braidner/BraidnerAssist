@@ -44,6 +44,7 @@ import {
   fmtSize,
 } from "./shared/mediaShared.tsx";
 import { useToast } from "../../components/ui/Toast.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { MediaLibraryTab } from "./MediaLibraryTab.tsx";
 import { MediaDiscoverTab } from "./MediaDiscoverTab.tsx";
 import { MediaSystemTab } from "./MediaSystemTab.tsx";
@@ -100,20 +101,26 @@ function AddTorrentDrawer({
   const onLookup = async () => {
     const q = titleQuery.trim();
     if (!q) return;
-    setLookingUp(true);
-    setTitleResults(await lookupTitle(kind, q));
-    setLookingUp(false);
+    try {
+      setLookingUp(true);
+      setTitleResults(await lookupTitle(kind, q));
+    } finally {
+      setLookingUp(false);
+    }
   };
 
   const onSearch = async () => {
     const q = query.trim();
     if (!q) return;
-    setSearching(true);
-    setSearchError(null);
-    const res = await searchReleases(q);
-    setResults(res.items);
-    setSearchError(res.error);
-    setSearching(false);
+    try {
+      setSearching(true);
+      setSearchError(null);
+      const res = await searchReleases(q);
+      setResults(res.items);
+      setSearchError(res.error);
+    } finally {
+      setSearching(false);
+    }
   };
 
   return (
@@ -136,12 +143,12 @@ function AddTorrentDrawer({
         <div className={ui.drawerInner}>
           <div className={ui.drawerHead}>
             <span className={ui.drawerKind}>Добавить в медиатеку</span>
-            <button
+            <Button
               className={cn(ui.button.base, ui.button.iconSm)}
               onClick={onClose}
             >
               ✕
-            </button>
+            </Button>
           </div>
 
           {/* Основной путь: TMDB → поиск и выбор релиза */}
@@ -177,13 +184,14 @@ function AddTorrentDrawer({
                 if (e.key === "Enter") onLookup();
               }}
             />
-            <button
+            <Button
               className={ms.button.accentIcon}
               disabled={!titleQuery.trim() || lookingUp}
+              loading={lookingUp}
               onClick={onLookup}
             >
-              {lookingUp ? "…" : "🔍"}
-            </button>
+              🔍
+            </Button>
           </div>
 
           {titleResults.length > 0 && (
@@ -223,29 +231,26 @@ function AddTorrentDrawer({
                           </span>
                         )}
                         <div className="mt-1 flex gap-2">
-                          <button
+                          <Button
                             className={ms.button.accentSm}
                             disabled={isAdded || busy === key}
+                            loading={busy === key}
                             onClick={async () => {
                               const ok = await onAddTitle(it, key);
                               if (ok)
                                 setAddedIds((p) => ({ ...p, [it.id]: true }));
                             }}
                           >
-                            {isAdded
-                              ? "В библиотеке"
-                              : busy === key
-                                ? "…"
-                                : "Добавить"}
-                          </button>
-                          <button
+                            {isAdded ? "В библиотеке" : "Добавить"}
+                          </Button>
+                          <Button
                             className={ms.button.sm}
                             onClick={() =>
                               setPickerFor(pickerOn ? null : it.id)
                             }
                           >
                             {pickerOn ? "Скрыть раздачи" : "Выбрать раздачу"}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -315,15 +320,16 @@ function AddTorrentDrawer({
                       onAdd(magnet.trim(), "magnet").then(() => setMagnet(""));
                   }}
                 />
-                <button
+                <Button
                   className={ms.button.accentIcon}
                   disabled={!magnet.trim() || busy === "magnet"}
+                  loading={busy === "magnet"}
                   onClick={() =>
                     onAdd(magnet.trim(), "magnet").then(() => setMagnet(""))
                   }
                 >
-                  {busy === "magnet" ? "…" : "+"}
-                </button>
+                  +
+                </Button>
               </div>
 
               <div className={ms.label}>Поиск релизов (Jackett)</div>
@@ -337,13 +343,14 @@ function AddTorrentDrawer({
                     if (e.key === "Enter") onSearch();
                   }}
                 />
-                <button
+                <Button
                   className={ms.button.accentIcon}
                   disabled={!query.trim() || searching}
+                  loading={searching}
                   onClick={onSearch}
                 >
-                  {searching ? "…" : "🔍"}
-                </button>
+                  🔍
+                </Button>
               </div>
 
               {searchError && (
@@ -366,25 +373,30 @@ function AddTorrentDrawer({
                         </span>
                         <div className="flex flex-wrap gap-1.5">
                           {torrserver && (
-                            <button
+                            <Button
                               className={ms.button.sm}
                               disabled={!r.url || busy === r.guid + "ts"}
+                              loading={busy === r.guid + "ts"}
                               title="Смотреть сейчас через TorrServer (без полной загрузки)"
-                              onClick={() =>
-                                r.url &&
-                                onWatchNow(r.url, r.title, r.guid + "ts")
-                              }
+                              onClick={() => {
+                                if (!r.url) return;
+                                return onWatchNow(r.url, r.title, r.guid + "ts");
+                              }}
                             >
-                              {busy === r.guid + "ts" ? "…" : "▶ Сейчас"}
-                            </button>
+                              ▶ Сейчас
+                            </Button>
                           )}
-                          <button
+                          <Button
                             className={ms.button.accentSm}
                             disabled={!r.url || busy === r.guid}
-                            onClick={() => r.url && onAdd(r.url, r.guid)}
+                            loading={busy === r.guid}
+                            onClick={() => {
+                              if (!r.url) return;
+                              return onAdd(r.url, r.guid);
+                            }}
                           >
-                            {busy === r.guid ? "…" : "Скачать"}
-                          </button>
+                            Скачать
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -501,11 +513,14 @@ export function MediaPage({
   const [homeLoading, setHomeLoading] = useState(false);
   const refreshDiscover = async () => {
     if (!media.configured) return;
-    setHomeLoading(true);
-    const home = await getDiscoverRails();
-    setDiscoverHome(home);
-    setHomeLoading(false);
-    if (home.configured) getDiscoverBecause().then(setBecause);
+    try {
+      setHomeLoading(true);
+      const home = await getDiscoverRails();
+      setDiscoverHome(home);
+      if (home.configured) getDiscoverBecause().then(setBecause);
+    } finally {
+      setHomeLoading(false);
+    }
   };
   useEffect(() => {
     if (media.configured) refreshDiscover();
@@ -576,9 +591,13 @@ export function MediaPage({
 
   const onWatchNow = async (url: string, title: string, key: string) => {
     if (!media.torrserver) return;
-    setBusy(key);
-    const info = await torrserverAdd(url, title);
-    setBusy(null);
+    let info = null;
+    try {
+      setBusy(key);
+      info = await torrserverAdd(url, title);
+    } finally {
+      setBusy(null);
+    }
     if (!info || !info.file) {
       toast.error("TorrServer: не удалось получить видеофайл");
       return;
@@ -596,9 +615,13 @@ export function MediaPage({
   };
 
   const removeStream = async (hash: string) => {
-    setBusy("tsrm" + hash);
-    const ok = await torrserverRemove(hash);
-    setBusy(null);
+    let ok = false;
+    try {
+      setBusy("tsrm" + hash);
+      ok = await torrserverRemove(hash);
+    } finally {
+      setBusy(null);
+    }
     if (ok) {
       toast.success("Стрим остановлен");
       refreshTs();
@@ -606,9 +629,13 @@ export function MediaPage({
   };
 
   const onAdd = async (url: string, key: string) => {
-    setBusy(key);
-    const ok = await addTorrent(url);
-    setBusy(null);
+    let ok = false;
+    try {
+      setBusy(key);
+      ok = await addTorrent(url);
+    } finally {
+      setBusy(null);
+    }
     if (ok) {
       toast.success("Торрент добавлен в qBittorrent");
       onMediaUpdate();
@@ -619,9 +646,13 @@ export function MediaPage({
     item: MediaLookupItem,
     key: string,
   ): Promise<boolean> => {
-    setBusy(key);
-    const ok = await addTitle(item.kind, item.id);
-    setBusy(null);
+    let ok = false;
+    try {
+      setBusy(key);
+      ok = await addTitle(item.kind, item.id);
+    } finally {
+      setBusy(null);
+    }
     if (ok) {
       toast.success(`«${item.title}» добавлен — ищем релиз`);
       onMediaUpdate();
@@ -647,9 +678,13 @@ export function MediaPage({
     it: TmdbItem,
     status: "watchlist" | "hidden" | "liked" | "disliked",
   ) => {
-    setBusy("pref" + it.tmdbId + status);
-    const pref = await saveMediaPreference(it, status);
-    setBusy(null);
+    let pref = null;
+    try {
+      setBusy("pref" + it.tmdbId + status);
+      pref = await saveMediaPreference(it, status);
+    } finally {
+      setBusy(null);
+    }
     if (!pref) {
       toast.error("Не удалось сохранить предпочтение");
       return;
@@ -667,9 +702,13 @@ export function MediaPage({
     hash: string,
     action: "pause" | "resume" | "delete",
   ) => {
-    setBusy(hash + action);
-    const ok = await torrentAction(hash, action);
-    setBusy(null);
+    let ok = false;
+    try {
+      setBusy(hash + action);
+      ok = await torrentAction(hash, action);
+    } finally {
+      setBusy(null);
+    }
     if (ok && action === "delete") toast.success("Раздача удалена");
     onMediaUpdate();
   };

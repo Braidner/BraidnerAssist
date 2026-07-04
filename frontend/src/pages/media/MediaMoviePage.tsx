@@ -14,7 +14,7 @@ import {
 	tmdbRailCards,
 	type DetailPlayer,
 } from "./shared/mediaDetail.tsx";
-import {MediaRail} from "./shared/mediaRails.tsx";
+import {MediaDetailPageSkeleton, MediaRail} from "./shared/mediaRails.tsx";
 import {cn} from "../../lib/cn.ts";
 import {media as ms} from "./shared/mediaStyles.ts";
 import {
@@ -37,6 +37,7 @@ import {
 	type TorrentRailItem,
 } from "@/lib/api.ts";
 import {useToast} from "../../components/ui/Toast.tsx";
+import {Button} from "../../components/ui/button.tsx";
 
 type AutoplayLocationState = {
 	from?: string;
@@ -99,9 +100,13 @@ export function MediaMoviePage({
 			toast.error("Файл ещё не появился в Jellyfin");
 			return;
 		}
-		setBusy(true);
-		const playInfo = await getMediaPlayUrl(playId);
-		setBusy(false);
+		let playInfo = null;
+		try {
+			setBusy(true);
+			playInfo = await getMediaPlayUrl(playId);
+		} finally {
+			setBusy(false);
+		}
 		if (playInfo && d && d !== "loading") {
 			if (playInfo.reason === "jellyfin_auth_required") {
 				toast.error("Jellyfin не принял учётку для сохранения прогресса. Перелогинься или обнови пароль в настройках.");
@@ -167,7 +172,7 @@ export function MediaMoviePage({
 	if (d === "loading")
 		return (
 			<div className={ms.page}>
-				<div className={cn(ms.empty, "mt-10")}>Загружаем…</div>
+				<MediaDetailPageSkeleton rows={2} />
 			</div>
 		);
 	if (!d)
@@ -181,9 +186,13 @@ export function MediaMoviePage({
 
 	const addToLib = async () => {
 		if (det.tmdbId == null) return;
-		setAct("add");
-		const ok = await addTitle("movie", det.tmdbId);
-		setAct(null);
+		let ok = false;
+		try {
+			setAct("add");
+			ok = await addTitle("movie", det.tmdbId);
+		} finally {
+			setAct(null);
+		}
 		if (ok) {
 			toast.success(`«${det.title}» добавлен в библиотеку — ищем релиз`);
 			setShowPicker(true);
@@ -226,9 +235,9 @@ export function MediaMoviePage({
 					actions={
 						<>
 							{det.hasFile && det.jellyfinId && (
-								<button
+								<Button
 									className={ms.playButton}
-									disabled={busy}
+									loading={busy}
 									onClick={play}
 								>
 									<svg
@@ -239,37 +248,39 @@ export function MediaMoviePage({
 									>
 										<polygon points="6,3 21,12 6,21"/>
 									</svg>
-									{busy ? "…" : "Смотреть"}
-								</button>
+									Смотреть
+								</Button>
 							)}
 							{!inLibrary && det.tmdbId != null && (
-								<button
+								<Button
 									className={ms.playButton}
-									disabled={act === "add"}
+									loading={act === "add"}
+									loadingLabel="Добавляем"
 									title="Зарегистрировать тайтл и выбрать релиз"
 									onClick={addToLib}
 								>
-									{act === "add" ? "…" : "➕ В библиотеку"}
-								</button>
+									➕ В библиотеку
+								</Button>
 							)}
 							{inLibrary && (
-								<button
+								<Button
 									className={ms.heroGhostBtn}
 									type="button"
 									title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
+									autoLoading={false}
 								>
 									<span className="size-2 rounded-full bg-accent shadow-[0_0_18px_rgba(229,51,51,0.75)]" />
 									В библиотеке
-								</button>
+								</Button>
 							)}
-								<button
+								<Button
 									className={ms.heroGhostBtn}
 									disabled={det.tmdbId == null}
 									title={det.tmdbId == null ? "Нет tmdbId" : ""}
 									onClick={() => setShowPicker((v) => !v)}
 								>
 									{showPicker ? "Скрыть поиск" : "Поиск"}
-								</button>
+								</Button>
 						</>
 					}
 					onBack={goBack}

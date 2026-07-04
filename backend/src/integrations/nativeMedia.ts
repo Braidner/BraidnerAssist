@@ -365,7 +365,10 @@ export async function getTorrentRail(): Promise<TorrentRailItem[]> {
   const byHash = new Map(downloads.map((download) => [download.hash.toLowerCase(), download]));
   const rows = await prisma.mediaTorrent.findMany({
     include: { title: true },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [
+      { addedAt: "desc" },
+      { id: "asc" },
+    ],
     take: 50,
   });
   const visible: TorrentRailItem[] = [];
@@ -444,7 +447,10 @@ export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise
     where: { kind_tmdbId: { kind, tmdbId } },
     include: {
       torrents: {
-        orderBy: { updatedAt: "desc" },
+        orderBy: [
+          { addedAt: "desc" },
+          { id: "asc" },
+        ],
         take: 24,
       },
     },

@@ -2,6 +2,7 @@
 // метаданными, встроенный плеер, поиск релизов и rail привязанных раздач.
 
 import {useEffect, useRef, useState} from "react";
+import { CheckCircle2, Plus } from "lucide-react";
 import {useParams, useNavigate, useLocation, useSearchParams} from "react-router-dom";
 import {
 	ReleasePicker,
@@ -68,6 +69,7 @@ export function MediaMoviePage({
 	const [busy, setBusy] = useState(false);
 	const [act, setAct] = useState<string | null>(null);
 	const [showPicker, setShowPicker] = useState(false);
+	const [queuedInLibrary, setQueuedInLibrary] = useState(false);
 	const autoplayConsumedRef = useRef<string | null>(null);
 	const locationState = location.state as AutoplayLocationState;
 	const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
@@ -89,6 +91,7 @@ export function MediaMoviePage({
 
 	useEffect(() => {
 		setD("loading");
+		setQueuedInLibrary(false);
 		fetchDetail().then((r) => setD(r));
 		getMediaLibrary().then(setLibrary);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,6 +219,7 @@ export function MediaMoviePage({
 		.filter((x) => x.id !== id && x.type === "Movie")
 		.slice(0, 8);
 	const inLibrary = det.inLibrary || det.hasFile || Boolean(det.jellyfinId);
+	const libraryState = inLibrary || queuedInLibrary || titleTorrents.length > 0;
 
 	return (
 		<div>
@@ -251,7 +255,7 @@ export function MediaMoviePage({
 									Смотреть
 								</Button>
 							)}
-							{!inLibrary && det.tmdbId != null && (
+							{!libraryState && det.tmdbId != null && (
 								<Button
 									className={ms.playButton}
 									loading={act === "add"}
@@ -259,17 +263,18 @@ export function MediaMoviePage({
 									title="Зарегистрировать тайтл и выбрать релиз"
 									onClick={addToLib}
 								>
-									➕ В библиотеку
+									<Plus className="size-4" strokeWidth={2.3} />
+									В библиотеку
 								</Button>
 							)}
-							{inLibrary && (
+							{libraryState && (
 								<Button
 									className={ms.heroGhostBtn}
 									type="button"
-									title="Тайтл уже добавлен. Позже второй клик будет удалять из библиотеки."
+									title={queuedInLibrary && !inLibrary ? "Релиз отправлен на загрузку" : "Тайтл уже в медиатеке"}
 									autoLoading={false}
 								>
-									<span className="size-2 rounded-full bg-accent shadow-[0_0_18px_rgba(229,51,51,0.75)]" />
+									<CheckCircle2 className="size-4 text-accent" strokeWidth={2.1} />
 									В библиотеке
 								</Button>
 							)}
@@ -295,6 +300,7 @@ export function MediaMoviePage({
 					downloads={media.downloads}
 					fallbackPosterSrc={posterSrc}
 					onGrabbed={() => {
+						setQueuedInLibrary(true);
 						onMediaUpdate();
 						refreshTitleTorrents();
 						window.setTimeout(refreshTitleTorrents, 2_000);

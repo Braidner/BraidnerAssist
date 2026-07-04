@@ -1,7 +1,7 @@
 // System tab for MediaPage: download queue, active TorrServer streams.
 
 import { Card } from "../../components/ui/Card.tsx";
-import { FileBrowser } from "../../components/panels/FileBrowser.tsx";
+import { MediaFileBrowser } from "./shared/MediaFileBrowser.tsx";
 import {
   torrserverStreamUrl,
   type MediaData,
@@ -270,7 +270,7 @@ export function MediaSystemTab({
       </Card>
 
       {/* Файловый менеджер медиатеки (Media v2 — если задан MEDIA_ROOT) */}
-      <FileBrowser />
+      <MediaFileBrowser />
     </div>
   );
 }

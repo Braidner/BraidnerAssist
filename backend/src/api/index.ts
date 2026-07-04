@@ -623,13 +623,15 @@ apiRouter.post("/media/release/search", async (req, res) => {
 apiRouter.post("/media/release/grab", async (req, res) => {
   const kind = String(req.body?.type ?? "") === "series" ? "series" : "movie";
   if (!config.media.jackett.configured) return res.status(503).json({ configured: false });
+  const id = Number(req.body?.id);
   const guid = String(req.body?.guid ?? "").trim();
   const indexerId = String(req.body?.indexerId ?? req.body?.indexer ?? "").trim();
-  if (!guid || !indexerId) return res.status(400).json({ error: "guid and indexerId required" });
+  const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
+  if (!Number.isFinite(id) || id <= 0 || !guid || !indexerId) return res.status(400).json({ error: "id, guid and indexerId required" });
   try {
-    res.json(await nativeGrabRelease(kind, guid, indexerId));
+    res.json(await nativeGrabRelease(kind, id, guid, indexerId, seasonNumber));
   } catch (e) {
-    logRouteError("jackett", req, e, { kind, guid, indexerId });
+    logRouteError("jackett", req, e, { kind, id, guid, indexerId, seasonNumber });
     res.status(502).json({ error: String(e) });
   }
 });

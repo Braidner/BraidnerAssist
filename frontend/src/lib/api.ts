@@ -1601,8 +1601,10 @@ export async function searchReleaseOptions(p: {
 
 export async function grabRelease(p: {
   type: "movie" | "series";
+  id: number;
   guid: string;
   indexerId: number | string;
+  seasonNumber?: number;
 }): Promise<{ ok: boolean; error: string | null; infohash?: string; added?: boolean }> {
   try {
     const res = await apiFetch("/api/media/release/grab", {

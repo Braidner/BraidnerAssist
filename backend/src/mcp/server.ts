@@ -249,16 +249,16 @@ export function createMcpServer() {
       const found = await nativeLookup(type, query);
       if (found.length === 0) return ok({ ok: false, error: "Ничего не найдено" });
       const releases = await nativeReleaseSearch(type, found[0].id, season);
-      return ok({ ok: true, title: found[0].title, count: releases.length, releases });
+      return ok({ ok: true, title: found[0].title, id: found[0].id, tmdbId: found[0].tmdbId, count: releases.length, releases });
     },
   );
 
   server.tool(
     "grab_release",
-    "Force-grab a specific release returned by search_releases (by guid + indexerId/indexer). Mission Control adds it to qBittorrent and saves it directly into the Jellyfin movies/tv library path.",
-    { type: z.enum(["movie", "series"]), guid: z.string(), indexerId: z.union([z.number(), z.string()]) },
-    async ({ type, guid, indexerId }) => {
-      return ok(await nativeGrabRelease(type, guid, indexerId));
+    "Force-grab a specific release returned by search_releases for the same title id (by id + guid + indexerId/indexer). Mission Control adds it to qBittorrent and saves it directly into the Jellyfin movies/tv library path.",
+    { type: z.enum(["movie", "series"]), id: z.number(), guid: z.string(), indexerId: z.union([z.number(), z.string()]), season: z.number().optional() },
+    async ({ type, id, guid, indexerId, season }) => {
+      return ok(await nativeGrabRelease(type, id, guid, indexerId, season));
     },
   );
 

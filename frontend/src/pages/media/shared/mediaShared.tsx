@@ -747,8 +747,10 @@ export function ReleasePicker({
   const grabOne = async (r: ReleaseOption): Promise<{ ok: boolean; error: string | null }> => {
     const res = await grabRelease({
       type: params.type,
+      id: params.id,
       guid: r.guid,
       indexerId: r.indexerId ?? r.indexer,
+      seasonNumber: params.seasonNumber,
     });
     if (res.ok) {
       if (res.infohash) setGrabbedHashes((p) => ({ ...p, [r.guid]: res.infohash! }));

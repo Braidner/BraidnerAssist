@@ -77,10 +77,37 @@ export interface PendingMediaTitle {
 
 const RELEASE_CACHE_TTL = 10 * 60_000;
 const LIBRARY_CATEGORY = "mc-library";
-const releaseCache = new Map<string, { at: number; item: SearchResult & { type: MediaKind; tmdbId: number; tvdbId: number | null; titleHint: string; seasonNumber?: number } }>();
+export type CachedRelease = SearchResult & {
+  type: MediaKind;
+  tmdbId: number;
+  tvdbId: number | null;
+  titleHint: string;
+  seasonNumber?: number;
+};
 
-function cacheKey(type: MediaKind, guid: string, indexerId: number | string): string {
-  return `${type}:${indexerId}:${guid}`;
+const releaseCache = new Map<string, { at: number; item: CachedRelease }>();
+
+export function releaseCacheKey(type: MediaKind, tmdbId: number, guid: string, indexerId: number | string): string {
+  return `${type}:${tmdbId}:${indexerId}:${guid}`;
+}
+
+export function cacheReleaseForTitle(item: CachedRelease): void {
+  const at = Date.now();
+  releaseCache.set(releaseCacheKey(item.type, item.tmdbId, item.guid, item.indexerId ?? item.trackerId ?? item.indexer), { at, item });
+  releaseCache.set(releaseCacheKey(item.type, item.tmdbId, item.guid, item.indexer), { at, item });
+}
+
+export function cachedReleaseForTitle(
+  type: MediaKind,
+  tmdbId: number,
+  guid: string,
+  indexerId: number | string,
+): CachedRelease | null {
+  return releaseCache.get(releaseCacheKey(type, tmdbId, guid, indexerId))?.item ?? null;
+}
+
+export function clearReleaseCacheForTest(): void {
+  releaseCache.clear();
 }
 
 function keepCacheFresh(): void {
@@ -136,6 +163,30 @@ function releaseQueries(detail: TmdbItem | null, title: string, seasonNumber?: n
     `${titleValue}${season}`,
     ...(detail?.year ? [`${titleValue} ${detail.year}${season}`] : []),
   ]).map((query) => [query, suffix].filter(Boolean).join(" "));
+}
+
+function releaseYear(item: SearchResult): number | null {
+  const text = [
+    item.details?.title,
+    item.title,
+    item.description,
+    item.query,
+  ].filter(Boolean).join(" ");
+  const matches = [...text.matchAll(/\b(19\d{2}|20\d{2})\b/g)]
+    .map((match) => Number(match[1]))
+    .filter((year) => Number.isFinite(year));
+  return matches[0] ?? null;
+}
+
+export function assertMovieReleaseMatchesTitle(
+  kind: MediaKind,
+  title: { title: string; year: number | null },
+  item: SearchResult,
+): void {
+  if (kind !== "movie" || !title.year) return;
+  const year = releaseYear(item);
+  if (!year || year === title.year) return;
+  throw new Error(`Релиз похож на ${year}, а выбранный фильм — ${title.year}. Обнови поиск на странице нужного фильма.`);
 }
 
 async function resolveTmdbId(kind: MediaKind, id: number): Promise<{ tmdbId: number; tvdbId: number | null }> {
@@ -230,19 +281,28 @@ export async function nativeReleaseSearch(
       titleHint: title.title,
       seasonNumber: kind === "series" ? seasonNumber : undefined,
     };
-    releaseCache.set(cacheKey(kind, release.guid, release.indexerId ?? release.trackerId ?? release.indexer), { at: Date.now(), item });
-    releaseCache.set(cacheKey(kind, release.guid, release.indexer), { at: Date.now(), item });
+    cacheReleaseForTitle(item);
   }
   return releases;
 }
 
-export async function nativeGrabRelease(kind: MediaKind, guid: string, indexerId: number | string): Promise<{ ok: true; infohash: string; added: boolean }> {
+export async function nativeGrabRelease(
+  kind: MediaKind,
+  id: number,
+  guid: string,
+  indexerId: number | string,
+  seasonNumber?: number,
+): Promise<{ ok: true; infohash: string; added: boolean }> {
   keepCacheFresh();
-  const cached = releaseCache.get(cacheKey(kind, guid, indexerId)) ?? [...releaseCache.values()].find((value) => value.item.type === kind && value.item.guid === guid);
-  if (!cached?.item.url) throw new Error("Release not in cache; run search_releases first");
-  const item = cached.item;
+  const title = await ensureTitle(kind, id);
+  const item = cachedReleaseForTitle(kind, title.tmdbId, guid, indexerId);
+  if (!item?.url) throw new Error("Release not in cache for this title; refresh release search and try again");
+  if (item.tmdbId !== title.tmdbId) throw new Error("Release belongs to another title; refresh release search and try again");
+  if (kind === "series" && seasonNumber != null && item.seasonNumber != null && item.seasonNumber !== seasonNumber) {
+    throw new Error("Release belongs to another season; refresh release search and try again");
+  }
+  assertMovieReleaseMatchesTitle(kind, title, item);
   const source = String(item.url);
-  const title = await ensureTitle(kind, item.tmdbId);
   const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
   const savePath = titleSavePath(kind, title, detail);
   const addedIds = await qbAddRaw(source, { category: LIBRARY_CATEGORY, savePath });

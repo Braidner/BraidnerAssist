@@ -31,6 +31,10 @@ export interface DownloadItem {
   category?: string;
   savePath?: string;
   contentType?: "movie" | "series";
+  mediaTitle?: string;
+  mediaYear?: number | null;
+  mediaPoster?: string | null;
+  mediaTmdbId?: number;
   downloadId?: string; // qB-хеш — ключ для ручного импорта
   importPending?: boolean; // legacy UI field; simplified pipeline does not set it
   importMessage?: string;
@@ -1051,28 +1055,47 @@ export async function qbittorrentDownloads(): Promise<DownloadItem[]> {
   const tracked = hashes.length
     ? await prisma.mediaTorrent.findMany({
         where: { infohash: { in: hashes } },
-        select: { infohash: true, title: { select: { kind: true } } },
+        select: {
+          infohash: true,
+          title: {
+            select: {
+              kind: true,
+              tmdbId: true,
+              title: true,
+              year: true,
+              poster: true,
+            },
+          },
+        },
       }).catch(() => [])
     : [];
-  const contentTypeByHash = new Map(
-    tracked
-      .filter((t) => t.title.kind === "movie" || t.title.kind === "series")
-      .map((t) => [t.infohash.toLowerCase(), t.title.kind as "movie" | "series"]),
+  const titleByHash = new Map(
+    tracked.map((t) => [t.infohash.toLowerCase(), t.title]),
   );
-  return torrents.map((t) => ({
-    hash: t.hash ?? "—",
-    title: t.name ?? "—",
-    source: "qbittorrent" as const,
-    progress: Math.round((t.progress ?? 0) * 100),
-    state: t.state ?? "—",
-    dlspeed: t.dlspeed ?? 0,
-    eta: t.eta != null && t.eta < 8_640_000 ? t.eta : null,
-    seeds: t.num_seeds ?? 0,
-    size: t.size ?? 0,
-    category: t.category,
-    savePath: t.save_path,
-    contentType: t.hash ? contentTypeByHash.get(t.hash.toLowerCase()) : undefined,
-  }));
+  return torrents.map((t) => {
+    const linkedTitle = t.hash ? titleByHash.get(t.hash.toLowerCase()) : undefined;
+    const contentType = linkedTitle?.kind === "movie" || linkedTitle?.kind === "series"
+      ? linkedTitle.kind
+      : undefined;
+    return {
+      hash: t.hash ?? "—",
+      title: t.name ?? "—",
+      source: "qbittorrent" as const,
+      progress: Math.round((t.progress ?? 0) * 100),
+      state: t.state ?? "—",
+      dlspeed: t.dlspeed ?? 0,
+      eta: t.eta != null && t.eta < 8_640_000 ? t.eta : null,
+      seeds: t.num_seeds ?? 0,
+      size: t.size ?? 0,
+      category: t.category,
+      savePath: t.save_path,
+      contentType,
+      mediaTitle: linkedTitle?.title,
+      mediaYear: linkedTitle?.year,
+      mediaPoster: linkedTitle?.poster,
+      mediaTmdbId: linkedTitle?.tmdbId,
+    };
+  });
 }
 
 // Резолв http(s)-источника: некоторые Torznab индексеры отдают downloadUrl,

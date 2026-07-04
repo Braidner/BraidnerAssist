@@ -36,6 +36,30 @@ export interface FileEntry {
   ext: string;
 }
 
+async function dirSize(abs: string): Promise<number> {
+  let dirents: import("node:fs").Dirent[];
+  try {
+    dirents = await fs.readdir(abs, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+
+  let total = 0;
+  for (const d of dirents) {
+    if (d.name.startsWith(".") || d.isSymbolicLink()) continue;
+    const childAbs = path.join(abs, d.name);
+    try {
+      const st = await fs.lstat(childAbs);
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) total += await dirSize(childAbs);
+      else if (st.isFile()) total += st.size;
+    } catch {
+      // Ignore files that vanish or cannot be read while the listing is built.
+    }
+  }
+  return total;
+}
+
 // Список содержимого папки (по умолчанию — корень).
 export async function listDir(relPath = ""): Promise<{ path: string; entries: FileEntry[] }> {
   const abs = safe(relPath);
@@ -47,9 +71,10 @@ export async function listDir(relPath = ""): Promise<{ path: string; entries: Fi
     let size = 0;
     let mtime = 0;
     try {
-      const st = await fs.stat(childAbs);
-      size = st.size;
+      const st = await fs.lstat(childAbs);
+      if (st.isSymbolicLink()) continue;
       mtime = st.mtimeMs;
+      size = st.isDirectory() ? await dirSize(childAbs) : st.size;
     } catch {
       continue; // битые симлинки и т.п.
     }
@@ -58,7 +83,7 @@ export async function listDir(relPath = ""): Promise<{ path: string; entries: Fi
       name: d.name,
       path: rel(childAbs),
       type: isDir ? "dir" : "file",
-      size: isDir ? 0 : size,
+      size,
       mtime,
       ext: isDir ? "" : path.extname(d.name).slice(1).toLowerCase(),
     });

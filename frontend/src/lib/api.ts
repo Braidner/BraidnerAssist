@@ -809,6 +809,10 @@ export interface DownloadItem {
   seeds?: number;
   size?: number;
   contentType?: "movie" | "series";
+  mediaTitle?: string;
+  mediaYear?: number | null;
+  mediaPoster?: string | null;
+  mediaTmdbId?: number;
   downloadId?: string;
   importPending?: boolean;
   importMessage?: string;

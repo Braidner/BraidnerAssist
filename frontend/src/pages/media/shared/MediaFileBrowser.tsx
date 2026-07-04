@@ -72,7 +72,7 @@ export function MediaFileBrowser() {
 
   const entries = data && data !== "loading" && data !== "off" ? data.entries : [];
   const totalFilesSize = useMemo(
-    () => entries.reduce((sum, entry) => sum + (entry.type === "file" ? entry.size : 0), 0),
+    () => entries.reduce((sum, entry) => sum + entry.size, 0),
     [entries],
   );
   const crumbs = cwd ? cwd.split("/") : [];
@@ -193,12 +193,12 @@ export function MediaFileBrowser() {
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-ink">{entry.name}</span>
                     <span className="mt-1 block truncate font-mono text-2xs text-muted">
-                      {entryKind(entry)} · {entry.type === "file" ? fmtSize(entry.size) : "размер считается по файлам внутри"} · {fmtDate(entry.mtime)}
+                      {entryKind(entry)} · {fmtSize(entry.size)} · {fmtDate(entry.mtime)}
                     </span>
                   </span>
                 </button>
                 <span className="whitespace-nowrap rounded-full bg-black/20 px-2.5 py-1 font-mono text-2xs text-ink-soft max-mob:hidden">
-                  {entry.type === "file" ? fmtSize(entry.size) : "папка"}
+                  {fmtSize(entry.size)}
                 </span>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon-sm" title="Переименовать" disabled={busy} onClick={() => onRename(entry)}>

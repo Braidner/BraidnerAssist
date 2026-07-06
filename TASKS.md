@@ -471,6 +471,25 @@
 - [x] Проверено и задеплоено: frontend/backend builds зелёные, GHCR images обновлены,
       `hermes.lan` на `ab7aea4`, backend `/healthz` отвечает.
 
+## Batch v10 — Media UX vNext (2026-07-06) ✅ ГОТОВО
+
+- [x] Smart home: новый `/api/media/home` выбирает hero по приоритету resume → новое в
+      библиотеке → watchlist → высокий рейтинг; Library показывает причину hero.
+- [x] Watchlist first-class: route `/media/list`, rail «Мой список» в Library, status badges
+      для watchlist items.
+- [x] User-aware preferences: миграция `20260706160000_media_preference_app_users` добавляет
+      `MediaPreference.appUserId`; чтение использует personal-over-global fallback, новые REST
+      записи пишутся за текущего `AppUser`.
+- [x] Pipeline status: `/api/media/statuses` отдаёт `watchlist|registered|release_selected|
+      downloading|awaiting_jellyfin|in_library|watched` без новых monitor-таблиц.
+- [x] ReleasePicker safety: parser/scoring добавили `declaredYears`, `episodeRange` и `match`;
+      фильмы/сериалы с явным несовпадением года или сезона блокируются на grab, UI показывает
+      год/сезон/качество/озвучку/seed chips и «Скачать лучший».
+- [x] Media queue: System tab группирует qB entries в «Активные», «Готово / ждёт Jellyfin»,
+      «На паузе», «Проблемные», «Сидируется» и даёт bulk actions.
+- [x] Проверено: `cd backend && npx prisma generate && npm run build && npm test`,
+      `cd frontend && npm run build`, dev-stand `/media`, `/media/list`, `/media/system`.
+
 ---
 
 ## REST API (план)

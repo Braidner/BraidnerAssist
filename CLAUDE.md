@@ -311,7 +311,9 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     **Локальные preferences** (`MediaPreference` в SQLite): `watchlist|hidden|liked|disliked`,
     endpoints `GET/POST/DELETE /api/media/preferences`; это только состояние дашборда, не Jellyfin
     favorites и не команды *arr. Discovery-карточки дают действия «В список»/«Добавить»/«Скрыть»,
-    Cmd-K показывает «Мой список». `/media/discover/rails` **graceful**: TMDB off → `200 {configured:false,…}` (виджет не
+    Cmd-K показывает «Мой список». Batch v10 делает preferences user-aware (`appUserId` + `global`
+    fallback), добавляет `/media/list`, `/api/media/home` smart hero и `/api/media/statuses`.
+    `/media/discover/rails` **graceful**: TMDB off → `200 {configured:false,…}` (виджет не
     падает). Общий рейл-компонент — `CardRail` + адаптеры `libraryRailCards`/`tmdbRailCards` в
     `shared/mediaDetail.tsx` (бывший `SimilarRail` обобщён под Jellyfin- и TMDB-постеры). Постер-прокси
     `api/poster.ts` получил `&w=` (`w342|w780|w1280|original`) — бэкдропы тащатся широким кропом.
@@ -442,6 +444,9 @@ native media pipeline внутри Mission Control. Сервисы публик�
   import state, Jackett Torznab search+health, release parsing/scoring, qB category `mc-native`,
   background importer, Repair Center summary, native Hermes tools и homelab compose без *arr/Prowlarr.
   Builds backend+frontend зелёные. ✅ ГОТОВО
+- **Batch v10 — Media UX vNext** (2026-07-06): smart Library hero, first-class `/media/list`,
+  personal preferences with global fallback, title pipeline statuses, grouped media queue, and
+  ReleasePicker year/season safety chips with blocked mismatches. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); будущий этап удаления Jellyfin
   (свой transcoding/watch-state) — отдельная большая тема.
 

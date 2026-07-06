@@ -163,6 +163,41 @@ function voiceTagClass(): string {
   return "whitespace-nowrap rounded-full bg-warn/15 px-2 py-0.5 font-mono text-2xs text-warn";
 }
 
+function releaseChipClass(tone: "good" | "warn" | "muted" = "muted"): string {
+  return cn(
+    "whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-2xs leading-none",
+    tone === "good" && "border-emerald-300/20 bg-emerald-400/12 text-emerald-100",
+    tone === "warn" && "border-bad/25 bg-bad/14 text-bad",
+    tone === "muted" && "border-white/10 bg-white/8 text-white/68",
+  );
+}
+
+function releaseMatchChips(release: ReleaseOption): { label: string; tone: "good" | "warn" | "muted" }[] {
+  const match = release.match;
+  const parsed = release.parsed;
+  const seeders = release.details?.stats?.seeders ?? release.seeders ?? 0;
+  const chips: { label: string; tone: "good" | "warn" | "muted" }[] = [];
+  if (match?.yearStatus === "match") {
+    chips.push({ label: `год ${match.declaredYears.find((y) => match.allowedYears.includes(y)) ?? match.allowedYears[0]} ✓`, tone: "good" });
+  } else if (match?.yearStatus === "mismatch") {
+    chips.push({ label: `год ${match.declaredYears.join(", ")} ≠ ${match.allowedYears.join("/")}`, tone: "warn" });
+  } else if (match?.allowedYears?.length) {
+    chips.push({ label: `год ${match.allowedYears.join("/")}?`, tone: "muted" });
+  }
+  if (match?.seasonStatus === "match" && parsed?.season) chips.push({ label: `S${String(parsed.season).padStart(2, "0")} ✓`, tone: "good" });
+  if (match?.seasonStatus === "mismatch" && parsed?.season) chips.push({ label: `не тот S${String(parsed.season).padStart(2, "0")}`, tone: "warn" });
+  if (parsed?.resolution) chips.push({ label: `${parsed.resolution}p`, tone: "muted" });
+  if (parsed?.source) chips.push({ label: parsed.source, tone: "muted" });
+  const voice = releaseVoice(release);
+  if (voice) chips.push({ label: voice, tone: "muted" });
+  chips.push({ label: `${seeders} seed`, tone: seeders > 0 ? "good" : "warn" });
+  for (const warning of [...(match?.warnings ?? []), ...(release.warnings ?? [])].slice(0, 2)) {
+    const label = warning.includes("partial title") ? "частичное название" : warning;
+    if (!chips.some((chip) => chip.label === label)) chips.push({ label, tone: "warn" });
+  }
+  return chips.slice(0, 7);
+}
+
 function findReleaseDownload(
   downloads: DownloadItem[],
   grabbedHash?: string,
@@ -599,6 +634,8 @@ export function TorrentCard({
       .filter(Boolean)
       .join(" · ")
     : null;
+  const matchChips = releaseMatchChips(release);
+  const blocked = Boolean(release.match?.block);
 
   return (
     <article
@@ -647,7 +684,7 @@ export function TorrentCard({
               busy={busy}
               done={isComplete}
               progress={progress}
-              disabled={disabled || Boolean(download)}
+              disabled={disabled || Boolean(download) || blocked}
               onClick={onGrab}
             />
           )}
@@ -688,6 +725,20 @@ export function TorrentCard({
           </div>
         )}
         {extraMeta}
+        {matchChips.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {matchChips.map((chip) => (
+              <span key={`${chip.tone}:${chip.label}`} className={releaseChipClass(chip.tone)}>
+                {chip.label}
+              </span>
+            ))}
+          </div>
+        )}
+        {blocked && (
+          <div className={cn(media.reject, "mt-2 whitespace-normal text-label")}>
+            Релиз заблокирован: год или сезон не совпадает.
+          </div>
+        )}
         {done && /multi-season/i.test((release.rejections ?? []).join(" ")) && (
           <div className={cn(media.reject, "mt-2 whitespace-normal text-label")}>
             Пак нескольких сезонов — после скачивания нажми «Импорт» в Загрузках.
@@ -773,6 +824,9 @@ export function ReleasePicker({
       window.setTimeout(() => onGrabbed?.(), 5_000);
     } else toast.error(res.error ?? "Не удалось отправить раздачу");
   };
+  const firstRelease = releases?.[0] ?? null;
+  const bestRelease = releases?.find((release) => !release.match?.block && !release.rejected) ?? firstRelease;
+  const bestBlocked = Boolean(bestRelease?.match?.block || bestRelease?.rejected);
 
   return (
     <div className="mt-3">
@@ -791,6 +845,26 @@ export function ReleasePicker({
           />
         </div>
       </div>
+
+      {bestRelease && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-white/[0.08] bg-white/[0.035] px-3 py-2">
+          <div className="min-w-0">
+            <div className="font-mono text-2xs uppercase tracking-[0.12em] text-muted">Лучший выбор</div>
+            <div className="truncate text-sm font-semibold text-ink" title={bestRelease.details?.title ?? bestRelease.title}>
+              {bestRelease.details?.title ?? bestRelease.title}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={cn(media.button.accentSm, "flex-none")}
+            disabled={bestBlocked || busyGuid === bestRelease.guid || Boolean(grabbedHashes[bestRelease.guid])}
+            onClick={() => onGrab(bestRelease)}
+          >
+            <Download size={14} />
+            {bestBlocked ? "Нужна проверка" : busyGuid === bestRelease.guid ? "Отправляем" : "Скачать лучший"}
+          </button>
+        </div>
+      )}
 
       {releases === null ? (
         <div className={media.empty}>Ищем раздачи…</div>

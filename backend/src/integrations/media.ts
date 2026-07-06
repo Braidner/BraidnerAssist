@@ -166,6 +166,18 @@ export interface MoviePageDetail {
 
 export type SeriesTitleIdType = "tmdb" | "tvdb" | "auto";
 
+export interface ReleaseMatch {
+  targetYear: number | null;
+  allowedYears: number[];
+  declaredYears: number[];
+  yearStatus: "match" | "mismatch" | "unknown" | "not_applicable";
+  seasonStatus: "match" | "mismatch" | "unknown" | "not_applicable";
+  confidence: "high" | "medium" | "low";
+  block: boolean;
+  reasons: string[];
+  warnings: string[];
+}
+
 export interface SearchResult {
   guid: string;
   indexerId?: number | string;
@@ -196,6 +208,7 @@ export interface SearchResult {
   releaseGroup?: string | null;
   studioHint?: string | null;
   details?: import("./releaseDetails.js").ReleaseDetails | null;
+  match?: ReleaseMatch;
   parsed?: unknown;
 }
 
@@ -1365,6 +1378,23 @@ export interface ResumeItem {
   seriesId: string | null;
 }
 
+export interface MediaHomeHero {
+  reason: "continue" | "new" | "watchlist" | "high_rated" | "fallback";
+  label: string;
+  kind: "movie" | "series" | "episode";
+  itemId: string;
+  jellyfinId: string | null;
+  seriesId: string | null;
+  tmdbId: number | null;
+  title: string;
+  year: number | null;
+  progress: number | null;
+}
+
+export interface MediaHome {
+  hero: MediaHomeHero | null;
+}
+
 async function resolveResumeSeriesId(item: {
   Id: string;
   Type?: string;
@@ -1408,6 +1438,81 @@ export async function getContinueWatching(ctx: MediaUserContext = {}): Promise<R
       seriesId: kind === "movie" ? null : await resolveResumeSeriesId(it, ctx),
     };
   }));
+}
+
+export async function getMediaHome(ctx: MediaUserContext = {}): Promise<MediaHome> {
+  const [resumeR, libraryR, prefsR] = await Promise.allSettled([
+    getContinueWatching(ctx),
+    getLibrary(ctx),
+    import("./mediaPreferences.js").then((m) => m.listMediaPreferences("watchlist", ctx.appUserId)),
+  ]);
+  const resume = resumeR.status === "fulfilled" ? resumeR.value : [];
+  const library = libraryR.status === "fulfilled" ? libraryR.value : [];
+  const watchlist = prefsR.status === "fulfilled" ? prefsR.value : [];
+
+  const firstResume = resume[0];
+  if (firstResume) {
+    return {
+      hero: {
+        reason: "continue",
+        label: firstResume.kind === "episode" ? "Продолжить серию" : "Продолжить просмотр",
+        kind: firstResume.kind,
+        itemId: firstResume.id,
+        jellyfinId: firstResume.id,
+        seriesId: firstResume.seriesId,
+        tmdbId: null,
+        title: firstResume.title,
+        year: firstResume.year,
+        progress: firstResume.positionPct,
+      },
+    };
+  }
+
+  const newestRegistered = await prisma.mediaTitle.findFirst({
+    where: { jellyfinId: { not: null } },
+    orderBy: { updatedAt: "desc" },
+  }).catch(() => null);
+  const newest = newestRegistered
+    ? library.find((item) => item.id === newestRegistered.jellyfinId || item.tmdbId === newestRegistered.tmdbId)
+    : null;
+  if (newest) {
+    return {
+      hero: {
+        reason: "new",
+        label: "Новое в библиотеке",
+        kind: newest.type === "Series" ? "series" : "movie",
+        itemId: newest.id,
+        jellyfinId: newest.id,
+        seriesId: newest.type === "Series" ? newest.id : null,
+        tmdbId: newest.tmdbId,
+        title: newest.name,
+        year: newest.year,
+        progress: null,
+      },
+    };
+  }
+
+  const watchlistIds = new Set(watchlist.map((item) => `${item.kind}:${item.tmdbId}`));
+  const watchlistHit = library.find((item) => item.tmdbId && watchlistIds.has(`${item.type === "Series" ? "series" : "movie"}:${item.tmdbId}`));
+  const highRated = [...library]
+    .filter((item) => !item.played)
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0] ?? library[0] ?? null;
+  const picked = watchlistHit ?? highRated;
+  if (!picked) return { hero: null };
+  return {
+    hero: {
+      reason: watchlistHit ? "watchlist" : highRated ? "high_rated" : "fallback",
+      label: watchlistHit ? "Из моего списка" : highRated ? "Высокий рейтинг" : "В библиотеке",
+      kind: picked.type === "Series" ? "series" : "movie",
+      itemId: picked.id,
+      jellyfinId: picked.id,
+      seriesId: picked.type === "Series" ? picked.id : null,
+      tmdbId: picked.tmdbId,
+      title: picked.name,
+      year: picked.year,
+      progress: null,
+    },
+  };
 }
 
 // Недавно просмотренные тайтлы (seed для «Потому что вы смотрели»). Привязка строго

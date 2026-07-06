@@ -25,6 +25,7 @@ import {
   qbAdd,
   qbAction,
   getContinueWatching,
+  getMediaHome,
   reportPlaybackEvent,
   unifiedSearch,
   type MediaUserContext,
@@ -40,6 +41,7 @@ import {
   getTorrentRail,
   getPendingMediaTitles,
   getTitleTorrents,
+  getMediaTitleStatuses,
 } from "../integrations/nativeMedia.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import {
@@ -383,6 +385,15 @@ apiRouter.get("/media/pending-titles", async (req, res) => {
   }
 });
 
+apiRouter.get("/media/statuses", async (req, res) => {
+  try {
+    res.json(await getMediaTitleStatuses(mediaUserContext(res)));
+  } catch (e) {
+    logRouteError("media", req, e);
+    res.status(502).json({ error: String(e) });
+  }
+});
+
 apiRouter.get("/media/torrents/:kind/:tmdbId", async (req, res) => {
   const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
   const tmdbId = Number(req.params.tmdbId);
@@ -391,6 +402,16 @@ apiRouter.get("/media/torrents/:kind/:tmdbId", async (req, res) => {
     res.json(await getTitleTorrents(kind, tmdbId));
   } catch (e) {
     logRouteError("media", req, e, { kind, tmdbId });
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.get("/media/home", async (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    res.json(await getMediaHome(mediaUserContext(res)));
+  } catch (e) {
+    logRouteError("media", req, e);
     res.status(502).json({ error: String(e) });
   }
 });
@@ -718,7 +739,7 @@ apiRouter.get("/media/tmdb/resolve", async (req, res) => {
 // Домашняя страница дискавери одним вызовом. Graceful: TMDB off → 200 {configured:false}.
 apiRouter.get("/media/discover/rails", async (req, res) => {
   try {
-    res.json(await getDiscoverHome());
+    res.json(await getDiscoverHome(mediaUserContext(res)));
   } catch (e) {
     logRouteError("discover", req, e);
     // Никогда не валим виджет — отдаём пустую, но валидную форму.
@@ -733,7 +754,7 @@ apiRouter.get("/media/discover/genre/:kind/:genreId", async (req, res) => {
   const genreId = Number(req.params.genreId);
   if (!Number.isFinite(genreId) || genreId <= 0) return res.status(400).json({ error: "genreId required" });
   try {
-    const hidden = await hiddenMediaKeys();
+    const hidden = await hiddenMediaKeys(mediaUserContext(res).appUserId);
     const items = await tmdbDiscover(kind, {
       genreId,
       year: req.query.year ? String(req.query.year) : undefined,
@@ -824,7 +845,7 @@ apiRouter.get("/media/preferences", async (req, res) => {
     ? (req.query.status as MediaPreferenceStatus)
     : undefined;
   try {
-    res.json(await listMediaPreferences(status));
+    res.json(await listMediaPreferences(status, mediaUserContext(res).appUserId));
   } catch (e) {
     logRouteError("media", req, e, { status });
     res.status(502).json({ error: String(e) });
@@ -843,6 +864,7 @@ apiRouter.post("/media/preferences", async (req, res) => {
     const pref = await upsertMediaPreference({
       kind,
       tmdbId,
+      appUserId: mediaUserContext(res).appUserId,
       status: status as MediaPreferenceStatus,
       title,
       tvdbId: req.body?.tvdbId == null ? null : Number(req.body.tvdbId) || null,
@@ -864,7 +886,7 @@ apiRouter.delete("/media/preferences/:kind/:tmdbId", async (req, res) => {
   const tmdbId = Number(req.params.tmdbId);
   if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
   try {
-    await removeMediaPreference(kind, tmdbId);
+    await removeMediaPreference(kind, tmdbId, mediaUserContext(res).appUserId);
     res.json({ ok: true });
   } catch (e) {
     logRouteError("media", req, e, { kind, tmdbId });

@@ -154,6 +154,7 @@ model MediaReleaseDetailCache {
 // не Jellyfin favorites и не команды Radarr/Sonarr.
 model MediaPreference {
   id        String   @id @default(cuid())
+  appUserId String   @default("global")
   kind      String   // movie | series
   tmdbId    Int
   tvdbId    Int?
@@ -167,7 +168,8 @@ model MediaPreference {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([kind, tmdbId])
+  @@unique([appUserId, kind, tmdbId])
+  @@index([appUserId, status, updatedAt])
   @@index([status, updatedAt])
 }
 

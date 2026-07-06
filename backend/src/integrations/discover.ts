@@ -77,7 +77,7 @@ const filterItems = (
 };
 
 // Домашняя страница дискавери. Graceful: TMDB выключен → configured:false, пустые рейлы.
-export async function getDiscoverHome(): Promise<DiscoverHome> {
+export async function getDiscoverHome(ctx: MediaUserContext = {}): Promise<DiscoverHome> {
   if (!config.media.tmdb.configured) {
     return { configured: false, hero: null, genres: { movie: [], series: [] }, rails: [] };
   }
@@ -93,8 +93,8 @@ export async function getDiscoverHome(): Promise<DiscoverHome> {
     tmdbDiscover("series", { sort: "popularity.desc" }),
     tmdbGenres("movie"),
     tmdbGenres("series"),
-    watchlistItems(),
-    hiddenMediaKeys(),
+    watchlistItems(ctx.appUserId),
+    hiddenMediaKeys(ctx.appUserId),
     ...HOME_MOVIE_GENRES.map((g) => tmdbDiscover("movie", { genreId: g.id })),
   ]);
 
@@ -148,7 +148,7 @@ export async function getBecauseRails(ctx: MediaUserContext = {}): Promise<Disco
     getRecentlyWatchedSeeds(6, ctx),
     getLibrary(ctx),
   ]);
-  const hidden = await hiddenMediaKeys().catch(() => new Set<string>());
+  const hidden = await hiddenMediaKeys(ctx.appUserId).catch(() => new Set<string>());
   const seeds = settled(seedsR, []);
   const inLib = libraryTmdbIds(settled(libR, []));
   const used = new Set<string>();

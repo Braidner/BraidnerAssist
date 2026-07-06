@@ -17,6 +17,9 @@ import {
     type MoviePageDetail,
     type SeriesPageDetail,
     type TorrentRailItem,
+    type MediaHome,
+    type MediaPreference,
+    type MediaTitleStatus,
 } from "@/lib/api.ts";
 import {useToast} from "../../components/ui/Toast.tsx";
 import {Button} from "../../components/ui/button.tsx";
@@ -29,6 +32,7 @@ import {
     MediaRail,
 } from "./shared/mediaRails.tsx";
 import {TorrentRailCard} from "./shared/mediaShared.tsx";
+import { MediaStatusBadge, statusKey } from "./shared/mediaStatus.tsx";
 
 interface MediaLibraryTabProps {
     library: LibraryItem[];
@@ -36,14 +40,21 @@ interface MediaLibraryTabProps {
     libReady: boolean;
     torrentRail: TorrentRailItem[];
     pendingTitles: PendingMediaTitle[];
+    watchlist: MediaPreference[];
+    titleStatuses: MediaTitleStatus[];
+    mediaHome: MediaHome;
     resume: ResumeItem[];
     onPlayResume: (it: ResumeItem) => void;
+    listOnly?: boolean;
 }
 
 interface LibraryHeroProps {
     heroItem: LibraryItem | null;
+    heroLabel: string | null;
+    heroResume: ResumeItem | null;
     resume: ResumeItem[];
     openDetail: (it: LibraryItem, autoplay?: boolean) => void;
+    onPlayResume: (it: ResumeItem) => void;
     scan: () => void;
 }
 
@@ -66,8 +77,12 @@ export function MediaLibraryTab({
                                     libReady,
                                     torrentRail,
                                     pendingTitles,
+                                    watchlist,
+                                    titleStatuses,
+                                    mediaHome,
                                     resume,
                                     onPlayResume,
+                                    listOnly = false,
                                 }: MediaLibraryTabProps) {
     const nav = useNavigate();
     const location = useLocation();
@@ -109,13 +124,20 @@ export function MediaLibraryTab({
     const sortedLibrary = [...library].sort((a, b) => a.name.localeCompare(b.name, "ru"));
     const movieItems = sortedLibrary.filter((it) => it.type === "Movie");
     const seriesItems = sortedLibrary.filter((it) => it.type === "Series");
+    const statusesByKey = new Map(titleStatuses.map((s) => [`${s.kind}:${s.tmdbId}`, s]));
 
     // Pick hero once when library loads; re-pick if library changes significantly
     const heroRef = useRef<LibraryItem | null>(null);
     if (heroRef.current === null && sortedLibrary.length > 0) {
         heroRef.current = getRandomItem(sortedLibrary);
     }
-    const heroItem = heroRef.current;
+    const homeHero = mediaHome.hero;
+    const heroItem = (homeHero
+      ? sortedLibrary.find((it) => it.id === homeHero.jellyfinId || it.id === homeHero.seriesId || (homeHero.tmdbId && it.tmdbId === homeHero.tmdbId))
+      : null) ?? heroRef.current;
+    const heroResume = homeHero?.reason === "continue"
+      ? resume.find((it) => it.id === homeHero.itemId) ?? null
+      : null;
 
     const scan = async () => {
         await refreshJellyfin();
@@ -131,9 +153,40 @@ export function MediaLibraryTab({
 
             {libReady ? (
             <>
-            <LibraryHero heroItem={heroItem} resume={resume} openDetail={openDetail} scan={scan}/>
+            {!listOnly && (
+                <LibraryHero
+                    heroItem={heroItem}
+                    heroLabel={homeHero?.label ?? null}
+                    heroResume={heroResume}
+                    resume={resume}
+                    openDetail={openDetail}
+                    onPlayResume={onPlayResume}
+                    scan={scan}
+                />
+            )}
 
-            {torrentRail.length > 0 && (
+            {watchlist.length > 0 && (
+                <MediaRail title="МОЙ СПИСОК" countLabel={String(watchlist.length)} className={ms.section}>
+                    {watchlist.map((it) => {
+                        const key = statusKey(it.kind, it.tmdbId);
+                        const status = key ? statusesByKey.get(key) : null;
+                        const inLibrary = library.find((lib) => lib.tmdbId === it.tmdbId && (lib.type === "Series" ? "series" : "movie") === it.kind);
+                        return (
+                            <MediaPosterCard
+                                key={`${it.kind}:${it.tmdbId}`}
+                                title={it.title}
+                                subtitle={`${it.kind === "series" ? "сериал" : "фильм"}${it.year ? ` · ${it.year}` : ""}`}
+                                imageUrl={posterUrl(it.poster)}
+                                rating={it.rating}
+                                onClick={() => inLibrary ? openDetail(inLibrary) : nav(`/media/${it.kind}/${it.tmdbId}`, {state: returnState()})}
+                                overlay={<MediaStatusBadge status={status} className="absolute bottom-2 left-2 right-2 justify-center" />}
+                            />
+                        );
+                    })}
+                </MediaRail>
+            )}
+
+            {!listOnly && torrentRail.length > 0 && (
                 <MediaRail title="СКАЧИВАЕТСЯ / СКОРО В БИБЛИОТЕКЕ" countLabel={String(torrentRail.length)} className={ms.section}>
                     {torrentRail.map((it) => (
                         <TorrentRailCard key={it.infohash} item={it} onOpen={() => void openTorrentTitle(it)} />
@@ -141,7 +194,7 @@ export function MediaLibraryTab({
                 </MediaRail>
             )}
 
-            {pendingTitles.length > 0 && (
+            {!listOnly && pendingTitles.length > 0 && (
                 <MediaRail title="ДОБАВЛЕНО / ЖДЁТ РЕЛИЗА" countLabel={String(pendingTitles.length)} className={ms.section}>
                     {pendingTitles.map((it) => (
                         <MediaPosterCard
@@ -155,7 +208,7 @@ export function MediaLibraryTab({
                 </MediaRail>
             )}
 
-            {resume.length > 0 && (
+            {!listOnly && resume.length > 0 && (
                 <MediaRail title="ПРОДОЛЖИТЬ ПРОСМОТР" countLabel={String(resume.length)} className={ms.section}>
                     {resume.map((it) => (
                         <ContinueWatchingCard
@@ -168,11 +221,11 @@ export function MediaLibraryTab({
                 </MediaRail>
             )}
 
-            {library.length === 0 ? (
+            {!listOnly && library.length === 0 ? (
                 <div className={ms.railHeaderInset} style={{paddingTop: 24, paddingBottom: 24, color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
                     Библиотека пуста или ещё не отсканирована.
                 </div>
-            ) : (
+            ) : !listOnly ? (
                 <>
                     {movieItems.length > 0 && (
                         <MediaRail title="ФИЛЬМЫ" count={movieItems.length} className={ms.section}>
@@ -205,14 +258,18 @@ export function MediaLibraryTab({
                         </MediaRail>
                     )}
                 </>
-            )}
+            ) : watchlist.length === 0 ? (
+                <div className={ms.railHeaderInset} style={{paddingTop: 24, paddingBottom: 24, color: "var(--muted)", fontFamily: "var(--mono)", fontSize: 12}}>
+                    Мой список пуст.
+                </div>
+            ) : null}
             </>
             ) : null}
         </div>
     );
 }
 
-function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
+function LibraryHero({heroItem, heroLabel, heroResume, resume, openDetail, onPlayResume, scan}: LibraryHeroProps) {
     const [heroDetail, setHeroDetail] = useState<HeroDetail>(null);
 
     useEffect(() => {
@@ -232,8 +289,12 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
     if (!heroItem) return null;
 
     // Cross-reference with resume list
-    const resumeItem = resume.find((r) => r.id === heroItem.id);
+    const resumeItem = heroResume ?? resume.find((r) => r.id === heroItem.id);
     const isResuming = !!resumeItem;
+    const playHero = () => {
+        if (resumeItem) onPlayResume(resumeItem);
+        else openDetail(heroItem, true);
+    };
 
     const overview = heroDetail?.overview ?? null;
     const genres = heroDetail?.genres ?? [];
@@ -243,7 +304,7 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
     return (
         <MediaHero
             title={heroItem.name}
-            eyebrow={isResuming ? "ПРОДОЛЖИТЬ ПРОСМОТР" : "В БИБЛИОТЕКЕ"}
+            eyebrow={heroLabel?.toUpperCase() ?? (isResuming ? "ПРОДОЛЖИТЬ ПРОСМОТР" : "В БИБЛИОТЕКЕ")}
             backgroundSrc={jellyfinBackdropUrl(heroItem.id)}
             overview={overview}
             metaItems={[
@@ -266,7 +327,7 @@ function LibraryHero({heroItem, resume, openDetail, scan}: LibraryHeroProps) {
                 <>
                     <Button
                         className={ms.playButton}
-                        onClick={(e) => { e.stopPropagation(); openDetail(heroItem, true); }}
+                        onClick={(e) => { e.stopPropagation(); playHero(); }}
                     >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <polygon points="6,3 21,12 6,21"/>

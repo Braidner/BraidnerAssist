@@ -194,6 +194,7 @@ export function MediaPosterCard({
   onClick,
   onHide,
   onWatchlist,
+  overlay,
 }: {
   title: string;
   subtitle: string;
@@ -204,6 +205,7 @@ export function MediaPosterCard({
   onClick: () => void;
   onHide?: () => void;
   onWatchlist?: () => void;
+  overlay?: ReactNode;
 }) {
   const hasActions = Boolean(onHide || onWatchlist);
   const [imageLoading, setImageLoading] = useState(Boolean(imageUrl));
@@ -278,6 +280,7 @@ export function MediaPosterCard({
             {rating.toFixed(1)}
           </div>
         ) : null}
+        {overlay}
       </div>
       <div className={ms.posterInfo}>
         <div className={ms.posterTitle}>{title}</div>

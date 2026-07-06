@@ -937,6 +937,7 @@ export type MediaPreferenceStatus = "watchlist" | "hidden" | "liked" | "disliked
 
 export interface MediaPreference {
   id: string;
+  appUserId: string;
   kind: "movie" | "series";
   tmdbId: number;
   tvdbId: number | null;
@@ -949,6 +950,34 @@ export interface MediaPreference {
   rating: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MediaTitleStatus {
+  kind: "movie" | "series";
+  tmdbId: number;
+  title: string;
+  status: "watchlist" | "registered" | "release_selected" | "downloading" | "awaiting_jellyfin" | "in_library" | "watched";
+  label: string;
+  progress: number | null;
+  jellyfinId: string | null;
+  updatedAt: string | null;
+}
+
+export interface MediaHomeHero {
+  reason: "continue" | "new" | "watchlist" | "high_rated" | "fallback";
+  label: string;
+  kind: "movie" | "series" | "episode";
+  itemId: string;
+  jellyfinId: string | null;
+  seriesId: string | null;
+  tmdbId: number | null;
+  title: string;
+  year: number | null;
+  progress: number | null;
+}
+
+export interface MediaHome {
+  hero: MediaHomeHero | null;
 }
 
 export interface Genre {
@@ -1161,6 +1190,16 @@ export async function deleteMediaPreference(kind: "movie" | "series", tmdbId: nu
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+export async function getMediaTitleStatuses(): Promise<MediaTitleStatus[]> {
+  try {
+    const res = await apiFetch("/api/media/statuses");
+    if (!res.ok) return [];
+    return (await res.json()) as MediaTitleStatus[];
+  } catch {
+    return [];
   }
 }
 
@@ -1473,6 +1512,16 @@ export async function getContinueWatching(): Promise<ResumeItem[]> {
   }
 }
 
+export async function getMediaHome(): Promise<MediaHome> {
+  try {
+    const res = await apiFetch("/api/media/home");
+    if (!res.ok) return { hero: null };
+    return (await res.json()) as MediaHome;
+  } catch {
+    return { hero: null };
+  }
+}
+
 export interface UnifiedSearchResult {
   inLibrary: LibraryItem[];
   discover: MediaLookupItem[];
@@ -1546,6 +1595,17 @@ export interface ReleaseOption {
       comments?: number | null;
     };
   } | null;
+  match?: {
+    targetYear: number | null;
+    allowedYears: number[];
+    declaredYears: number[];
+    yearStatus: "match" | "mismatch" | "unknown" | "not_applicable";
+    seasonStatus: "match" | "mismatch" | "unknown" | "not_applicable";
+    confidence: "high" | "medium" | "low";
+    block: boolean;
+    reasons: string[];
+    warnings: string[];
+  };
   protocol?: string;
   rejected?: boolean;
   rejections?: string[];
@@ -1563,6 +1623,10 @@ export interface ReleaseOption {
     releaseGroup?: string | null;
     studioHint?: string | null;
     hdr?: string | null;
+    season?: number | null;
+    episodes?: number[];
+    episodeRange?: { from: number; to: number } | null;
+    declaredYears?: number[];
   };
 }
 

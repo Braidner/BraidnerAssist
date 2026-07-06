@@ -149,6 +149,7 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     **Discovery preferences survive cleanup**: `MediaPreference` remains the source of truth for
     `watchlist|hidden|liked|disliked`; endpoints `GET/POST/DELETE /api/media/preferences` stay
     active, Discovery rails filter hidden/disliked, and Cmd-K "Мой список" reads watchlist.
+    Batch v10 makes preferences user-aware via `appUserId` with `global` fallback.
     **Active media REST**: `GET /api/media` (qB downloads), `GET /api/media/library`,
     `GET /api/media/torrent-rail`, `GET /api/media/search` (Jackett fallback),
     `GET /api/media/lookup`, `POST /api/media/add` (lookup/registry compatibility),
@@ -212,7 +213,9 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     provider-id папку внутри `/data/movies` или `/data/tv` (qB namespace), затем пишет
     `MediaTitle`/`MediaTorrent`. Фронт:
     `ReleasePicker` доступен на детальной странице сериала на каждый сезон, на странице фильма
-    и в дравере добавления.
+    и в дравере добавления. Batch v10 показывает год/сезон/качество/озвучку/seed chips,
+    кнопку «Скачать лучший» и блокирует grab, если явный год или сезон релиза не совпадает
+    с выбранным TMDB-title/season; для сериалов учитываются год старта и годы эпизодов сезона.
     **Загрузки (ручной fallback)**: `POST /media/torrent` (magnet или .torrent URL → qBittorrent),
     `POST /media/torrent/:hash/:action` (pause|resume|delete), `GET /media/search` (Jackett),
     `POST /media/scan` (`/Library/Refresh`).
@@ -224,7 +227,9 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     скачиваются или уже скачались, но пока не связались с Jellyfin item. Этот library rail исчезает
     после `jellyfinId` link. `GET /media/torrents/:kind/:tmdbId` показывает все раздачи конкретного
     TMDB-title на detail-странице, включая уже связанный с Jellyfin контент. `MediaSystemTab`
-    больше не показывает Native pipeline/Repair Center.
+    больше не показывает Native pipeline/Repair Center. Batch v10 добавляет `/api/media/home`
+    для smart hero, `/api/media/statuses` для pipeline status и группирует очередь по
+    пользовательским состояниям.
     Env: `JELLYFIN_*`/`QBITTORRENT_*`/`JACKETT_*`/`TORRSERVER_*`/`TMDB_API_KEY`/`MEDIA_ROOT`/
     `QBITTORRENT_SAVE_ROOT`/`MEDIA_TV`/`MEDIA_MOVIES`.
     MCP: `search_releases`/`grab_release`, `list_jackett_indexers`, `test_jackett_search`,
@@ -381,6 +386,9 @@ Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
   `/data/poster-cache` + `/api/poster-cache/status|DELETE`, Workbox `CacheFirst` для
   `/api/poster`, TMDB poster default `w342` (backend fallback для старых URL), virtualized
   `MediaRail` и iPhone standalone safe-area/edge-to-edge polish. ✅ ГОТОВО
+- **Batch v10 — Media UX vNext** (2026-07-06): smart Library hero, `/media/list`,
+  user-aware preferences with global fallback, `/api/media/statuses`, grouped System queue,
+  and ReleasePicker safety chips for year/season/quality/voice/seed. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); будущий этап удаления Jellyfin
   (свой transcoding/watch-state) — отдельная большая тема.
 

@@ -10,6 +10,7 @@ import {
   type DownloadItem,
   type MediaUserContext,
   type MoviePageDetail,
+  type ReleaseMatch,
   type SearchResult,
   type SeriesPageDetail,
   type SeriesTitleIdType,
@@ -23,6 +24,8 @@ import {
   tmdbTvToTvdb,
   type TmdbItem,
 } from "./tmdb.js";
+import { parseReleaseTitle } from "./releaseParse.js";
+import { listMediaPreferences } from "./mediaPreferences.js";
 
 type MediaKind = "movie" | "series";
 
@@ -73,6 +76,17 @@ export interface PendingMediaTitle {
   backdrop: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MediaTitleStatus {
+  kind: MediaKind;
+  tmdbId: number;
+  title: string;
+  status: "watchlist" | "registered" | "release_selected" | "downloading" | "awaiting_jellyfin" | "in_library" | "watched";
+  label: string;
+  progress: number | null;
+  jellyfinId: string | null;
+  updatedAt: Date | string | null;
 }
 
 const RELEASE_CACHE_TTL = 10 * 60_000;
@@ -169,13 +183,92 @@ function releaseYear(item: SearchResult): number | null {
   const text = [
     item.details?.title,
     item.title,
-    item.description,
-    item.query,
   ].filter(Boolean).join(" ");
-  const matches = [...text.matchAll(/\b(19\d{2}|20\d{2})\b/g)]
-    .map((match) => Number(match[1]))
-    .filter((year) => Number.isFinite(year));
-  return matches[0] ?? null;
+  return parseReleaseTitle(text).declaredYears[0] ?? null;
+}
+
+async function allowedReleaseYears(kind: MediaKind, title: { year: number | null; tmdbId: number }, seasonNumber?: number): Promise<number[]> {
+  const years = new Set<number>();
+  if (title.year) years.add(title.year);
+  if (kind === "series" && seasonNumber != null) {
+    const episodes = await tmdbSeason(title.tmdbId, seasonNumber).catch(() => []);
+    for (const episode of episodes) {
+      const year = episode.airDate?.slice(0, 4);
+      const n = year ? Number(year) : NaN;
+      if (Number.isFinite(n)) years.add(n);
+    }
+  }
+  return [...years].sort((a, b) => a - b);
+}
+
+function releaseTextForMatch(item: SearchResult): string {
+  return [item.details?.title, item.title].filter(Boolean).join(" ");
+}
+
+export function buildReleaseMatch(input: {
+  kind: MediaKind;
+  title: { year: number | null };
+  item: SearchResult;
+  seasonNumber?: number;
+  allowedYears: number[];
+}): ReleaseMatch {
+  const parsed = parseReleaseTitle(releaseTextForMatch(input.item));
+  const declaredYears = parsed.declaredYears;
+  const targetYear = input.title.year;
+  const yearStatus: ReleaseMatch["yearStatus"] = input.allowedYears.length === 0
+    ? "unknown"
+    : declaredYears.length === 0
+      ? "unknown"
+      : declaredYears.some((year) => input.allowedYears.includes(year))
+        ? "match"
+        : "mismatch";
+  const seasonStatus: ReleaseMatch["seasonStatus"] = input.kind !== "series" || input.seasonNumber == null
+    ? "not_applicable"
+    : parsed.season == null
+      ? "unknown"
+      : parsed.season === input.seasonNumber
+        ? "match"
+        : "mismatch";
+  const warnings = [
+    ...(yearStatus === "mismatch" ? [`год не совпадает: ${declaredYears.join(", ")} ≠ ${input.allowedYears.join("/")}`] : []),
+    ...(seasonStatus === "mismatch" ? [`не тот сезон: S${String(parsed.season).padStart(2, "0")}`] : []),
+  ];
+  const reasons = [
+    ...(yearStatus === "match" ? [`год ${declaredYears.find((year) => input.allowedYears.includes(year))}`] : []),
+    ...(seasonStatus === "match" ? [`S${String(input.seasonNumber).padStart(2, "0")}`] : []),
+  ];
+  const block = yearStatus === "mismatch" || seasonStatus === "mismatch";
+  const confidence: ReleaseMatch["confidence"] = block
+    ? "low"
+    : yearStatus === "match" && (seasonStatus === "match" || seasonStatus === "not_applicable")
+      ? "high"
+      : "medium";
+  return {
+    targetYear,
+    allowedYears: input.allowedYears,
+    declaredYears,
+    yearStatus,
+    seasonStatus,
+    confidence,
+    block,
+    reasons,
+    warnings,
+  };
+}
+
+export function applyReleaseMatch(item: SearchResult, match: ReleaseMatch): SearchResult {
+  const scoreDelta =
+    (match.yearStatus === "match" ? 18 : match.yearStatus === "mismatch" ? -180 : 0) +
+    (match.seasonStatus === "match" ? 16 : match.seasonStatus === "mismatch" ? -120 : 0);
+  return {
+    ...item,
+    match,
+    score: (item.score ?? 0) + scoreDelta,
+    scoreReasons: [...(item.scoreReasons ?? []), ...match.reasons],
+    warnings: [...(item.warnings ?? []), ...match.warnings],
+    rejected: Boolean((item as any).rejected) || match.block,
+    rejections: [...((item as any).rejections ?? []), ...match.warnings],
+  } as SearchResult;
 }
 
 export function assertMovieReleaseMatchesTitle(
@@ -187,6 +280,15 @@ export function assertMovieReleaseMatchesTitle(
   const year = releaseYear(item);
   if (!year || year === title.year) return;
   throw new Error(`Релиз похож на ${year}, а выбранный фильм — ${title.year}. Обнови поиск на странице нужного фильма.`);
+}
+
+export function assertReleaseMatchAllowsGrab(item: SearchResult): void {
+  if (item.match?.yearStatus === "mismatch") {
+    throw new Error(`Релиз похож на ${item.match.declaredYears.join(", ")}, а выбранный тайтл — ${item.match.allowedYears.join("/")}. Обнови поиск на странице нужного тайтла.`);
+  }
+  if (item.match?.seasonStatus === "mismatch") {
+    throw new Error("Релиз относится к другому сезону. Обнови поиск на странице нужного сезона.");
+  }
 }
 
 async function resolveTmdbId(kind: MediaKind, id: number): Promise<{ tmdbId: number; tvdbId: number | null }> {
@@ -272,7 +374,20 @@ export async function nativeReleaseSearch(
   const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
   const queries = releaseQueries(detail, title.title, kind === "series" ? seasonNumber : undefined, opts.query);
   const releases = await jackettSearchMany(queries, { kind, sortBy: "seeders", limit: opts.limit });
-  for (const release of releases) {
+  const allowedYears = await allowedReleaseYears(kind, title, kind === "series" ? seasonNumber : undefined);
+  const annotated = releases
+    .map((release) => applyReleaseMatch(
+      release,
+      buildReleaseMatch({
+        kind,
+        title,
+        item: release,
+        seasonNumber: kind === "series" ? seasonNumber : undefined,
+        allowedYears,
+      }),
+    ))
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0));
+  for (const release of annotated) {
     const item = {
       ...release,
       type: kind,
@@ -283,7 +398,7 @@ export async function nativeReleaseSearch(
     };
     cacheReleaseForTitle(item);
   }
-  return releases;
+  return annotated;
 }
 
 export async function nativeGrabRelease(
@@ -302,6 +417,7 @@ export async function nativeGrabRelease(
     throw new Error("Release belongs to another season; refresh release search and try again");
   }
   assertMovieReleaseMatchesTitle(kind, title, item);
+  assertReleaseMatchAllowsGrab(item);
   const source = String(item.url);
   const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
   const savePath = titleSavePath(kind, title, detail);
@@ -437,6 +553,73 @@ export async function getPendingMediaTitles(): Promise<PendingMediaTitle[]> {
     createdAt: title.createdAt.toISOString(),
     updatedAt: title.updatedAt.toISOString(),
   }));
+}
+
+function statusFromTitle(input: {
+  kind: MediaKind;
+  tmdbId: number;
+  title: string;
+  jellyfinId: string | null;
+  torrents: { progress: number; updatedAt: Date; state: string | null }[];
+  updatedAt: Date;
+}): MediaTitleStatus {
+  const newestTorrent = [...input.torrents].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
+  const progress = newestTorrent ? Math.round(newestTorrent.progress * 100) : null;
+  if (input.jellyfinId) {
+    return { ...input, status: "in_library", label: "В библиотеке", progress: 100, updatedAt: input.updatedAt };
+  }
+  if (!newestTorrent) {
+    return { ...input, status: "registered", label: "Ждет релиза", progress: null, updatedAt: input.updatedAt };
+  }
+  if (progress != null && progress >= 100) {
+    return { ...input, status: "awaiting_jellyfin", label: "Ждет Jellyfin", progress: 100, updatedAt: newestTorrent.updatedAt };
+  }
+  if (progress != null && progress > 0) {
+    return { ...input, status: "downloading", label: `Качается ${progress}%`, progress, updatedAt: newestTorrent.updatedAt };
+  }
+  return { ...input, status: "release_selected", label: "Релиз выбран", progress, updatedAt: newestTorrent.updatedAt };
+}
+
+export async function getMediaTitleStatuses(ctx: MediaUserContext = {}): Promise<MediaTitleStatus[]> {
+  await linkMediaTitlesToJellyfin().catch(() => {});
+  const [titles, prefs] = await Promise.all([
+    prisma.mediaTitle.findMany({
+      include: {
+        torrents: {
+          select: { progress: true, updatedAt: true, state: true },
+          orderBy: { updatedAt: "desc" },
+        },
+      },
+    }),
+    listMediaPreferences(undefined, ctx.appUserId),
+  ]);
+  const byKey = new Map<string, MediaTitleStatus>();
+  for (const title of titles) {
+    const kind = title.kind === "series" ? "series" : "movie";
+    byKey.set(`${kind}:${title.tmdbId}`, statusFromTitle({
+      kind,
+      tmdbId: title.tmdbId,
+      title: title.title,
+      jellyfinId: title.jellyfinId,
+      torrents: title.torrents,
+      updatedAt: title.updatedAt,
+    }));
+  }
+  for (const pref of prefs.filter((item) => item.status === "watchlist")) {
+    const key = `${pref.kind}:${pref.tmdbId}`;
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      kind: pref.kind,
+      tmdbId: pref.tmdbId,
+      title: pref.title,
+      status: "watchlist",
+      label: "В списке",
+      progress: null,
+      jellyfinId: null,
+      updatedAt: pref.updatedAt,
+    });
+  }
+  return [...byKey.values()].sort((a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime());
 }
 
 export async function getTitleTorrents(kind: MediaKind, tmdbId: number): Promise<TorrentRailItem[]> {

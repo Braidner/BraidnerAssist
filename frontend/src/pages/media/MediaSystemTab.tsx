@@ -51,11 +51,11 @@ function DownloadCard({
     download.seeds != null ? `${download.seeds} seed` : "",
     fmtSize(download.size),
   ].filter(Boolean).join(" · ");
-  const badge = paused ? "pause" : `${download.progress}%`;
   const actionBusy = (action: string) => busy === download.hash + action;
   const artworkSrc = posterUrl(download.mediaPoster);
   const title = download.mediaTitle ?? download.title;
   const releaseTitle = download.mediaTitle ? download.title : null;
+  const userStatus = userQueueStatus(download);
 
   return (
     <article className="group relative flex min-h-[230px] flex-col overflow-hidden rounded-[14px] border border-white/[0.07] bg-white/[0.03] transition-colors hover:border-white/[0.13] hover:bg-white/[0.045]">
@@ -83,7 +83,7 @@ function DownloadCard({
           </span>
         </div>
         <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 font-mono text-2xs font-semibold text-white backdrop-blur-md">
-          {badge}
+          {userStatus}
         </span>
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/45">
           <div
@@ -171,6 +171,35 @@ interface MediaSystemTabProps {
   onTorrent: (hash: string, action: "pause" | "resume" | "delete") => void;
   onSetAddOpen: (v: boolean) => void;
   onRemoveStream: (hash: string) => void;
+  onScanLibrary: () => void | Promise<void>;
+}
+
+type QueueGroupKey = "active" | "ready" | "paused" | "problem" | "seeding";
+
+const GROUP_LABEL: Record<QueueGroupKey, string> = {
+  active: "Активные",
+  ready: "Готово / ждет Jellyfin",
+  paused: "На паузе",
+  problem: "Проблемные",
+  seeding: "Сидируется",
+};
+
+function queueGroup(download: DownloadItem): QueueGroupKey {
+  const state = download.state.toLowerCase();
+  if (/paused|stopped/i.test(download.state)) return "paused";
+  if (/error|missing|stalled/i.test(download.state) || (download.seeds ?? 0) <= 0 && download.progress < 100) return "problem";
+  if (download.progress >= 100 && /up|seeding|queuedup/i.test(state)) return "seeding";
+  if (download.progress >= 100) return "ready";
+  return "active";
+}
+
+function userQueueStatus(download: DownloadItem): string {
+  const group = queueGroup(download);
+  if (group === "active") return `Качается ${download.progress}%`;
+  if (group === "ready") return "Готово";
+  if (group === "paused") return "На паузе";
+  if (group === "problem") return download.progress >= 100 ? "Нет сидов" : "Проблема";
+  return "Сидируется";
 }
 
 export function MediaSystemTab({
@@ -184,16 +213,32 @@ export function MediaSystemTab({
   onTorrent,
   onSetAddOpen,
   onRemoveStream,
+  onScanLibrary,
 }: MediaSystemTabProps) {
   const toast = useToast();
-  const stableDownloads = useMemo(
-    () => [...media.downloads].sort((a, b) => {
-      const byTitle = a.title.localeCompare(b.title, "ru");
-      if (byTitle !== 0) return byTitle;
-      return a.hash.localeCompare(b.hash);
-    }),
+  const groupedDownloads = useMemo(
+    () => {
+      const groups = new Map<QueueGroupKey, DownloadItem[]>();
+      for (const download of media.downloads) {
+        const group = queueGroup(download);
+        groups.set(group, [...(groups.get(group) ?? []), download]);
+      }
+      for (const [group, items] of groups) {
+        groups.set(group, items.sort((a, b) => b.progress - a.progress || a.title.localeCompare(b.title, "ru")));
+      }
+      return (["active", "ready", "paused", "problem", "seeding"] as QueueGroupKey[])
+        .map((key) => ({ key, items: groups.get(key) ?? [] }))
+        .filter((group) => group.items.length > 0);
+    },
     [media.downloads],
   );
+  const active = media.downloads.filter((d) => queueGroup(d) === "active");
+  const paused = media.downloads.filter((d) => queueGroup(d) === "paused");
+  const ready = media.downloads.filter((d) => queueGroup(d) === "ready" || queueGroup(d) === "seeding");
+  const bulk = (items: DownloadItem[], action: "pause" | "resume" | "delete") => {
+    for (const item of items) onTorrent(item.hash, action);
+  };
+  const bulkButton = cn(ms.button.sm, "border border-white/10 bg-white/[0.045] text-ink-soft hover:bg-white/[0.075] disabled:opacity-40");
 
   const playStream = (s: TorrServerStream) => {
     if (!s.file) {
@@ -310,6 +355,20 @@ export function MediaSystemTab({
           </div>
         ) : (
           <div className="mt-3 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2 px-0.5 pb-1">
+              <button className={bulkButton} disabled={ready.length === 0} onClick={() => onScanLibrary()}>
+                Пересканировать готовые
+              </button>
+              <button className={bulkButton} disabled={ready.length === 0} onClick={() => bulk(ready, "delete")}>
+                Очистить готовые
+              </button>
+              <button className={bulkButton} disabled={active.length === 0} onClick={() => bulk(active, "pause")}>
+                Пауза активные
+              </button>
+              <button className={bulkButton} disabled={paused.length === 0} onClick={() => bulk(paused, "resume")}>
+                Возобновить паузу
+              </button>
+            </div>
             {(() => {
               const totalSpeed = media.downloads.reduce(
                 (s, d) => s + (d.dlspeed ?? 0),
@@ -330,16 +389,24 @@ export function MediaSystemTab({
                 </div>
               );
             })()}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-              {stableDownloads.map((download) => (
-                <DownloadCard
-                  key={download.hash}
-                  download={download}
-                  busy={busy}
-                  onTorrent={onTorrent}
-                />
-              ))}
-            </div>
+            {groupedDownloads.map((group) => (
+              <section key={group.key} className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 font-mono text-pill uppercase tracking-[0.12em] text-muted">
+                  <span>{GROUP_LABEL[group.key]}</span>
+                  <span className={ms.panelCount}>{group.items.length}</span>
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+                  {group.items.map((download) => (
+                    <DownloadCard
+                      key={download.hash}
+                      download={download}
+                      busy={busy}
+                      onTorrent={onTorrent}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </Card>

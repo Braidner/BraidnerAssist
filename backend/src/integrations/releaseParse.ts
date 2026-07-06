@@ -11,6 +11,8 @@ export interface ParsedRelease {
   hdr: string | null;
   season: number | null;
   episodes: number[];
+  episodeRange: { from: number; to: number } | null;
+  declaredYears: number[];
   bannedHits: string[];
 }
 
@@ -73,7 +75,18 @@ export function parseReleaseTitle(title: string, bannedWords: string[] = []): Pa
 
   const seasonMatch = raw.match(/\bS(\d{1,2})(?:[ ._-]?E(\d{1,3}))?/i) ?? raw.match(/\bseason[ ._-]?(\d{1,2})\b/i);
   const season = seasonMatch ? Number(seasonMatch[1]) : null;
-  const episodes = seasonMatch?.[2] ? [Number(seasonMatch[2])] : [];
+  const rangeMatch = raw.match(/\bS\d{1,2}[ ._-]?E(\d{1,3})[ ._-]?(?:-|–|to|по)[ ._-]?E?(\d{1,3})\b/i);
+  const episodeRange = rangeMatch
+    ? { from: Number(rangeMatch[1]), to: Number(rangeMatch[2]) }
+    : null;
+  const episodes = episodeRange
+    ? Array.from({ length: Math.max(0, episodeRange.to - episodeRange.from + 1) }, (_, i) => episodeRange.from + i)
+    : seasonMatch?.[2] ? [Number(seasonMatch[2])] : [];
+  const declaredYears = uniq(
+    [...raw.matchAll(/\b(19\d{2}|20\d{2})\b/g)]
+      .map((match) => Number(match[1]))
+      .filter((year) => Number.isFinite(year)),
+  );
 
   const groupMatch = raw.match(/(?:\s[-–]\s*|\[)([A-Za-z0-9][A-Za-z0-9._-]{1,24})\]?\s*$/);
   const group = groupMatch?.[1] ?? null;
@@ -81,5 +94,5 @@ export function parseReleaseTitle(title: string, bannedWords: string[] = []): Pa
   const studioHint = studioMatch?.[0] ?? null;
   const bannedHits = bannedWords.filter((w) => w && lower.includes(w.toLowerCase()));
 
-  return { resolution, codec, source, group, releaseGroup: group, studioHint, languages, voice, voiceLabel, hdr, season, episodes, bannedHits };
+  return { resolution, codec, source, group, releaseGroup: group, studioHint, languages, voice, voiceLabel, hdr, season, episodes, episodeRange, declaredYears, bannedHits };
 }

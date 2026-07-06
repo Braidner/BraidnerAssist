@@ -1,0 +1,12 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+ENV CI=1
+
+COPY package.json package-lock.json ./
+RUN npm ci \
+    && npx playwright install --with-deps chromium
+
+COPY . .
+
+CMD ["npm", "run", "test:e2e"]

@@ -25,6 +25,10 @@ import {
   torrserverRemove,
   torrserverStreamUrl,
   getContinueWatching,
+  getMediaHome,
+  getMediaPreferences,
+  getMediaTitleStatuses,
+  refreshJellyfin,
   type MediaData,
   type DownloadItem,
   type TorrentRailItem,
@@ -37,6 +41,9 @@ import {
   type TmdbItem,
   type DiscoverHome,
   type DiscoverRail,
+  type MediaHome,
+  type MediaPreference,
+  type MediaTitleStatus,
 } from "@/lib/api.ts";
 import {
   ReleasePicker,
@@ -414,10 +421,11 @@ function AddTorrentDrawer({
   );
 }
 
-type MediaTab = "library" | "discover" | "system";
-const TAB_KEYS: MediaTab[] = ["library", "discover", "system"];
+type MediaTab = "library" | "list" | "discover" | "system";
+const TAB_KEYS: MediaTab[] = ["library", "list", "discover", "system"];
 const TAB_ROUTES: Record<MediaTab, string> = {
   library: "/media",
+  list: "/media/list",
   discover: "/media/discover",
   system: "/media/system",
 };
@@ -452,8 +460,8 @@ export function MediaPage({
 
   const visibleTabs = allowSystem ? TAB_KEYS : TAB_KEYS.filter((key) => key !== "system");
   const visibleLabels = allowSystem
-    ? ["Библиотека", "Дискавери", "Система"]
-    : ["Библиотека", "Дискавери"];
+    ? ["Библиотека", "Мой список", "Дискавери", "Система"]
+    : ["Библиотека", "Мой список", "Дискавери"];
 
   useRegisterTabs(
     visibleLabels,
@@ -465,6 +473,9 @@ export function MediaPage({
   const [library, setLibrary] = useState<LibraryItem[]>([]);
   const [torrentRail, setTorrentRail] = useState<TorrentRailItem[]>([]);
   const [pendingTitles, setPendingTitles] = useState<PendingMediaTitle[]>([]);
+  const [watchlist, setWatchlist] = useState<MediaPreference[]>([]);
+  const [titleStatuses, setTitleStatuses] = useState<MediaTitleStatus[]>([]);
+  const [mediaHome, setMediaHome] = useState<MediaHome>({ hero: null });
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [player, setPlayer] = useState<{
@@ -489,10 +500,13 @@ export function MediaPage({
     if (!media.configured) return;
     let alive = true;
     const load = () =>
-      Promise.all([getTorrentRail(), getPendingMediaTitles()]).then(([items, pending]) => {
+      Promise.all([getTorrentRail(), getPendingMediaTitles(), getMediaTitleStatuses(), getMediaHome(), getMediaPreferences("watchlist")]).then(([items, pending, statuses, home, prefs]) => {
         if (!alive) return;
         setTorrentRail(items);
         setPendingTitles(pending);
+        setTitleStatuses(statuses);
+        setMediaHome(home);
+        setWatchlist(prefs);
       });
     load();
     const timer = window.setInterval(load, 15_000);
@@ -694,6 +708,8 @@ export function MediaPage({
       status === "hidden" ? "скрыт из рекомендаций" :
       status === "liked" ? "отмечен как понравившийся" : "больше не будет рекомендоваться";
     toast.success(`«${it.title}» ${label}`);
+    getMediaPreferences("watchlist").then(setWatchlist);
+    getMediaTitleStatuses().then(setTitleStatuses);
     refreshDiscover();
   };
 
@@ -711,6 +727,14 @@ export function MediaPage({
     }
     if (ok && action === "delete") toast.success("Раздача удалена");
     onMediaUpdate();
+  };
+
+  const onScanLibrary = async () => {
+    const ok = await refreshJellyfin();
+    if (ok) {
+      toast.success("Скан Jellyfin запущен");
+      onMediaUpdate();
+    } else toast.error("Не удалось запустить скан Jellyfin");
   };
 
   const openDiscover = (it: MediaLookupItem) =>
@@ -771,8 +795,27 @@ export function MediaPage({
           libReady={libReady}
           torrentRail={torrentRail}
           pendingTitles={pendingTitles}
+          watchlist={watchlist}
+          titleStatuses={titleStatuses}
+          mediaHome={mediaHome}
           resume={resume}
           onPlayResume={playResume}
+        />
+      )}
+
+      {tab === "list" && (
+        <MediaLibraryTab
+          library={library}
+          setLibrary={setLibrary}
+          libReady={libReady}
+          torrentRail={[]}
+          pendingTitles={[]}
+          watchlist={watchlist}
+          titleStatuses={titleStatuses}
+          mediaHome={mediaHome}
+          resume={[]}
+          onPlayResume={playResume}
+          listOnly
         />
       )}
 
@@ -809,6 +852,7 @@ export function MediaPage({
         onTorrent={onTorrent}
           onSetAddOpen={setAddOpen}
           onRemoveStream={removeStream}
+          onScanLibrary={onScanLibrary}
         />
       )}
     </div>

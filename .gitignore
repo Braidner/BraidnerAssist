@@ -32,6 +32,8 @@ backend/prisma/*.db
 # Logs
 *.log
 npm-debug.log*
+frontend/playwright-report/
+frontend/test-results/
 
 # Editor / OS
 .DS_Store

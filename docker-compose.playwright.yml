@@ -1,0 +1,16 @@
+services:
+  playwright:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.playwright
+    environment:
+      CI: "1"
+      PLAYWRIGHT_HOST: 0.0.0.0
+      PLAYWRIGHT_PORT: 4173
+    volumes:
+      - ./frontend/e2e:/app/e2e
+      - ./frontend/playwright-report:/app/playwright-report
+      - ./frontend/test-results:/app/test-results
+    extra_hosts:
+      - "hermes.lan:host-gateway"
+      - "host.docker.internal:host-gateway"

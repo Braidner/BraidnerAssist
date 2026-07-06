@@ -6,7 +6,7 @@ import { MediaMoviePage } from "./MediaMoviePage.tsx";
 import { MediaGenrePage } from "./MediaGenrePage.tsx";
 import { getMedia, type MediaData } from "../../lib/api.ts";
 
-type MediaTab = "library" | "discover" | "system";
+type MediaTab = "library" | "list" | "discover" | "system";
 
 const DEFAULT_MEDIA: MediaData = {
   configured: false,
@@ -18,6 +18,7 @@ const DEFAULT_MEDIA: MediaData = {
 
 const tabForPath = (pathname: string): MediaTab | null => {
   if (pathname === "/media" || pathname === "/media/") return "library";
+  if (pathname === "/media/list") return "list";
   if (pathname === "/media/discover") return "discover";
   if (pathname === "/media/system") return "system";
   return null;

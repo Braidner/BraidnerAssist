@@ -422,7 +422,7 @@ function AddTorrentDrawer({
 }
 
 type MediaTab = "library" | "list" | "discover" | "system";
-const TAB_KEYS: MediaTab[] = ["library", "list", "discover", "system"];
+const TAB_KEYS: MediaTab[] = ["library", "discover", "system"];
 const TAB_ROUTES: Record<MediaTab, string> = {
   library: "/media",
   list: "/media/list",

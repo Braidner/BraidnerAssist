@@ -460,8 +460,8 @@ export function MediaPage({
 
   const visibleTabs = allowSystem ? TAB_KEYS : TAB_KEYS.filter((key) => key !== "system");
   const visibleLabels = allowSystem
-    ? ["Библиотека", "Мой список", "Дискавери", "Система"]
-    : ["Библиотека", "Мой список", "Дискавери"];
+    ? ["Библиотека", "Дискавери", "Система"]
+    : ["Библиотека", "Дискавери"];
 
   useRegisterTabs(
     visibleLabels,

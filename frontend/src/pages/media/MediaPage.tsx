@@ -29,6 +29,7 @@ import {
   getMediaPreferences,
   getMediaTitleStatuses,
   refreshJellyfin,
+  deleteEmptyMediaTitle,
   type MediaData,
   type DownloadItem,
   type TorrentRailItem,
@@ -675,6 +676,20 @@ export function MediaPage({
     return ok;
   };
 
+  const onRemovePendingTitle = async (item: PendingMediaTitle) => {
+    const result = await deleteEmptyMediaTitle(item.kind, item.tmdbId);
+    if (result.ok) {
+      toast.success("Тайтл убран из библиотеки");
+      setPendingTitles((items) => items.filter((it) => !(it.kind === item.kind && it.tmdbId === item.tmdbId)));
+      getMediaTitleStatuses().then(setTitleStatuses);
+      getMediaHome().then(setMediaHome);
+    } else {
+      toast.error(result.error ?? "Не удалось удалить тайтл");
+      getPendingMediaTitles().then(setPendingTitles);
+      getMediaTitleStatuses().then(setTitleStatuses);
+    }
+  };
+
   const onAddTmdb = async (it: TmdbItem) => {
     const item: MediaLookupItem = {
       kind: it.kind,
@@ -800,6 +815,7 @@ export function MediaPage({
           mediaHome={mediaHome}
           resume={resume}
           onPlayResume={playResume}
+          onRemovePendingTitle={onRemovePendingTitle}
         />
       )}
 
@@ -815,6 +831,7 @@ export function MediaPage({
           mediaHome={mediaHome}
           resume={[]}
           onPlayResume={playResume}
+          onRemovePendingTitle={onRemovePendingTitle}
           listOnly
         />
       )}

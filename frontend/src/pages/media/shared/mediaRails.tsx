@@ -1,5 +1,5 @@
 import { Children, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Bookmark, EyeOff, Play, Star } from "lucide-react";
+import { Bookmark, EyeOff, Play, Star, Trash2 } from "lucide-react";
 import { cn } from "@/lib/cn.ts";
 import type { ResumeItem } from "@/lib/api.ts";
 import { media as ms } from "./mediaStyles.ts";
@@ -194,6 +194,7 @@ export function MediaPosterCard({
   onClick,
   onHide,
   onWatchlist,
+  onRemove,
   overlay,
 }: {
   title: string;
@@ -205,9 +206,10 @@ export function MediaPosterCard({
   onClick: () => void;
   onHide?: () => void;
   onWatchlist?: () => void;
+  onRemove?: () => void;
   overlay?: ReactNode;
 }) {
-  const hasActions = Boolean(onHide || onWatchlist);
+  const hasActions = Boolean(onHide || onWatchlist || onRemove);
   const [imageLoading, setImageLoading] = useState(Boolean(imageUrl));
 
   useEffect(() => {
@@ -253,9 +255,7 @@ export function MediaPosterCard({
               >
                 <EyeOff size={16} strokeWidth={1.9} />
               </button>
-            ) : (
-              <span />
-            )}
+            ) : null}
             {onWatchlist ? (
               <button
                 type="button"
@@ -269,9 +269,21 @@ export function MediaPosterCard({
               >
                 <Bookmark size={16} strokeWidth={1.9} />
               </button>
-            ) : (
-              <span />
-            )}
+            ) : null}
+            {onRemove ? (
+              <button
+                type="button"
+                className={ms.posterActionButton}
+                title="Убрать из библиотеки"
+                aria-label="Убрать из библиотеки"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+              >
+                <Trash2 size={16} strokeWidth={1.9} />
+              </button>
+            ) : null}
           </div>
         ) : null}
         {rating != null ? (

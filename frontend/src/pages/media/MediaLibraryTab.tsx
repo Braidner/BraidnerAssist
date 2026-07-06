@@ -45,6 +45,7 @@ interface MediaLibraryTabProps {
     mediaHome: MediaHome;
     resume: ResumeItem[];
     onPlayResume: (it: ResumeItem) => void;
+    onRemovePendingTitle: (it: PendingMediaTitle) => void;
     listOnly?: boolean;
 }
 
@@ -82,6 +83,7 @@ export function MediaLibraryTab({
                                     mediaHome,
                                     resume,
                                     onPlayResume,
+                                    onRemovePendingTitle,
                                     listOnly = false,
                                 }: MediaLibraryTabProps) {
     const nav = useNavigate();
@@ -203,6 +205,7 @@ export function MediaLibraryTab({
                             subtitle={`${it.kind === "series" ? "сериал" : "фильм"} · ожидает релиз${it.year ? ` · ${it.year}` : ""}`}
                             imageUrl={posterUrl(it.poster)}
                             onClick={() => openPendingTitle(it)}
+                            onRemove={() => onRemovePendingTitle(it)}
                         />
                     ))}
                 </MediaRail>

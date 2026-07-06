@@ -555,6 +555,43 @@ export async function getPendingMediaTitles(): Promise<PendingMediaTitle[]> {
   }));
 }
 
+export class MediaTitleRemoveError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = "MediaTitleRemoveError";
+  }
+}
+
+export async function removeEmptyMediaTitle(kind: MediaKind, tmdbId: number): Promise<{ removed: true }> {
+  await linkMediaTitlesToJellyfin().catch(() => {});
+  const title = await prisma.mediaTitle.findUnique({
+    where: { kind_tmdbId: { kind, tmdbId } },
+    select: {
+      id: true,
+      jellyfinId: true,
+      _count: { select: { torrents: true } },
+    },
+  });
+  if (!title) throw new MediaTitleRemoveError("Тайтл не найден", 404);
+  if (title.jellyfinId || title._count.torrents > 0) {
+    throw new MediaTitleRemoveError("Нельзя удалить: у тайтла уже есть медиафайлы или выбранные раздачи", 409);
+  }
+  const deleted = await prisma.mediaTitle.deleteMany({
+    where: {
+      id: title.id,
+      jellyfinId: null,
+      torrents: { none: {} },
+    },
+  });
+  if (deleted.count !== 1) {
+    throw new MediaTitleRemoveError("Нельзя удалить: состояние тайтла изменилось", 409);
+  }
+  return { removed: true };
+}
+
 function statusFromTitle(input: {
   kind: MediaKind;
   tmdbId: number;

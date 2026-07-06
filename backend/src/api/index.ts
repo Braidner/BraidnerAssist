@@ -42,6 +42,8 @@ import {
   getPendingMediaTitles,
   getTitleTorrents,
   getMediaTitleStatuses,
+  removeEmptyMediaTitle,
+  MediaTitleRemoveError,
 } from "../integrations/nativeMedia.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import {
@@ -390,6 +392,21 @@ apiRouter.get("/media/statuses", async (req, res) => {
     res.json(await getMediaTitleStatuses(mediaUserContext(res)));
   } catch (e) {
     logRouteError("media", req, e);
+    res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.delete("/media/titles/:kind/:tmdbId", async (req, res) => {
+  const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
+  const tmdbId = Number(req.params.tmdbId);
+  if (!kind || !Number.isFinite(tmdbId) || tmdbId <= 0) return res.status(400).json({ error: "kind/tmdbId required" });
+  try {
+    res.json(await removeEmptyMediaTitle(kind, tmdbId));
+  } catch (e) {
+    if (e instanceof MediaTitleRemoveError) {
+      return res.status(e.statusCode).json({ error: e.message });
+    }
+    logRouteError("media", req, e, { kind, tmdbId });
     res.status(502).json({ error: String(e) });
   }
 });

@@ -1310,6 +1310,22 @@ export async function getPendingMediaTitles(): Promise<PendingMediaTitle[]> {
   }
 }
 
+export async function deleteEmptyMediaTitle(
+  kind: "movie" | "series",
+  tmdbId: number,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/media/titles/${kind}/${tmdbId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) return { ok: true };
+    const body = await res.json().catch(() => null) as { error?: string } | null;
+    return { ok: false, error: body?.error ?? "Не удалось удалить тайтл" };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 export interface SeriesEpisode {
   id: string;
   name: string;

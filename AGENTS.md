@@ -145,7 +145,10 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     **Lightweight registry**: SQLite keeps only `MediaTitle` (kind, TMDB/TVDB metadata,
     optional `jellyfinId`) and `MediaTorrent` (infohash/release/savePath/qB snapshot) to power
     the library rail "Скачивается / Скоро в библиотеке" and link `TMDB → torrent → Jellyfin`.
-    This registry is not a monitor and does not search for missing episodes.
+    This registry is not a monitor and does not search for missing episodes. Empty accidental
+    registry titles can be removed from Library via `DELETE /api/media/titles/:kind/:tmdbId`,
+    but only while there is no `jellyfinId` and no `MediaTorrent`; this never deletes Jellyfin
+    media files or qBittorrent content.
     **Discovery preferences survive cleanup**: `MediaPreference` remains the source of truth for
     `watchlist|hidden|liked|disliked`; endpoints `GET/POST/DELETE /api/media/preferences` stay
     active, Discovery rails filter hidden/disliked, and Cmd-K "Мой список" reads watchlist.
@@ -153,6 +156,7 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     **Active media REST**: `GET /api/media` (qB downloads), `GET /api/media/library`,
     `GET /api/media/torrent-rail`, `GET /api/media/search` (Jackett fallback),
     `GET /api/media/lookup`, `POST /api/media/add` (lookup/registry compatibility),
+    `DELETE /api/media/titles/:kind/:tmdbId` (empty registry-title only),
     `POST /api/media/release/search`, `POST /api/media/release/grab`, `POST /api/media/torrent`,
     `POST /api/media/torrent/:hash/:action`, `POST /api/media/scan`, Jellyfin playback/detail/
     devices/play-to routes, and Discovery routes. Removed active endpoints include
@@ -388,7 +392,8 @@ Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
   `MediaRail` и iPhone standalone safe-area/edge-to-edge polish. ✅ ГОТОВО
 - **Batch v10 — Media UX vNext** (2026-07-06): smart Library hero, `/media/list`,
   user-aware preferences with global fallback, `/api/media/statuses`, grouped System queue,
-  and ReleasePicker safety chips for year/season/quality/voice/seed. ✅ ГОТОВО
+  ReleasePicker safety chips for year/season/quality/voice/seed, and safe removal of empty
+  accidental registry titles from the Library pending rail. ✅ ГОТОВО
 - **Отложено**: drag-and-drop виджетов (react-grid-layout); будущий этап удаления Jellyfin
   (свой transcoding/watch-state) — отдельная большая тема.
 

@@ -487,6 +487,9 @@
       год/сезон/качество/озвучку/seed chips и «Скачать лучший».
 - [x] Media queue: System tab группирует qB entries в «Активные», «Готово / ждёт Jellyfin»,
       «На паузе», «Проблемные», «Сидируется» и даёт bulk actions.
+- [x] Safe pending-title removal: Library rail «Добавлено / ждёт релиза» получил кнопку
+      «Убрать из библиотеки»; backend `DELETE /api/media/titles/:kind/:tmdbId` удаляет только
+      пустой `MediaTitle` без `jellyfinId` и без `MediaTorrent`, не трогая Jellyfin/qB/filesystem.
 - [x] Проверено: `cd backend && npx prisma generate && npm run build && npm test`,
       `cd frontend && npm run build`, dev-stand `/media`, `/media/list`, `/media/system`.
 

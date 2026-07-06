@@ -5,6 +5,7 @@ import { apiRouter } from "./api/index.js";
 import { authRouter } from "./api/auth.js";
 import { versionRouter } from "./api/version.js";
 import { posterRouter } from "./api/poster.js";
+import { jellyfinGatewayRouter } from "./api/jellyfinGateway.js";
 import { torrserverStreamRouter } from "./api/torrserverStream.js";
 import { jwtAuth } from "./middleware/jwtAuth.js";
 import { mcpRouter } from "./mcp/handler.js";
@@ -38,6 +39,10 @@ app.use("/api/poster", posterRouter);
 // TorrServer видеопоток: <video> не шлёт bearer → публичный (LAN-only) + анти-SSRF.
 // Монтируется ДО jwtAuth, чтобы перехватить /api/media/torrserver/stream.
 app.use("/api/media/torrserver/stream", torrserverStreamRouter);
+
+// Jellyfin-compatible gateway for native clients. It intentionally lives outside
+// /api because Jellyfin clients expect server endpoints at the configured base URL.
+app.use("/jf", jellyfinGatewayRouter);
 
 // All other /api routes require valid JWT
 app.use("/api", jwtAuth, apiRouter);

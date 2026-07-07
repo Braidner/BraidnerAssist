@@ -1268,6 +1268,18 @@ export async function qbSetFilePrio(hash: string, indexes: number[], priority: n
   if (!res.ok) throw new Error(`qBittorrent filePrio ${res.status}`);
 }
 
+export async function qbRenameFile(hash: string, oldPath: string, newPath: string): Promise<void> {
+  if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
+  const sid = await qbLogin();
+  const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/renameFile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", ...(sid ? { Cookie: sid } : {}) },
+    body: new URLSearchParams({ hash, oldPath, newPath }),
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) throw new Error(`qBittorrent renameFile ${res.status}`);
+}
+
 const qbBasename = (p: string) => p.replace(/\\/g, "/").split("/").pop() ?? p;
 
 // Применить пофайловый выбор: качаем только wanted-файлы (остальные prio 0).

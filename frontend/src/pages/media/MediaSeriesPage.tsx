@@ -2,9 +2,10 @@
 // сезоны/эпизоды, встроенный плеер, поиск релизов и rail привязанных раздач.
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileVideo, Plus, Wrench, X } from "lucide-react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
+  fmtSize,
   ReleasePicker,
   TorrentRailCard,
 } from "./shared/mediaShared.tsx";
@@ -30,10 +31,14 @@ import {
   getMediaLibrary,
   getDiscoverSimilar,
   getTitleTorrents,
+  getTitleTorrentFiles,
+  repairSeriesEpisode,
   backdropUrl,
+  type DetailEpisode,
   type SeriesPageDetail,
   type MediaData,
   type LibraryItem,
+  type RepairTorrentFile,
   type TmdbItem,
   type TorrentRailItem,
 } from "@/lib/api.ts";
@@ -66,6 +71,158 @@ function relAir(iso: string | null): string {
 const isAired = (iso: string | null) =>
   Boolean(iso && new Date(iso).getTime() < Date.now());
 
+type RepairTarget = {
+  episode: DetailEpisode;
+};
+
+function shortHash(hash: string): string {
+  return hash.slice(0, 7);
+}
+
+function RepairDrawer({
+  target,
+  torrents,
+  files,
+  selectedHash,
+  selectedFileIndex,
+  loadingFiles,
+  busy,
+  onClose,
+  onSelectTorrent,
+  onSelectFile,
+  onConfirm,
+}: {
+  target: RepairTarget;
+  torrents: TorrentRailItem[];
+  files: RepairTorrentFile[];
+  selectedHash: string | null;
+  selectedFileIndex: number | null;
+  loadingFiles: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onSelectTorrent: (hash: string) => void;
+  onSelectFile: (index: number) => void;
+  onConfirm: () => void;
+}) {
+  const videoFiles = files.filter((file) => file.isVideo);
+  const selectedFile = videoFiles.find((file) => file.index === selectedFileIndex) ?? null;
+  const episodeCode = `S${String(target.episode.seasonNumber).padStart(2, "0")}E${String(target.episode.episodeNumber).padStart(2, "0")}`;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 px-3 py-4 backdrop-blur-sm md:items-center">
+      <section className="w-full max-w-4xl overflow-hidden rounded-[16px] border border-white/[0.10] bg-[#101014]/95 shadow-[0_28px_90px_rgba(0,0,0,0.55)]">
+        <header className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-4 py-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 font-mono text-2xs uppercase tracking-4 text-accent">
+              <Wrench className="size-3.5" />
+              Repair episode
+            </div>
+            <h3 className="mt-1 truncate text-sm font-semibold text-white">
+              {episodeCode} · {target.episode.title}
+            </h3>
+          </div>
+          <Button variant="ghost" size="icon-sm" title="Закрыть" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </header>
+
+        <div className="grid min-h-[360px] grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="border-b border-white/[0.08] bg-white/[0.025] p-3 md:border-b-0 md:border-r">
+            <div className="mb-2 font-mono text-2xs uppercase tracking-4 text-muted">Раздачи</div>
+            <div className="space-y-2">
+              {torrents.length === 0 ? (
+                <div className="rounded-[10px] border border-white/[0.08] bg-black/20 p-3 text-xs text-muted">
+                  Нет привязанных раздач для этого тайтла.
+                </div>
+              ) : torrents.map((torrent) => (
+                <button
+                  key={torrent.infohash}
+                  type="button"
+                  className={cn(
+                    "block w-full rounded-[10px] border p-3 text-left transition-colors",
+                    selectedHash === torrent.infohash
+                      ? "border-accent/65 bg-accent/14 text-white"
+                      : "border-white/[0.08] bg-black/18 text-white/78 hover:border-white/[0.16] hover:bg-white/[0.045]",
+                  )}
+                  onClick={() => onSelectTorrent(torrent.infohash)}
+                >
+                  <span className="line-clamp-2 text-xs font-semibold">{torrent.releaseTitle}</span>
+                  <span className="mt-2 block font-mono text-2xs text-muted">
+                    {shortHash(torrent.infohash)} · {torrent.size ? fmtSize(torrent.size) : "размер неизвестен"} · {torrent.progress}%
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-col p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="font-mono text-2xs uppercase tracking-4 text-muted">Файлы</div>
+              {selectedFile?.warning ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#ffb84d]/12 px-2 py-1 font-mono text-2xs text-[#ffd9a3]">
+                  <AlertTriangle className="size-3" />
+                  нужна проверка
+                </span>
+              ) : null}
+            </div>
+            <div className="max-h-[360px] flex-1 space-y-2 overflow-y-auto pr-1">
+              {!selectedHash ? (
+                <div className="rounded-[10px] border border-white/[0.08] bg-black/20 p-3 text-xs text-muted">
+                  Выбери раздачу слева.
+                </div>
+              ) : loadingFiles ? (
+                <div className="rounded-[10px] border border-white/[0.08] bg-black/20 p-3 text-xs text-muted">
+                  Загружаем файлы...
+                </div>
+              ) : videoFiles.length === 0 ? (
+                <div className="rounded-[10px] border border-white/[0.08] bg-black/20 p-3 text-xs text-muted">
+                  Видео-файлы не найдены.
+                </div>
+              ) : videoFiles.map((file) => (
+                <button
+                  key={file.index}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-[10px] border p-3 text-left transition-colors",
+                    selectedFileIndex === file.index
+                      ? "border-accent/65 bg-accent/14 text-white"
+                      : "border-white/[0.08] bg-black/18 text-white/78 hover:border-white/[0.16] hover:bg-white/[0.045]",
+                  )}
+                  onClick={() => onSelectFile(file.index)}
+                >
+                  <FileVideo className="mt-0.5 size-4 flex-none text-accent" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words text-xs font-semibold">{file.name}</span>
+                    <span className="mt-1 block font-mono text-2xs text-muted">
+                      {fmtSize(file.size)} · {Math.round(file.progress * 100)}% · index {file.index}
+                    </span>
+                    {file.warning ? (
+                      <span className="mt-2 inline-flex rounded-full bg-[#ffb84d]/12 px-2 py-0.5 font-mono text-2xs text-[#ffd9a3]">
+                        {file.warning}
+                      </span>
+                    ) : null}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 flex justify-end border-t border-white/[0.08] pt-3">
+              <Button
+                className="rounded-[10px] bg-accent text-white hover:bg-accent/90"
+                disabled={!selectedHash || selectedFileIndex == null || busy}
+                onClick={onConfirm}
+              >
+                <Wrench className="size-4" />
+                {busy ? "Чиним" : "Привязать"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function MediaSeriesPage({
   media,
   onMediaUpdate,
@@ -90,6 +247,12 @@ export function MediaSeriesPage({
   const [showAllPicker, setShowAllPicker] = useState(false);
   const [queuedInLibrary, setQueuedInLibrary] = useState(false);
   const [titleTorrents, setTitleTorrents] = useState<TorrentRailItem[]>([]);
+  const [repairTarget, setRepairTarget] = useState<RepairTarget | null>(null);
+  const [repairHash, setRepairHash] = useState<string | null>(null);
+  const [repairFiles, setRepairFiles] = useState<RepairTorrentFile[]>([]);
+  const [repairFileIndex, setRepairFileIndex] = useState<number | null>(null);
+  const [repairLoading, setRepairLoading] = useState(false);
+  const [repairBusy, setRepairBusy] = useState(false);
   const autoplayConsumedRef = useRef<string | null>(null);
   const locationState = location.state as AutoplayLocationState;
   const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
@@ -108,11 +271,12 @@ export function MediaSeriesPage({
       : source === "discover"
         ? getSeriesDiscoverDetail(Number(id), { idType: "tvdb" })
         : getMediaTitleDetail("series", Number(id), { idType: "auto" });
+  const reloadDetail = () => fetchDetail().then((r) => setD(r));
 
   useEffect(() => {
     setD("loading");
     setQueuedInLibrary(false);
-    fetchDetail().then((r) => setD(r));
+    reloadDetail();
     getMediaLibrary().then(setLibrary);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, source]);
@@ -176,6 +340,65 @@ export function MediaSeriesPage({
     refreshTitleTorrents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detTmdbId]);
+
+  const openRepair = (episode: DetailEpisode) => {
+    setRepairTarget({ episode });
+    const firstHash = titleTorrents[0]?.infohash ?? null;
+    setRepairHash(firstHash);
+    setRepairFileIndex(null);
+    setRepairFiles([]);
+    if (detTmdbId != null && firstHash) {
+      setRepairLoading(true);
+      getTitleTorrentFiles("series", detTmdbId, firstHash)
+        .then((files) => {
+          setRepairFiles(files);
+          setRepairFileIndex(files.find((file) => file.isVideo)?.index ?? null);
+        })
+        .finally(() => setRepairLoading(false));
+    }
+  };
+
+  const selectRepairTorrent = (hash: string) => {
+    setRepairHash(hash);
+    setRepairFileIndex(null);
+    setRepairFiles([]);
+    if (detTmdbId == null) return;
+    setRepairLoading(true);
+    getTitleTorrentFiles("series", detTmdbId, hash)
+      .then((files) => {
+        setRepairFiles(files);
+        setRepairFileIndex(files.find((file) => file.isVideo)?.index ?? null);
+      })
+      .finally(() => setRepairLoading(false));
+  };
+
+  const confirmRepair = async () => {
+    if (!repairTarget || !repairHash || repairFileIndex == null || detTmdbId == null) return;
+    try {
+      setRepairBusy(true);
+      await repairSeriesEpisode({
+        tmdbId: detTmdbId,
+        hash: repairHash,
+        fileIndex: repairFileIndex,
+        seasonNumber: repairTarget.episode.seasonNumber,
+        episodeNumber: repairTarget.episode.episodeNumber,
+      });
+      toast.success("Эпизод привязан. Jellyfin сканирует библиотеку.");
+      setRepairTarget(null);
+      setRepairHash(null);
+      setRepairFileIndex(null);
+      setRepairFiles([]);
+      refreshTitleTorrents();
+      setD("loading");
+      window.setTimeout(() => {
+        reloadDetail();
+      }, 1_500);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не удалось выполнить repair");
+    } finally {
+      setRepairBusy(false);
+    }
+  };
 
   const openTmdb = (it: TmdbItem) => {
     nav(`/media/${it.kind === "movie" ? "movie" : "series"}/${it.tmdbId}`);
@@ -420,6 +643,14 @@ export function MediaSeriesPage({
         </div>
       )}
 
+      {titleTorrents.length > 0 && (
+        <MediaRail title="Скачанные раздачи" countLabel={String(titleTorrents.length)} className="mb-10 mt-6">
+          {titleTorrents.map((it) => (
+            <TorrentRailCard key={it.infohash} item={it} />
+          ))}
+        </MediaRail>
+      )}
+
       {/* Season rails */}
       {det.seasons.length === 0 ? (
         <div className={cn(ms.empty, "mt-6")}>Эпизоды не найдены.</div>
@@ -444,6 +675,7 @@ export function MediaSeriesPage({
                           : ep.stillRemote
                             ? posterUrl(ep.stillRemote, "w342")
                             : null;
+                        const playableId = ep.jellyfinId;
                         return (
                       <article
                         key={`${ep.seasonNumber}-${ep.episodeNumber}`}
@@ -491,22 +723,32 @@ export function MediaSeriesPage({
                                 <span className="truncate font-mono text-2xs text-white/58" title={fmtAir(ep.airDate)}>
                                   {relAir(ep.airDate)}
                                 </span>
-                            <button
-                              className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.18] bg-black/25 text-white/78 backdrop-blur-md transition-all hover:border-transparent hover:bg-[var(--epa,var(--accent))] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-                              title={ep.jellyfinId ? "Воспроизвести" : "Файл недоступен"}
-                              disabled={!ep.jellyfinId || busy === ep.jellyfinId}
-                              onClick={() =>
-                                ep.jellyfinId &&
-                                play(
-                                  ep.jellyfinId,
-                                  `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
-                                )
-                              }
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                <polygon points="6,3 21,12 6,21" />
-                              </svg>
-                            </button>
+                            {playableId ? (
+                              <button
+                                className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.18] bg-black/25 text-white/78 backdrop-blur-md transition-all hover:border-transparent hover:bg-[var(--epa,var(--accent))] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                                title="Воспроизвести"
+                                disabled={busy === playableId}
+                                onClick={() =>
+                                  play(
+                                    playableId,
+                                    `${det.title} — S${ep.seasonNumber}E${ep.episodeNumber} ${ep.title}`,
+                                  )
+                                }
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                  <polygon points="6,3 21,12 6,21" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <button
+                                className="grid h-8 w-8 flex-none place-items-center rounded-full border border-white/[0.18] bg-black/25 text-white/78 backdrop-blur-md transition-all hover:border-accent/70 hover:bg-accent/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+                                title={titleTorrents.length > 0 ? "Repair: выбрать файл из раздачи" : "Нет привязанных раздач"}
+                                disabled={titleTorrents.length === 0}
+                                onClick={() => openRepair(ep)}
+                              >
+                                <Wrench className="size-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </article>
@@ -544,12 +786,20 @@ export function MediaSeriesPage({
         <SimilarRail items={similarItems} />
       )}
 
-      {titleTorrents.length > 0 && (
-        <MediaRail title="Медиа" countLabel={String(titleTorrents.length)} className="mb-10">
-          {titleTorrents.map((it) => (
-            <TorrentRailCard key={it.infohash} item={it} />
-          ))}
-        </MediaRail>
+      {repairTarget && (
+        <RepairDrawer
+          target={repairTarget}
+          torrents={titleTorrents}
+          files={repairFiles}
+          selectedHash={repairHash}
+          selectedFileIndex={repairFileIndex}
+          loadingFiles={repairLoading}
+          busy={repairBusy}
+          onClose={() => setRepairTarget(null)}
+          onSelectTorrent={selectRepairTorrent}
+          onSelectFile={setRepairFileIndex}
+          onConfirm={confirmRepair}
+        />
       )}
 
     </div>

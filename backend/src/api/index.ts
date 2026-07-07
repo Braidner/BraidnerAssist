@@ -70,6 +70,7 @@ import {
 } from "../integrations/mediaPreferences.js";
 import { clearPosterCache, getPosterCacheStatus } from "../integrations/posterCache.js";
 import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integrations/files.js";
+import { listTitleTorrentFiles, repairSeriesEpisode } from "../integrations/mediaRepair.js";
 import { log, getEntries, errorDetail } from "../logger.js";
 
 export const apiRouter = Router();
@@ -420,6 +421,45 @@ apiRouter.get("/media/torrents/:kind/:tmdbId", async (req, res) => {
   } catch (e) {
     logRouteError("media", req, e, { kind, tmdbId });
     res.status(502).json({ error: String(e) });
+  }
+});
+
+apiRouter.get("/media/torrents/:kind/:tmdbId/:hash/files", async (req, res) => {
+  const kind = req.params.kind === "series" ? "series" : req.params.kind === "movie" ? "movie" : null;
+  const tmdbId = Number(req.params.tmdbId);
+  const hash = String(req.params.hash ?? "");
+  if (kind !== "series" || !Number.isFinite(tmdbId) || tmdbId <= 0 || !hash) {
+    return res.status(400).json({ error: "series tmdbId/hash required" });
+  }
+  try {
+    res.json(await listTitleTorrentFiles(tmdbId, hash));
+  } catch (e) {
+    logRouteError("media", req, e, { kind, tmdbId, hash });
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+apiRouter.post("/media/series/:tmdbId/episodes/repair", async (req, res) => {
+  const tmdbId = Number(req.params.tmdbId);
+  const hash = typeof req.body?.hash === "string" ? req.body.hash : "";
+  const fileIndex = Number(req.body?.fileIndex);
+  const seasonNumber = Number(req.body?.seasonNumber);
+  const episodeNumber = Number(req.body?.episodeNumber);
+  if (
+    !Number.isFinite(tmdbId) ||
+    tmdbId <= 0 ||
+    !hash ||
+    !Number.isInteger(fileIndex) ||
+    !Number.isInteger(seasonNumber) ||
+    !Number.isInteger(episodeNumber)
+  ) {
+    return res.status(400).json({ error: "tmdbId/hash/fileIndex/seasonNumber/episodeNumber required" });
+  }
+  try {
+    res.json(await repairSeriesEpisode({ tmdbId, hash, fileIndex, seasonNumber, episodeNumber }));
+  } catch (e) {
+    logRouteError("media", req, e, { tmdbId, hash, fileIndex, seasonNumber, episodeNumber });
+    res.status(400).json({ error: String(e) });
   }
 });
 

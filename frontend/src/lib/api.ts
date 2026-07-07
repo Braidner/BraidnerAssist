@@ -895,6 +895,58 @@ export async function getTitleTorrents(
   }
 }
 
+export interface RepairTorrentFile {
+  index: number;
+  name: string;
+  size: number;
+  priority: number;
+  progress: number;
+  ext: string;
+  isVideo: boolean;
+  warning: string | null;
+}
+
+export interface RepairEpisodeResult {
+  ok: true;
+  sourcePath: string;
+  destPath: string;
+  qbitPath: string;
+  sameFile: boolean;
+}
+
+export async function getTitleTorrentFiles(
+  kind: "series",
+  tmdbId: number,
+  hash: string,
+): Promise<RepairTorrentFile[]> {
+  try {
+    const res = await apiFetch(`/api/media/torrents/${kind}/${tmdbId}/${encodeURIComponent(hash)}/files`);
+    if (!res.ok) return [];
+    return (await res.json()) as RepairTorrentFile[];
+  } catch {
+    return [];
+  }
+}
+
+export async function repairSeriesEpisode(input: {
+  tmdbId: number;
+  hash: string;
+  fileIndex: number;
+  seasonNumber: number;
+  episodeNumber: number;
+}): Promise<RepairEpisodeResult> {
+  const res = await apiFetch(`/api/media/series/${input.tmdbId}/episodes/repair`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? "Repair failed");
+  }
+  return (await res.json()) as RepairEpisodeResult;
+}
+
 export interface JackettHealth {
   id: string;
   configured: boolean;

@@ -161,8 +161,17 @@ export async function repairSeriesEpisode(input: {
   }
 
   if (!sameFile) {
-    await fs.mkdir(path.dirname(targetAbs), { recursive: true });
     await qbRenameFile(input.hash.toLowerCase(), selected.name, qbitTargetPath);
+    let renamed = false;
+    for (let i = 0; i < 6; i++) {
+      const currentFiles = await qbFiles(input.hash);
+      renamed = currentFiles.some((file) => file.name === qbitTargetPath);
+      if (renamed) break;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!renamed) {
+      throw new Error("qBittorrent принял rename, но путь файла не изменился");
+    }
   }
   await jellyfinRefresh().catch(() => {});
 

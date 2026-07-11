@@ -684,7 +684,7 @@ export function TorrentCard({
               busy={busy}
               done={isComplete}
               progress={progress}
-              disabled={disabled || Boolean(download) || blocked}
+              disabled={disabled || Boolean(download)}
               onClick={onGrab}
             />
           )}

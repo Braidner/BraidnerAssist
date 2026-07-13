@@ -4,6 +4,16 @@
 Desktop (Proxmox VM). Используется человеком И AI-агентом **Hermes** (Claude-based),
 который читает данные и управляет задачами через MCP/REST API.
 
+## Design Context
+
+Стратегия и визуальная система вынесены в отдельные root-файлы (читаются командами impeccable):
+
+- **`PRODUCT.md`** — register (`product`), platform (`web`), пользователи (человек + Hermes как
+  co-equal операторы), позиционирование, 5 принципов, anti-references.
+- **`DESIGN.md`** (+ `.impeccable/design.json`) — визуальный стандарт «The Cinematic Cockpit»:
+  тёмная, плоская система с красным accent-glow; frontmatter-токены + 6 секций + named-правила.
+  Каноничный источник дизайн-решений — см. также раздел «UI / Дизайн-система» ниже.
+
 ## Стек
 
 - **Frontend**: React + TypeScript + Vite, nginx в проде
@@ -338,17 +348,23 @@ native media pipeline внутри Mission Control. Сервисы публик�
 `host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в
 `/srv/stack/.creds` (chmod 600) и в server `.env` дашборда — в гит не коммитятся.
 
-## UI / Дизайн-система (неоморфизм)
+## UI / Дизайн-система (flat / «The Cinematic Cockpit»)
 
-Текущий визуальный стандарт фронтенда — **неоморфизм** (портирован из Claude Design
-бандла). Источник токенов и компонентных классов — `frontend/src/styles.css`.
+Текущий визуальный стандарт фронтенда — **плоский (flat) дизайн** на Tailwind v4 + shadcn
+(`Mission Control v4`). Глубина — тональные слои поверхностей + hairline-бордеры, НЕ тени;
+единственная выразительная «тень» — красный accent-glow. Прежний неоморфизм (`.neu*`) удалён.
+Источник токенов и компонентных классов — `frontend/src/styles.css`. Полная визуальная спека
+с named-правилами — в `DESIGN.md` (frontmatter-токены + 6 секций) и `.impeccable/design.json`.
 
 - **Токены** (`:root`): `--radius` (10px для shadcn), `--card-radius` (19px),
   `--accent` (`#e53333`) + `--accent-glow-sm|glow|glow-lg`; шрифты
   `--font`/`--mono`/`--font-ui` — Syne.
 - **Темы** — палитра под `.mc[data-theme="dark"|"light"]` (dark по умолчанию).
   Тема ставится на обёртку `.mc` (не на `:root`); переключатель в `theme.ts`.
-- **Примитивы теней**: `.neu` (выпуклый), `.neu-in` (вдавленный), `.neu-sm` (мелкий).
+- **Глубина без теней**: тональная лестница поверхностей (`--page` → `--surface` → `--raise`
+  → `--surface-2`) + один hairline-бордер (`--hair`, white 4.5%). Тени нет; красный
+  accent-glow означает «live/primary», а не «приподнято». Единственная санкционированная
+  чёрная drop-тень — hover-lift плитки медиатеки.
 - **Компоненты**: `frontend/src/components/` — `Card`, `Ring`, `icons` (SVG-набор) +
   `panels/` (StatStrip/MiniWidgets, Placeholder) + `layout/` (TopBar, Sidebar, Drawer, CommandPalette).
   Раскладка — **вариант C (three columns)**: полоса мини-статов + 3 колонки.

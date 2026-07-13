@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-12T00:00:00Z",
+  "title": "Design System: Mission Control",
+  "extensions": {
+    "colorMeta": {
+      "accent-red": { "role": "primary", "displayName": "Signal Red", "canonical": "#e53333", "tonalRamp": ["#2a0d0d", "#4a1414", "#701d1d", "#9c2626", "#c22c2c", "#e53333", "#ec5c5c", "#f39191"] },
+      "accent-ink": { "role": "primary", "displayName": "Accent Ink", "canonical": "#1a0505", "tonalRamp": ["#0d0303", "#1a0505", "#2e0a0a", "#451010", "#5c1717", "#7a2020", "#a02e2e", "#c94545"] },
+      "page": { "role": "neutral", "displayName": "Console Black", "canonical": "#09090d", "tonalRamp": ["#050508", "#09090d", "#0e1018", "#121622", "#171b28", "#1e2434", "#2a3345", "#3a4557"] },
+      "surface": { "role": "neutral", "displayName": "Panel Slate", "canonical": "#0e1018", "tonalRamp": ["#09090d", "#0e1018", "#121622", "#171b28", "#1e2434", "#28324a", "#36425f", "#4a597a"] },
+      "raise": { "role": "neutral", "displayName": "Raise Slate", "canonical": "#121622", "tonalRamp": ["#09090d", "#0e1018", "#121622", "#171b28", "#1e2434", "#28324a", "#36425f", "#4a597a"] },
+      "surface-2": { "role": "neutral", "displayName": "Hover Slate", "canonical": "#171b28", "tonalRamp": ["#0e1018", "#121622", "#171b28", "#1e2434", "#28324a", "#36425f", "#4a597a", "#63739a"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#dce4f0", "tonalRamp": ["#3a4557", "#4e5c72", "#63739a", "#8896aa", "#a6b2c4", "#c2ccdb", "#dce4f0", "#eef2f8"] },
+      "ink-soft": { "role": "neutral", "displayName": "Ink Soft", "canonical": "#8896aa", "tonalRamp": ["#2a3345", "#3a4557", "#4e5c72", "#63739a", "#8896aa", "#a6b2c4", "#c2ccdb", "#dce4f0"] },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#4e5c72", "tonalRamp": ["#171b28", "#1e2434", "#2a3345", "#3a4557", "#4e5c72", "#63739a", "#8896aa", "#a6b2c4"] },
+      "faint": { "role": "neutral", "displayName": "Faint", "canonical": "#1e2434", "tonalRamp": ["#09090d", "#0e1018", "#121622", "#171b28", "#1e2434", "#28324a", "#36425f", "#4a597a"] },
+      "warn": { "role": "tertiary", "displayName": "Warn Amber", "canonical": "#e3a93f", "tonalRamp": ["#2e2210", "#4a3616", "#70521d", "#9c7226", "#c2902c", "#e3a93f", "#ecc06c", "#f3d799"] },
+      "bad": { "role": "tertiary", "displayName": "Bad Pink-Red", "canonical": "#e06b8a", "tonalRamp": ["#2e1119", "#4a1a28", "#70283c", "#9c3853", "#c24a69", "#e06b8a", "#ec93a8", "#f3bccb"] },
+      "info": { "role": "tertiary", "displayName": "Info Blue", "canonical": "#6f9ce8", "tonalRamp": ["#111d2e", "#1a2e4a", "#284570", "#385f9c", "#4a7dd4", "#6f9ce8", "#9cbcef", "#c2d7f6"] }
+    },
+    "typographyMeta": {
+      "hero": { "displayName": "Hero", "purpose": "Landing / overview hero headline, 84px. Once per view at most." },
+      "cinematic": { "displayName": "Cinematic", "purpose": "Media detail hero title over a full-bleed backdrop; the one fluid role." },
+      "title": { "displayName": "Title", "purpose": "Page/section headings and drawer titles, 18px." },
+      "body": { "displayName": "Body", "purpose": "Default reading size, 13px; prose caps 65–75ch." },
+      "label": { "displayName": "Label", "purpose": "Uppercase tracked mono panel titles and metadata keys; always --muted." },
+      "data": { "displayName": "Data", "purpose": "Tabular numeric values (counts, speeds, sizes) with tnum on." }
+    },
+    "shadows": [
+      { "name": "accent-glow-sm", "value": "0 0 18px color-mix(in srgb, #e53333 34%, transparent)", "purpose": "Resting glow on the primary red button — says 'live', not 'raised'." },
+      { "name": "accent-glow", "value": "0 0 28px color-mix(in srgb, #e53333 52%, transparent)", "purpose": "Hover-state glow on the primary red button." },
+      { "name": "accent-glow-lg", "value": "0 0 42px color-mix(in srgb, #e53333 58%, transparent)", "purpose": "Strongest red glow for emphasis moments." },
+      { "name": "media-lift", "value": "0 24px 66px rgba(0,0,0,0.78)", "purpose": "The only sanctioned black drop shadow — media library card on hover-lift." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.22, 0.61, 0.36, 1)", "purpose": "Default ease-out for theme/state transitions (--ease). ~150ms." },
+      { "name": "ease-cinematic", "value": "cubic-bezier(0.19, 1, 0.22, 1)", "purpose": "Slow expo curve for the 950ms media-card hover lift and art shadow." },
+      { "name": "duration-state", "value": "150ms", "purpose": "Standard console transition (background, border, color, transform)." },
+      { "name": "duration-cinematic", "value": "950ms", "purpose": "Media hover lift/scale/shadow choreography." }
+    ],
+    "breakpoints": [
+      { "name": "narrow", "value": "760px" },
+      { "name": "mob", "value": "860px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled, glowing control — primary action per view.",
+      "html": "<button class=\"ds-btn-primary\">Передать Hermes</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid transparent; border-radius: 10px; background: #e53333; color: #1a0505; font-family: Syne, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer; box-shadow: 0 0 18px color-mix(in srgb, #e53333 34%, transparent); transition: background .15s cubic-bezier(0.22,0.61,0.36,1), box-shadow .15s cubic-bezier(0.22,0.61,0.36,1), transform .1s; } .ds-btn-primary:hover { box-shadow: 0 0 28px color-mix(in srgb, #e53333 52%, transparent); } .ds-btn-primary:focus-visible { outline: none; border-color: #e53333; box-shadow: 0 0 0 3px color-mix(in srgb, #e53333 50%, transparent); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:disabled { opacity: .5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The workhorse control — most buttons are not primary.",
+      "html": "<button class=\"ds-btn-outline\">Обновить</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid rgba(255,255,255,0.045); border-radius: 10px; background: transparent; color: #8896aa; font-family: Syne, system-ui, sans-serif; font-size: 0.8125rem; font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer; transition: background .15s, border-color .15s, color .15s, transform .1s; } .ds-btn-outline:hover { background: #171b28; border-color: color-mix(in srgb, #e53333 40%, transparent); color: #dce4f0; transform: translateY(-1px); } .ds-btn-outline:focus-visible { outline: 2px solid color-mix(in srgb, #e53333 70%, transparent); outline-offset: 2px; } .ds-btn-outline:active { color: #e53333; transform: translateY(0); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Lowest-emphasis control; icon buttons and inline toolbar actions.",
+      "html": "<button class=\"ds-btn-ghost\" aria-label=\"Settings\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z\"/></svg></button>",
+      "css": ".ds-btn-ghost { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #8896aa; cursor: pointer; transition: background .15s, color .15s; } .ds-btn-ghost:hover { background: #171b28; color: #dce4f0; } .ds-btn-ghost:focus-visible { outline: 2px solid color-mix(in srgb, #e53333 70%, transparent); outline-offset: 2px; } .ds-btn-ghost:active { color: #e53333; }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text field with the shared red focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Найти тайтл…\" />",
+      "css": ".ds-input { width: 100%; height: 32px; padding: 4px 10px; border: 1px solid rgba(255,255,255,0.045); border-radius: 10px; background: #0e1018; color: #dce4f0; font-family: Syne, system-ui, sans-serif; font-size: 0.8125rem; outline: none; transition: border-color .15s, box-shadow .15s; } .ds-input::placeholder { color: #4e5c72; } .ds-input:focus-visible { border-color: #e53333; box-shadow: 0 0 0 3px color-mix(in srgb, #e53333 50%, transparent); } .ds-input:disabled { opacity: .5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Panel Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The console container — hairline border, tonal surface, no shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-head\"><span class=\"ds-card-title\"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 11l3 3L22 4\"/><path d=\"M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11\"/></svg>Задачи</span><span class=\"ds-card-count\">4</span></div><p class=\"ds-card-body\">Проверить деплой hermes.lan и обновить образы GHCR.</p></div>",
+      "css": ".ds-card { display: flex; flex-direction: column; padding: 24px; border: 1px solid rgba(255,255,255,0.045); border-radius: 19px; background: #121622; color: #dce4f0; font-family: Syne, system-ui, sans-serif; } .ds-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; } .ds-card-title { display: inline-flex; align-items: center; gap: 10px; color: #4e5c72; font-size: 0.78125rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; } .ds-card-title svg { color: #8896aa; } .ds-card-count { color: #4e5c72; font-size: 0.71875rem; font-variant-numeric: tabular-nums; } .ds-card-body { margin: 0; color: #8896aa; font-size: 0.8125rem; line-height: 1.5; }"
+    },
+    {
+      "name": "Accent Badge",
+      "kind": "chip",
+      "refersTo": "badge-accent",
+      "description": "Status token — text in the hue, 10% wash, 25% border. The house formula.",
+      "html": "<span class=\"ds-badge-accent\">LIVE</span>",
+      "css": ".ds-badge-accent { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid color-mix(in srgb, #e53333 25%, transparent); border-radius: 9999px; background: color-mix(in srgb, #e53333 10%, transparent); color: #e53333; font-family: Syne, system-ui, sans-serif; font-size: 0.65625rem; letter-spacing: 0.05em; white-space: nowrap; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Cinematic Cockpit",
+    "overview": "Mission Control is two surfaces sharing one shell: a tight instrument cluster (tasks, homelab services, agent logs, system gauges) where density is the point, and a full-bleed media theatre (hero backdrops, 68–84px titles, auto-hiding chrome, HLS into the hero background). The single red accent is the wire between them — it marks the live thing on the console and the play button in the theatre, and almost nothing else. The room is dark by default: near-black surfaces separated by tonal steps and hairline borders, never drop shadows. This is a flat system; the older 'neumorphism' language in CLAUDE.md has been fully replaced. It rejects soft embossing, pastel SaaS gradients, glassmorphism-as-default, and decorative motion.",
+    "keyCharacteristics": [
+      "Dark-first, near-black tonal layering; hairline borders instead of shadows.",
+      "A single family (Syne) carries display, UI, labels, and tabular figures.",
+      "One red accent, used as a live-status signal — never decoration.",
+      "Extreme density on the console side; full-bleed cinema on the media side.",
+      "Fixed rem type scale for UI; fluid only where the media hero is genuinely cinematic."
+    ],
+    "rules": [
+      { "name": "The One Wire Rule", "body": "Signal Red is a signal, not a color you decorate with. It marks the single live or primary thing in a view; its glow is reserved for exactly those. If two red things compete for 'the live one,' one is wrong.", "section": "colors" },
+      { "name": "The No-Green Rule", "body": "Success is red (--ok: var(--accent)); there is no green token. Status is carried by red (live/ok), amber (warn), pink-red (bad), and blue (info).", "section": "colors" },
+      { "name": "The Tabular Rule", "body": "Every number in a column or that updates in place uses the mono role with tnum on; figures must not reflow as their value changes.", "section": "typography" },
+      { "name": "The Tracked-Label Rule", "body": "Structural labels are uppercase, tracking 0.16em, and --muted. Small, spaced, dim is how a label signals 'I am chrome, not content.'", "section": "typography" },
+      { "name": "The Flat-Console Rule", "body": "On the console, depth is tonal + hairline only. If you reach for a black box-shadow to separate two panels, fix the surface color, not the shadow.", "section": "elevation" },
+      { "name": "The Glow-Means-Live Rule", "body": "A red glow is never ambient decoration; it appears only on live or primary elements. A resting, non-primary surface never glows.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the app dark-first — Console Black (#09090d) is the page; surfaces climb the tonal ladder from there.",
+      "Do convey panel depth with a tonal step + a single hairline border, never a drop shadow.",
+      "Do reserve Signal Red (#e53333) and its glow for the one live or primary element in a view.",
+      "Do set numeric/columnar values in the mono role with tabular figures (tnum).",
+      "Do set structural labels UPPERCASE, tracking-5 (0.16em), --muted.",
+      "Do give every interactive component its full state set (default / hover / focus-visible red ring / active / disabled / loading).",
+      "Do honor prefers-reduced-motion — the media hover and skeleton shimmer already collapse to near-instant."
+    ],
+    "donts": [
+      "Don't reintroduce neumorphism — no soft dual embossed shadows on surfaces.",
+      "Don't use a black box-shadow to separate console panels; the media-card hover lift is the only sanctioned black drop shadow.",
+      "Don't add a green — success is red; status lives in the four-signal vocabulary.",
+      "Don't decorate with the red accent or its glow — a resting, non-primary surface never glows.",
+      "Don't set body copy in --muted; use --ink / --ink-soft.",
+      "Don't flip the light theme to white paper — it is a cool slate that keeps the console mood in daylight.",
+      "Don't introduce a second type family or a real monospace face — one Syne, many weights, tnum for figures.",
+      "Don't use glassmorphism as a default surface; backdrop-blur is reserved for the modal/drawer overlay scrim."
+    ]
+  }
+}

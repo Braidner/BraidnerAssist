@@ -290,7 +290,7 @@ body.sb-locked {
   display: inline-block;
 }
 .media-ep-missed {
-  color: #e06666 !important;
+  color: var(--bad) !important;
 }
 
 .media-skeleton {

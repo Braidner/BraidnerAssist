@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card } from "../../components/ui/Card.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { Ring } from "../../components/ui/Ring.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import { BackendLogsCard } from "./BackendLogsCard.tsx";
@@ -132,30 +133,33 @@ function DockerCard({
                 <span className={statTag}>{c.state.toUpperCase()}</span>
                 <div className="ml-auto flex gap-1.5">
                   {!running && (
-                    <button
-                      className={ui.button.sm}
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={busy}
                       onClick={() => act(c, "start")}
                     >
                       Запустить
-                    </button>
+                    </Button>
                   )}
                   {running && (
-                    <button
-                      className={ui.button.sm}
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={busy}
                       onClick={() => act(c, "stop")}
                     >
                       Стоп
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className={ui.button.sm}
+                  <Button
+                    variant="outline"
+                    size="sm"
                     disabled={busy}
                     onClick={() => act(c, "restart")}
                   >
                     Рестарт
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -256,9 +260,9 @@ function PosterCacheCard({
       icon="cloud"
       title="Poster cache"
       action={
-        <button className={ui.button.sm} disabled={busy} onClick={purge}>
+        <Button variant="outline" size="sm" disabled={busy} onClick={purge}>
           Очистить
-        </button>
+        </Button>
       }
     >
       {!cache.configured ? (

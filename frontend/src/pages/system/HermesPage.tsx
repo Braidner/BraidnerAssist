@@ -16,9 +16,9 @@ import {
 
 // LED-класс по статусу AgentTask
 function cmdLed(status: string): string {
-  if (status === "done") return "bg-ok";
   if (status === "active" || status === "in_progress") return "bg-accent";
   if (status === "error") return "bg-bad";
+  if (status === "done") return "bg-ink-soft";
   return "bg-muted";
 }
 

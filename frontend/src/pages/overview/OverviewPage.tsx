@@ -19,10 +19,10 @@ export function OverviewPage() {
         className="flex flex-col gap-3 px-4 pb-6 pt-3 sm:px-6"
       >
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <TasksPanel flat />
-          <HermesLogPanel flat />
+          <TasksPanel />
+          <HermesLogPanel />
         </div>
-        <HomeAssistantPanel flat />
+        <HomeAssistantPanel />
       </div>
     </div>
   );

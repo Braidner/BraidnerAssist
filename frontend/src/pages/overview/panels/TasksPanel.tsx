@@ -14,7 +14,7 @@ const PRIO_VAR: Record<Prio, string> = {
   info: "var(--info)",
 };
 
-export function TasksPanel({ flat }: { flat?: boolean }) {
+export function TasksPanel() {
   const {
     tasks,
     onToggleTask: onToggle,
@@ -37,170 +37,42 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
     inputRef.current?.focus();
   }
 
-  if (flat) {
-    return (
-      <div className={cn(ui.panel, "p-4")}>
-        <div className="mb-4 flex items-center gap-2 font-mono uppercase tracking-5">
-          <icons.list className="size-[15px] text-accent" />
-          <span className="text-cell text-ink">Задачи</span>
-          <span className={cn(ui.panelCount, "rounded border border-hair bg-surface px-2 py-1")}>
-            {open} активных
-          </span>
-        </div>
-        <form onSubmit={submit} className="mb-3.5 flex gap-3">
-          <div className="flex flex-1 items-center rounded-[14px] border border-hair bg-surface px-4">
-            <input
-              ref={inputRef}
-              className="w-full bg-transparent py-[13px] font-mono text-body text-ink outline-none placeholder:text-muted"
-              placeholder="$ новая задача…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-          </div>
-          <button className={cn(ui.button.base, ui.button.icon, "h-[50px] w-[50px] rounded-2xl text-accent")} type="submit" aria-label="Добавить">
-            <icons.plus style={{ width: 20, height: 20 }} />
-          </button>
-        </form>
-        <div className="mb-3 flex gap-2">
-          <button
-            className={cn(ui.pill, !showDone && "border-accent/50 bg-accent/15 text-accent")}
-            onClick={() => setShowDone(false)}
-          >
-            Активные
-          </button>
-          <button
-            className={cn(ui.pill, showDone && "border-accent/50 bg-accent/15 text-accent")}
-            onClick={() => setShowDone(true)}
-          >
-            Все
-          </button>
-        </div>
-        <div
-          className="scroll flex min-h-0 flex-1 flex-col pr-1.5"
-          style={{ flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}
-        >
-          {visible.length === 0 && (
-            <div className="py-2.5 font-mono text-xs text-muted">
-              {tasks.length === 0
-                ? "Нет задач. Введи название выше или создай через Hermes."
-                : "Нет активных задач — все выполнены."}
-            </div>
-          )}
-          {visible.map((t) => (
-            <div
-              key={t.id}
-              className={cn(
-                "group flex cursor-pointer items-start gap-3 border-t border-hair px-1 py-3.5 transition-colors hover:bg-surface/60",
-                t.done && "opacity-55",
-              )}
-              onClick={() => onSelect(t)}
-              style={{
-                opacity: t.tag === "gitlab" ? (t.done ? 0.5 : 0.85) : undefined,
-              }}
-            >
-              <span
-                className={cn(
-                  "mt-0.5 grid size-[22px] flex-none place-items-center rounded-md border border-hair bg-surface text-transparent transition-colors",
-                  t.done && "border-accent/50 bg-accent text-accent-ink",
-                )}
-                role="checkbox"
-                aria-checked={t.done}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggle(t);
-                }}
-              >
-                <icons.check className="size-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className={cn("truncate text-row font-medium text-ink", t.done && "line-through text-muted")}>{t.label}</div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2 font-mono text-label text-muted">
-                  <span
-                    className="size-2 rounded-full"
-                    style={{ background: PRIO_VAR[t.prio] }}
-                  />
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-hair bg-surface px-2.5 py-0.5">
-                    {t.tag === "gitlab" && (
-                      <span
-                        className="size-1.5 rounded-full"
-                        style={{ background: "var(--pink)" }}
-                      />
-                    )}
-                    {t.tag}
-                  </span>
-                  {t.claimedBy === "hermes" && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-accent">
-                      <icons.bot style={{ width: 11, height: 11 }} />
-                      Hermes
-                    </span>
-                  )}
-                  <span>{fmtUpdated(t.updatedAt)}</span>
-                </div>
-              </div>
-              {t.tag === "local" && (
-                <button
-                  className="grid size-8 flex-none place-items-center rounded-lg border border-transparent text-muted opacity-0 transition-opacity hover:border-bad/35 hover:text-bad group-hover:opacity-100"
-                  title="Удалить задачу"
-                  aria-label="Удалить задачу"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Удалить задачу «${t.label}»?`)) onDelete(t);
-                  }}
-                >
-                  <icons.trash style={{ width: 15, height: 15 }} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <Card
       icon="list"
       title="Задачи"
       action={<span className={ui.panelCount}>{open} активн.</span>}
     >
-      <form onSubmit={submit} className="mb-3.5 flex gap-3">
-        <div className="flex flex-1 items-center rounded-[14px] border border-hair bg-surface px-4">
-          <input
-            ref={inputRef}
-            className="w-full bg-transparent py-[13px] font-mono text-body text-ink outline-none placeholder:text-muted"
-            placeholder="$ новая задача…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </div>
+      <form onSubmit={submit} className="mb-3.5 flex items-stretch gap-2">
+        <input
+          ref={inputRef}
+          className={cn(ui.input, "flex-1 font-mono placeholder:text-muted")}
+          placeholder="$ новая задача…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+        />
         <button
-          className={cn(
-            ui.button.base,
-            ui.button.icon,
-            "h-[50px] w-[50px] rounded-2xl text-accent",
-          )}
+          className={cn(ui.button.base, ui.button.icon, "text-accent")}
           type="submit"
           aria-label="Добавить"
         >
-          <icons.plus style={{ width: 20, height: 20 }} />
+          <icons.plus className="size-[18px]" />
         </button>
       </form>
 
-      <div className="mb-3 flex gap-2">
+      <div className={cn(ui.seg, "mb-3")}>
         <button
-          className={cn(
-            ui.pill,
-            !showDone && "border-accent/50 bg-accent/15 text-accent",
-          )}
+          type="button"
+          className={cn(ui.segButton, !showDone && ui.segButtonOn)}
+          aria-pressed={!showDone}
           onClick={() => setShowDone(false)}
         >
           Активные
         </button>
         <button
-          className={cn(
-            ui.pill,
-            showDone && "border-accent/50 bg-accent/15 text-accent",
-          )}
+          type="button"
+          className={cn(ui.segButton, showDone && ui.segButtonOn)}
+          aria-pressed={showDone}
           onClick={() => setShowDone(true)}
         >
           Все
@@ -212,7 +84,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
         style={{ flex: 1, minHeight: 0, marginRight: -6, paddingRight: 6 }}
       >
         {visible.length === 0 && (
-          <div className="py-2.5 font-mono text-xs text-muted">
+          <div className="py-2.5 font-mono text-xs text-ink-soft">
             {tasks.length === 0
               ? "Нет задач. Введи название выше или создай через Hermes."
               : "Нет активных задач — все выполнены."}
@@ -232,14 +104,23 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
           >
             <span
               className={cn(
-                "mt-0.5 grid size-[22px] flex-none place-items-center rounded-md border border-hair bg-surface text-transparent transition-colors",
+                "mt-0.5 grid size-[22px] flex-none cursor-pointer place-items-center rounded-md border border-hair bg-surface text-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
                 t.done && "border-accent/50 bg-accent text-accent-ink",
               )}
               role="checkbox"
+              tabIndex={0}
               aria-checked={t.done}
+              aria-label={t.label}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggle(t);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggle(t);
+                }
               }}
             >
               <icons.check className="size-3.5" />
@@ -248,7 +129,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
               <div
                 className={cn(
                   "truncate text-row font-medium text-ink",
-                  t.done && "line-through text-muted",
+                  t.done && "text-muted line-through",
                 )}
               >
                 {t.label}
@@ -269,7 +150,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
                 </span>
                 {t.claimedBy === "hermes" && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-accent">
-                    <icons.bot style={{ width: 11, height: 11 }} />
+                    <icons.bot className="size-[11px]" />
                     Hermes
                   </span>
                 )}
@@ -278,7 +159,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
             </div>
             {t.tag === "local" && (
               <button
-                className="grid size-8 flex-none place-items-center rounded-lg border border-transparent text-muted opacity-0 transition-opacity hover:border-bad/35 hover:text-bad group-hover:opacity-100"
+                className="grid size-8 flex-none place-items-center rounded-lg border border-transparent text-muted opacity-0 transition-opacity hover:border-bad/35 hover:text-bad focus-visible:opacity-100 group-hover:opacity-100"
                 title="Удалить задачу"
                 aria-label="Удалить задачу"
                 onClick={(e) => {
@@ -286,7 +167,7 @@ export function TasksPanel({ flat }: { flat?: boolean }) {
                   if (confirm(`Удалить задачу «${t.label}»?`)) onDelete(t);
                 }}
               >
-                <icons.trash style={{ width: 15, height: 15 }} />
+                <icons.trash className="size-[15px]" />
               </button>
             )}
           </div>

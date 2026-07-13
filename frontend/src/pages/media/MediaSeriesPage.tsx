@@ -709,7 +709,7 @@ export function MediaSeriesPage({
                                 ep.hasFile
                                   ? "bg-white/[0.12] text-white"
                                   : missed
-                                    ? "bg-black/45 text-[#ff8a8a]"
+                                    ? "bg-black/45 text-bad"
                                     : "bg-black/45 text-white/58",
                               )}
                             >

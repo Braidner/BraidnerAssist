@@ -45,6 +45,13 @@ export const ui = {
     "hover:border-accent/40 hover:bg-surface-2 hover:text-ink",
     focus,
   ),
+  // Segmented control — shared with the media surface (mediaStyles `seg`).
+  seg: "flex gap-1.5 rounded-xl bg-surface p-1",
+  segButton: cn(
+    "h-8 flex-1 cursor-pointer rounded-[9px] border-0 bg-transparent text-cell font-medium text-muted transition-colors hover:text-ink",
+    focus,
+  ),
+  segButtonOn: "bg-accent text-accent-ink hover:text-accent-ink",
   overlay:
     "fixed inset-0 z-40 bg-black/45 backdrop-blur-sm transition-opacity duration-200",
   drawer:

@@ -51,7 +51,7 @@ export const media = {
   itemMeta: "font-mono text-2xs text-muted",
   itemPlay: "absolute bottom-2.5 right-2.5 text-sm text-accent",
   seenBadge:
-    "absolute right-1.5 top-1.5 grid h-5 min-w-5 place-items-center rounded-[10px] bg-ok px-1.5 text-data font-bold text-[#06241a]",
+    "absolute right-1.5 top-1.5 grid h-5 min-w-5 place-items-center rounded-[10px] bg-emerald-400 px-1.5 text-data font-bold text-[#06241a]",
   skeleton:
     "aspect-[2/3] animate-[skel-pulse_1.4s_ease-in-out_infinite] rounded-xl bg-surface",
   calendarRows: "mt-2 flex flex-col gap-1.5",

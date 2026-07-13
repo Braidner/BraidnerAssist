@@ -126,7 +126,7 @@ What this system rejects: soft embossed neumorphism, pastel SaaS gradients, glas
 
 **Key Characteristics:**
 - Dark-first, near-black tonal layering; hairline borders instead of shadows.
-- A single family (Syne) carries display, UI, labels, and tabular figures.
+- Syne carries the console (display, UI, labels, tabular figures); Oswald is the cinematic display face for the media theatre only.
 - One red accent, used as a live-status signal — never as decoration.
 - Extreme density on the console side; full-bleed cinema on the media side.
 - Fixed rem type scale for UI; fluid only where the media hero is genuinely cinematic.
@@ -156,18 +156,25 @@ The light theme is a **cool slate**, not white — page `#e4e8f0`, surfaces `#e9
 - **Warn Amber** (`#e3a93f` dark / `#cf8a1f` light): warnings, degraded services.
 - **Bad Pink-Red** (`#e06b8a` dark / `#d2587a` light): errors, destructive actions, offline.
 - **Info Blue** (`#6f9ce8` dark / `#4a7dd4` light): informational / neutral highlights.
-- **OK = Signal Red.** Success reuses the accent (`--ok: var(--accent)`); this system does not carry a green.
+- **OK = Signal Red.** On the console, "ok/success" reuses the accent (`--ok: var(--accent)`); the console itself carries no green.
+
+### The media pipeline palette (canonical)
+The **media** register is the product's design lead, and it carries a richer, deliberate multi-hue **pipeline-status** palette — one hue per stage of a title's journey, so state is glanceable at a distance (Sonarr/Radarr-style):
+- **watchlist → sky** (`sky-400`), **release_selected → amber**, **downloading → red accent** (the live stage), **awaiting_jellyfin → violet**, **in_library / watched → emerald**. Ratings use a single **gold**.
+
+This is not console drift — it is media's own vocabulary, and it wins inside the media theatre. Red still means the *active/live* stage; the other hues mark settled or pending states that are not competing for "live."
 
 ### Named Rules
-**The One Wire Rule.** Signal Red is a signal, not a color you decorate with. It marks the single live or primary thing in a view — one action, one selection, one alert — and its glow is reserved for exactly those. If two red things compete for "the live one," one of them is wrong.
+**The One Wire Rule (console).** On the console, Signal Red is a signal, not decoration. It marks the single live or primary thing in a view — one action, one selection, one alert — and its glow is reserved for exactly those. If two red things compete for "the live one," one of them is wrong. (Media relaxes this to its pipeline palette above.)
 
-**The No-Green Rule.** Success is red, not green. There is no green token. Status is carried by red (live/ok), amber (warn), pink-red (bad), and blue (info) — introducing a green breaks the console's four-signal vocabulary.
+**The No-Console-Green Rule.** The console shell carries no green — status there is red (live/ok), amber (warn), pink-red (bad), blue (info). Green belongs to the media pipeline (`in_library`/`watched` → emerald) and stays there; do not import a celebration-green into console success states.
 
 ## 3. Typography
 
-**Display / UI / Mono Font:** Syne (variable, weights 400–800), with `system-ui, -apple-system, sans-serif` fallback.
+**UI / Body / Mono Font:** Syne (variable, weights 400–800), with `system-ui, -apple-system, sans-serif` fallback.
+**Cinematic Display Font:** Oswald (weights 600–700), with `var(--font)` (Syne) fallback — loaded via the `index.html` Google Fonts link.
 
-**Character:** One family does everything. Syne's geometric-but-quirky letterforms give the display sizes personality while its tight metrics survive being shrunk to 8–13px for dense UI. The "mono" role is the same Syne with `font-feature-settings: "tnum" 1` for tabular figures — there is no separate monospace face in production (the JetBrains Mono / Inconsolata declarations are commented out). Fixed rem sizing throughout the console; fluid only for the media hero, which is genuinely cinematic.
+**Character:** Syne carries the whole console — display, UI, labels, and (as the "mono" role, same face with `font-feature-settings: "tnum" 1`) tabular figures; there is no separate monospace face in production. The one deliberate second face is **Oswald**, a condensed grotesque used *only* for the cinematic media register: the library/detail hero titles (`text-hero`/`text-cinematic`), the discover section labels, and the giant watermark rank numerals. Its condensed weight is what makes the media theatre read as cinema rather than console. Fixed rem sizing throughout the console; fluid only for the media hero.
 
 ### Hierarchy
 - **Hero** (800, 5.25rem / 84px, line-height 1): The landing / overview hero headline. The system's loudest voice; used once per view at most.
@@ -243,9 +250,9 @@ The media detail pages (`/media/series|movie/:id`) render a full-bleed backdrop 
 ### Don't:
 - **Don't** reintroduce neumorphism. No soft dual embossed shadows on surfaces — the flat pass replaced that on purpose, whatever CLAUDE.md's older text says.
 - **Don't** use a black `box-shadow` to separate console panels. If two panels don't read as distinct, fix the surface tone, not the shadow. (The media-card hover lift is the *only* sanctioned black drop shadow.)
-- **Don't** add a green. Success is red (`--ok: var(--accent)`); status lives in the four-signal vocabulary (red / amber / pink-red / blue).
+- **Don't** import media's greens into the console. Console success stays red (`--ok: var(--accent)`); emerald belongs to the media pipeline (`in_library`/`watched`) and stays there.
 - **Don't** decorate with the red accent or its glow. A resting, non-primary surface never glows — the Glow-Means-Live Rule.
 - **Don't** set body copy in `--muted` — it's tuned to recede as a label and fails contrast as reading text. Use `--ink` / `--ink-soft`.
 - **Don't** flip the light theme to white paper. It is a cool slate (`#e4e8f0`) that keeps the console mood in daylight.
-- **Don't** introduce a second type family or a real monospace face. One Syne, many weights, `tnum` for figures.
+- **Don't** introduce a *third* type family or a real monospace face. Syne for the console, Oswald for the media cinematic display, `tnum` for figures — that's the whole system.
 - **Don't** use glassmorphism as a default surface. Backdrop-blur is reserved for the modal/drawer overlay scrim, not for content cards.

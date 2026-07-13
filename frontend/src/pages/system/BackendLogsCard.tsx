@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "../../components/ui/Card.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { getLogs, type LogEntry, type LogLevel } from "../../lib/api.ts";
-import { cn } from "../../lib/cn.ts";
 import { ui } from "../../lib/ui.ts";
 
 type LogFilter = LogLevel | "all";
@@ -78,29 +78,27 @@ export function BackendLogsCard() {
       action={
         <div className="flex items-center gap-2">
           <span className={ui.panelCount}>{entries.length}</span>
-          <button
-            className={cn(ui.button.base, ui.button.sm)}
+          <Button
+            variant="outline"
+            size="icon-sm"
             onClick={() => void load()}
             title="Обновить"
           >
             ↺
-          </button>
+          </Button>
         </div>
       }
     >
       <div className="mb-2.5 flex flex-wrap gap-1.5">
         {(["all", "error", "warn", "info"] as const).map((level) => (
-          <button
+          <Button
             key={level}
-            className={cn(
-              ui.button.base,
-              ui.button.sm,
-              filter === level && ui.button.accent,
-            )}
+            size="sm"
+            variant={filter === level ? "default" : "outline"}
             onClick={() => setFilter(level)}
           >
             {levelLabel(level)}
-          </button>
+          </Button>
         ))}
       </div>
 

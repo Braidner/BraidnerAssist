@@ -847,22 +847,129 @@ export function ReleasePicker({
       </div>
 
       {bestRelease && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[12px] border border-white/[0.08] bg-white/[0.035] px-3 py-2">
-          <div className="min-w-0">
-            <div className="font-mono text-2xs uppercase tracking-[0.12em] text-muted">Лучший выбор</div>
-            <div className="truncate text-sm font-semibold text-ink" title={bestRelease.details?.title ?? bestRelease.title}>
-              {bestRelease.details?.title ?? bestRelease.title}
+        <div data-impeccable-variants="a46d5efa" data-impeccable-variant-count="3" style={{ display: "contents" }}>
+          {/* impeccable-variants-start a46d5efa */}
+          {/* Original */}
+          <div data-impeccable-variant="original">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/20 bg-accent/[0.06] px-3 py-2">
+              <div className="min-w-0">
+                <div className="font-mono text-2xs uppercase tracking-4 text-accent/80">Лучший выбор</div>
+                <div className="truncate text-sm font-semibold text-ink" title={bestRelease.details?.title ?? bestRelease.title}>
+                  {bestRelease.details?.title ?? bestRelease.title}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={cn(media.button.accentSm, "flex-none")}
+                disabled={bestBlocked || busyGuid === bestRelease.guid || Boolean(grabbedHashes[bestRelease.guid])}
+                onClick={() => onGrab(bestRelease)}
+              >
+                <Download size={14} />
+                {bestBlocked ? "Нужна проверка" : busyGuid === bestRelease.guid ? "Отправляем" : "Скачать лучший"}
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            className={cn(media.button.accentSm, "flex-none")}
-            disabled={bestBlocked || busyGuid === bestRelease.guid || Boolean(grabbedHashes[bestRelease.guid])}
-            onClick={() => onGrab(bestRelease)}
-          >
-            <Download size={14} />
-            {bestBlocked ? "Нужна проверка" : busyGuid === bestRelease.guid ? "Отправляем" : "Скачать лучший"}
-          </button>
+          {/* Variants: insert below this line */}
+          <style data-impeccable-css="a46d5efa">{`
+            @scope ([data-impeccable-variant="1"]) {
+              :scope > .mc-bp { padding: 12px 16px; }
+              :scope[data-p-density="roomy"] > .mc-bp { padding: 12px 16px; }
+              :scope[data-p-density="comfy"] > .mc-bp { padding: 10px 14px; }
+              :scope[data-p-density="cozy"] > .mc-bp { padding: 8px 12px; }
+            }
+            @scope ([data-impeccable-variant="2"]) {
+              :scope > .mc-bp { padding: 12px; }
+              :scope[data-p-density="roomy"] > .mc-bp { padding: 12px; }
+              :scope[data-p-density="comfy"] > .mc-bp { padding: 10px; }
+              :scope[data-p-density="cozy"] > .mc-bp { padding: 8px; }
+            }
+            @scope ([data-impeccable-variant="3"]) {
+              :scope > .mc-bp { padding: 12px 16px; }
+              :scope[data-p-density="roomy"] > .mc-bp { padding: 12px 16px; }
+              :scope[data-p-density="comfy"] > .mc-bp { padding: 10px 14px; }
+              :scope[data-p-density="cozy"] > .mc-bp { padding: 8px 12px; }
+            }
+          `}</style>
+          {/* Variant 1 — roomy, chip-led (rhythm & spacing) */}
+          <div data-impeccable-variant="1" data-impeccable-params='[{"id":"density","kind":"steps","default":"roomy","label":"Плотность","options":[{"value":"cozy","label":"Плотно"},{"value":"comfy","label":"Средне"},{"value":"roomy","label":"Просторно"}]}]'>
+            <div className="mc-bp mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/25 bg-accent/[0.07]">
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="flex-none text-accent"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z" /></svg>
+                  <span className="font-mono text-2xs uppercase tracking-4 text-accent">Лучший выбор</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {releaseMatchChips(bestRelease).map((c, i) => (
+                    <span key={i} className={releaseChipClass(c.tone)}>{c.label}</span>
+                  ))}
+                </div>
+                <div className="truncate text-2xs text-muted" title={bestRelease.details?.title ?? bestRelease.title}>{bestRelease.details?.title ?? bestRelease.title}</div>
+              </div>
+              <button
+                type="button"
+                className={cn(media.button.accentSm, "flex-none")}
+                disabled={bestBlocked || busyGuid === bestRelease.guid || Boolean(grabbedHashes[bestRelease.guid])}
+                onClick={() => onGrab(bestRelease)}
+              >
+                <Download size={14} />
+                {bestBlocked ? "Нужна проверка" : busyGuid === bestRelease.guid ? "Отправляем" : "Скачать лучший"}
+              </button>
+            </div>
+          </div>
+          {/* Variant 2 — award-badge hierarchy (icon-led two-column) */}
+          <div data-impeccable-variant="2" style={{ display: "none" }} data-impeccable-params='[{"id":"density","kind":"steps","default":"roomy","label":"Плотность","options":[{"value":"cozy","label":"Плотно"},{"value":"comfy","label":"Средне"},{"value":"roomy","label":"Просторно"}]}]'>
+            <div className="mc-bp mb-3 flex items-center gap-3 rounded-xl border border-accent/25 bg-accent/[0.06]">
+              <div className="grid size-10 flex-none place-items-center rounded-lg bg-accent/15 text-accent">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z" /></svg>
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="font-mono text-2xs uppercase tracking-4 text-accent/80">Лучший выбор</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {releaseMatchChips(bestRelease).map((c, i) => (
+                    <span key={i} className={releaseChipClass(c.tone)}>{c.label}</span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={cn(media.button.accentSm, "flex-none")}
+                disabled={bestBlocked || busyGuid === bestRelease.guid || Boolean(grabbedHashes[bestRelease.guid])}
+                onClick={() => onGrab(bestRelease)}
+              >
+                <Download size={14} />
+                {bestBlocked ? "Нужна проверка" : busyGuid === bestRelease.guid ? "Отправляем" : "Скачать лучший"}
+              </button>
+            </div>
+          </div>
+          {/* Variant 3 — micro-details finish (card radius, pill badge, hover glow) */}
+          <div data-impeccable-variant="3" style={{ display: "none" }} data-impeccable-params='[{"id":"density","kind":"steps","default":"roomy","label":"Плотность","options":[{"value":"cozy","label":"Плотно"},{"value":"comfy","label":"Средне"},{"value":"roomy","label":"Просторно"}]}]'>
+            <div className="mc-bp group mb-3 flex flex-wrap items-center justify-between gap-3 rounded-card border border-accent/25 bg-accent/[0.06] transition-shadow duration-200 hover:shadow-[var(--accent-glow-sm)]">
+              <div className="flex min-w-0 flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex flex-none items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 font-mono text-2xs uppercase tracking-3 text-accent">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2z" /></svg>
+                    Лучший
+                  </span>
+                  <span className="truncate text-2xs text-muted" title={bestRelease.details?.title ?? bestRelease.title}>{bestRelease.details?.title ?? bestRelease.title}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {releaseMatchChips(bestRelease).map((c, i) => (
+                    <span key={i} className={releaseChipClass(c.tone)}>{c.label}</span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={cn(media.button.accentSm, "flex-none")}
+                disabled={bestBlocked || busyGuid === bestRelease.guid || Boolean(grabbedHashes[bestRelease.guid])}
+                onClick={() => onGrab(bestRelease)}
+              >
+                <Download size={14} />
+                {bestBlocked ? "Нужна проверка" : busyGuid === bestRelease.guid ? "Отправляем" : "Скачать лучший"}
+              </button>
+            </div>
+          </div>
+          {/* impeccable-variants-end a46d5efa */}
         </div>
       )}
 

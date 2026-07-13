@@ -215,7 +215,7 @@ export function buildReleaseMatch(input: {
   const parsed = parseReleaseTitle(releaseTextForMatch(input.item));
   const declaredYears = parsed.declaredYears;
   const targetYear = input.title.year;
-  const yearStatus: ReleaseMatch["yearStatus"] = input.allowedYears.length === 0
+  let yearStatus: ReleaseMatch["yearStatus"] = input.allowedYears.length === 0
     ? "unknown"
     : declaredYears.length === 0
       ? "unknown"
@@ -229,6 +229,14 @@ export function buildReleaseMatch(input: {
       : parsed.season === input.seasonNumber
         ? "match"
         : "mismatch";
+  // For a confirmed series season the season NUMBER is the authoritative
+  // disambiguator, so the release year is not authoritative: TMDB season air
+  // years can be incomplete (collapsing allowedYears to just the show's debut
+  // year) and release labels drift between a season's premiere and finale year.
+  // Don't reject a correct season pack just because its year isn't in the set.
+  if (yearStatus === "mismatch" && input.kind === "series" && input.seasonNumber != null && seasonStatus === "match") {
+    yearStatus = "unknown";
+  }
   const warnings = [
     ...(yearStatus === "mismatch" ? [`год не совпадает: ${declaredYears.join(", ")} ≠ ${input.allowedYears.join("/")}`] : []),
     ...(seasonStatus === "mismatch" ? [`не тот сезон: S${String(parsed.season).padStart(2, "0")}`] : []),

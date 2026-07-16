@@ -8,6 +8,11 @@ export const media = {
   pageMain: "flex flex-col gap-5",
   pageSide: "flex flex-col gap-5",
   input: cn(ui.input, "min-w-0 flex-1"),
+  select: cn(
+    "h-9 cursor-pointer appearance-none rounded-[10px] border border-hair bg-surface py-1.5 pl-3 pr-8 text-body text-ink outline-none transition-colors",
+    "focus:border-accent/60 focus:outline focus:outline-2 focus:outline-accent/20 focus:outline-offset-1",
+    "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%238a8a94%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:12px] bg-[right_10px_center] bg-no-repeat",
+  ),
   field: "flex items-stretch gap-2",
   empty: "py-3 font-mono text-xs text-muted",
   panelCount: ui.panelCount,

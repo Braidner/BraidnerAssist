@@ -99,6 +99,7 @@ export function MediaRail({
   count,
   countLabel,
   onTitleClick,
+  headerActions,
   children,
   className,
 }: {
@@ -106,6 +107,7 @@ export function MediaRail({
   count?: number;
   countLabel?: string;
   onTitleClick?: () => void;
+  headerActions?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -172,6 +174,7 @@ export function MediaRail({
         )}
         <div className={ms.discSecLine} />
         {renderedCount ? <span className={ms.discSecCount}>{renderedCount}</span> : null}
+        {headerActions ? <div className="flex flex-none items-center gap-2">{headerActions}</div> : null}
       </div>
       <div
         ref={trackRef}

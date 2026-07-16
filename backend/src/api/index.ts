@@ -35,6 +35,7 @@ import {
   nativeLookupAll,
   nativeAdd,
   nativeReleaseSearch,
+  nativeSeasonSummaries,
   nativeGrabRelease,
   nativeSeriesDiscoverDetail,
   nativeMovieDiscoverDetail,
@@ -694,6 +695,22 @@ apiRouter.post("/media/release/search", async (req, res) => {
   } catch (e) {
     logRouteError("jackett", req, e, { kind, id, seasonNumber, query, limit });
     res.status(502).json({ error: String(e) });
+  }
+});
+
+// Список сезонов тайтла (номер + год выхода) для селекта в ReleasePicker.
+// Graceful: не сериал / TMDB не настроен / ошибка → [].
+apiRouter.get("/media/seasons", async (req, res) => {
+  const kind = String(req.query?.type ?? "") === "series" ? "series" : "movie";
+  const id = Number(req.query?.id);
+  if (kind !== "series" || !Number.isFinite(id) || id <= 0 || !config.media.tmdb.configured) {
+    return res.json([]);
+  }
+  try {
+    res.json(await nativeSeasonSummaries(id));
+  } catch (e) {
+    logRouteError("tmdb", req, e, { kind, id });
+    res.json([]);
   }
 });
 

@@ -210,6 +210,7 @@ export interface SearchResult {
   details?: import("./releaseDetails.js").ReleaseDetails | null;
   match?: ReleaseMatch;
   parsed?: unknown;
+  inferredSeason?: number | null;
 }
 
 export interface PlayDevice {

@@ -21,7 +21,9 @@ import {
   tmdbSearch,
   tmdbSeason,
   tmdbTvSeasons,
+  tmdbTvSeasonSummaries,
   tmdbTvToTvdb,
+  type SeasonSummary,
   type TmdbItem,
 } from "./tmdb.js";
 import { parseReleaseTitle } from "./releaseParse.js";
@@ -199,6 +201,34 @@ async function allowedReleaseYears(kind: MediaKind, title: { year: number | null
     }
   }
   return [...years].sort((a, b) => a - b);
+}
+
+// airYear → seasonNumber. Iterated ascending (summaries are sorted), so the
+// FIRST (lowest) season for a shared premiere year wins — deterministic.
+export function buildSeasonYearIndex(summaries: SeasonSummary[]): Map<number, number> {
+  const index = new Map<number, number>();
+  for (const s of summaries) {
+    if (s.airYear == null || index.has(s.airYear)) continue;
+    index.set(s.airYear, s.seasonNumber);
+  }
+  return index;
+}
+
+// Best-effort season for a release: the season parsed from its title if present,
+// otherwise mapped from its declared year via the TMDB air-date index.
+export function inferReleaseSeason(
+  parsed: { season?: number | null; declaredYears?: number[] } | undefined,
+  yearIndex: Map<number, number>,
+): number | null {
+  if (parsed?.season != null) return parsed.season;
+  const year = parsed?.declaredYears?.[0];
+  if (year != null && yearIndex.has(year)) return yearIndex.get(year)!;
+  return null;
+}
+
+export async function nativeSeasonSummaries(id: number): Promise<SeasonSummary[]> {
+  const { tmdbId } = await resolveTmdbId("series", id);
+  return tmdbTvSeasonSummaries(tmdbId);
 }
 
 function releaseTextForMatch(item: SearchResult): string {
@@ -386,17 +416,29 @@ export async function nativeReleaseSearch(
   const queries = releaseQueries(detail, title.title, kind === "series" ? seasonNumber : undefined, opts.query);
   const releases = await jackettSearchMany(queries, { kind, sortBy: "seeders", limit: opts.limit });
   const allowedYears = await allowedReleaseYears(kind, title, kind === "series" ? seasonNumber : undefined);
+  const seasonYearIndex = buildSeasonYearIndex(
+    kind === "series" ? await tmdbTvSeasonSummaries(title.tmdbId).catch(() => []) : [],
+  );
   const annotated = releases
-    .map((release) => applyReleaseMatch(
-      release,
-      buildReleaseMatch({
-        kind,
-        title,
-        item: release,
-        seasonNumber: kind === "series" ? seasonNumber : undefined,
-        allowedYears,
-      }),
-    ))
+    .map((release) => {
+      const matched = applyReleaseMatch(
+        release,
+        buildReleaseMatch({
+          kind,
+          title,
+          item: release,
+          seasonNumber: kind === "series" ? seasonNumber : undefined,
+          allowedYears,
+        }),
+      );
+      return {
+        ...matched,
+        inferredSeason: inferReleaseSeason(
+          matched.parsed as { season?: number | null; declaredYears?: number[] } | undefined,
+          seasonYearIndex,
+        ),
+      };
+    })
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.seeders ?? 0) - (a.seeders ?? 0));
   for (const release of annotated) {
     const item = {

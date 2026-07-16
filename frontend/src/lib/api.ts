@@ -1696,6 +1696,7 @@ export interface ReleaseOption {
     episodeRange?: { from: number; to: number } | null;
     declaredYears?: number[];
   };
+  inferredSeason?: number | null;
 }
 
 export interface MediaSearchResponse<T> {
@@ -1713,6 +1714,28 @@ async function readMediaSearchError(res: Response): Promise<string> {
     /* ignore non-json errors */
   }
   return res.status >= 500 ? "Ошибка поиска" : `Ошибка поиска (${res.status})`;
+}
+
+export interface SeasonSummary {
+  seasonNumber: number;
+  airYear: number | null;
+  episodeCount: number;
+  name: string;
+}
+
+// Список сезонов для селекта в ReleasePicker. Любая ошибка / не сериал → [].
+export async function getReleaseSeasons(
+  type: "movie" | "series",
+  id: number,
+): Promise<SeasonSummary[]> {
+  if (type !== "series") return [];
+  try {
+    const res = await apiFetch(`/api/media/seasons?type=series&id=${id}`);
+    if (!res.ok) return [];
+    return (await res.json()) as SeasonSummary[];
+  } catch {
+    return [];
+  }
 }
 
 export async function searchReleaseOptions(p: {

@@ -857,6 +857,22 @@ export function ReleasePicker({
   const firstRelease = releases?.[0] ?? null;
   const bestRelease = releases?.find((release) => !release.match?.block && !release.rejected) ?? firstRelease;
   const bestBlocked = Boolean(bestRelease?.match?.block || bestRelease?.rejected);
+  const seasonSelectEl: ReactNode | null =
+    seasonSelectEnabled && seasons.length > 0 ? (
+      <select
+        className={media.select}
+        value={season ?? ""}
+        onChange={(e) => setSeason(e.target.value === "" ? undefined : Number(e.target.value))}
+        aria-label="Сезон"
+      >
+        <option value="">Все сезоны</option>
+        {seasons.map((s) => (
+          <option key={s.seasonNumber} value={s.seasonNumber}>
+            {s.airYear ? `Сезон ${s.seasonNumber} · ${s.airYear}` : `Сезон ${s.seasonNumber}`}
+          </option>
+        ))}
+      </select>
+    ) : null;
 
   return (
     <div className="mt-3">
@@ -1004,33 +1020,41 @@ export function ReleasePicker({
       )}
 
       {releases === null ? (
-        <div className={media.empty}>Ищем раздачи…</div>
+        <>
+          {seasonSelectEl && (
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className={media.discSecLabel}>Релизы</span>
+              {seasonSelectEl}
+            </div>
+          )}
+          <div className={media.empty}>Ищем раздачи…</div>
+        </>
       ) : error ? (
-        <div className={cn(media.empty, "text-bad")}>{error}</div>
+        <>
+          {seasonSelectEl && (
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className={media.discSecLabel}>Релизы</span>
+              {seasonSelectEl}
+            </div>
+          )}
+          <div className={cn(media.empty, "text-bad")}>{error}</div>
+        </>
       ) : releases.length === 0 ? (
-        <div className={media.empty}>Раздачи не найдены.</div>
+        <>
+          {seasonSelectEl && (
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className={media.discSecLabel}>Релизы</span>
+              {seasonSelectEl}
+            </div>
+          )}
+          <div className={media.empty}>Раздачи не найдены.</div>
+        </>
       ) : (
         <MediaRail
           title="Релизы"
           count={releases.length}
           countLabel={`${releases.length} раздач · по сидам`}
-          headerActions={
-            seasonSelectEnabled && seasons.length > 0 ? (
-              <select
-                className={media.select}
-                value={season ?? ""}
-                onChange={(e) => setSeason(e.target.value === "" ? undefined : Number(e.target.value))}
-                aria-label="Сезон"
-              >
-                <option value="">Все сезоны</option>
-                {seasons.map((s) => (
-                  <option key={s.seasonNumber} value={s.seasonNumber}>
-                    {s.airYear ? `Сезон ${s.seasonNumber} · ${s.airYear}` : `Сезон ${s.seasonNumber}`}
-                  </option>
-                ))}
-              </select>
-            ) : undefined
-          }
+          headerActions={seasonSelectEl}
         >
           {releases.map((r) => {
             const download = findReleaseDownload(downloads, grabbedHashes[r.guid]);

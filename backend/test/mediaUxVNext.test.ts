@@ -80,9 +80,32 @@ test("release matching accepts a series season year and rejects unrelated years"
   assert.equal(ok.yearStatus, "match");
   assert.equal(ok.seasonStatus, "match");
   assert.equal(ok.block, false);
-  assert.equal(bad.yearStatus, "mismatch");
+  // Season is the authoritative disambiguator for a series, so the wrong-season
+  // pack is blocked on seasonStatus; year is intentionally non-authoritative.
   assert.equal(bad.seasonStatus, "mismatch");
   assert.equal(bad.block, true);
+});
+
+test("release matching does not block a later series season on the show's debut year (free-text search)", async () => {
+  const { buildReleaseMatch } = await import("../src/integrations/nativeMedia.js");
+  // Free-text "s7" search: no structured seasonNumber, so allowedYears collapses
+  // to the show's debut year only. A genuine S07 release from 2023 must not be
+  // rejected as a year mismatch.
+  const match = buildReleaseMatch({
+    kind: "series",
+    title: { year: 2013 },
+    item: {
+      guid: "rm-s7",
+      title: "Rick and Morty - S7E1-10 - 2023 1080p WEB-DL",
+      size: 1,
+      seeders: 10,
+      indexer: "mock",
+      url: "magnet:?xt=urn:btih:rm-s7",
+    },
+    allowedYears: [2013],
+  });
+  assert.notEqual(match.yearStatus, "mismatch");
+  assert.equal(match.block, false);
 });
 
 test("effective preferences let app user rows override global rows", async () => {

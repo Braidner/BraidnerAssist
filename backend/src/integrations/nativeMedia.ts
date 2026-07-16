@@ -229,12 +229,15 @@ export function buildReleaseMatch(input: {
       : parsed.season === input.seasonNumber
         ? "match"
         : "mismatch";
-  // For a confirmed series season the season NUMBER is the authoritative
-  // disambiguator, so the release year is not authoritative: TMDB season air
-  // years can be incomplete (collapsing allowedYears to just the show's debut
-  // year) and release labels drift between a season's premiere and finale year.
-  // Don't reject a correct season pack just because its year isn't in the set.
-  if (yearStatus === "mismatch" && input.kind === "series" && input.seasonNumber != null && seasonStatus === "match") {
+  // For a series release the season NUMBER is the authoritative disambiguator,
+  // so the release year is not authoritative: TMDB season air years can be
+  // incomplete (collapsing allowedYears to just the show's debut year) and
+  // release labels drift between a season's premiere and finale year. Any
+  // release that declares its own season (S07) must not be rejected on year
+  // alone — a genuine season mismatch is still caught by seasonStatus below.
+  // This covers both the per-season picker (seasonNumber set) and free-text
+  // search (seasonNumber undefined, allowedYears = just the debut year).
+  if (yearStatus === "mismatch" && input.kind === "series" && parsed.season != null) {
     yearStatus = "unknown";
   }
   const warnings = [

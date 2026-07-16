@@ -279,6 +279,39 @@ export async function tmdbTvSeasons(tmdbId: number): Promise<number[]> {
     .sort((a: number, b: number) => a - b);
 }
 
+export interface SeasonSummary {
+  seasonNumber: number;
+  airYear: number | null;
+  episodeCount: number;
+  name: string;
+}
+
+// Pure mapper over the /tv/{id} `seasons[]` array. Keeps real seasons (>=1),
+// parses the premiere year from air_date, sorts ascending. Kept separate from
+// the network call so it can be unit-tested.
+export function mapSeasonSummaries(rawSeasons: unknown): SeasonSummary[] {
+  const seasons = Array.isArray(rawSeasons) ? rawSeasons : [];
+  return seasons
+    .map((s: any) => {
+      const seasonNumber = Number(s?.season_number);
+      const yearNum = typeof s?.air_date === "string" ? Number(s.air_date.slice(0, 4)) : NaN;
+      const epCount = Number(s?.episode_count);
+      return {
+        seasonNumber,
+        airYear: Number.isFinite(yearNum) ? yearNum : null,
+        episodeCount: Number.isFinite(epCount) ? epCount : 0,
+        name: String(s?.name ?? `Season ${seasonNumber}`),
+      };
+    })
+    .filter((s) => Number.isFinite(s.seasonNumber) && s.seasonNumber >= 1)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber);
+}
+
+export async function tmdbTvSeasonSummaries(tmdbId: number): Promise<SeasonSummary[]> {
+  const data = await tmdbGet(`/tv/${tmdbId}`);
+  return mapSeasonSummaries(data?.seasons);
+}
+
 // tvdbId (Jellyfin/external ids) → TMDB tv id. ВАЖНО: TMDB tv id ≠ tvdbId.
 export async function tmdbFindByTvdb(tvdbId: number): Promise<number | null> {
   const data = await tmdbGet(`/find/${tvdbId}`, { external_source: "tvdb_id" });

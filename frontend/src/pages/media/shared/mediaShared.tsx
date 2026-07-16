@@ -7,9 +7,11 @@ import { Check, Download, Search } from "lucide-react";
 import {
   searchReleaseOptions,
   grabRelease,
+  getReleaseSeasons,
   posterUrl,
   type DownloadItem,
   type ReleaseOption,
+  type SeasonSummary,
   type TorrentRailItem,
 } from "@/lib/api.ts";
 import { getToken } from "@/lib/auth.ts";
@@ -636,6 +638,8 @@ export function TorrentCard({
     : null;
   const matchChips = releaseMatchChips(release);
   const blocked = Boolean(release.match?.block);
+  const seasonBadge =
+    release.inferredSeason != null ? `S${String(release.inferredSeason).padStart(2, "0")}` : null;
 
   return (
     <article
@@ -674,6 +678,11 @@ export function TorrentCard({
           {quality && (
             <span className="max-w-full truncate rounded-full bg-black/70 px-2 py-1 font-mono text-2xs font-semibold leading-none text-white/70 backdrop-blur-md">
               {quality}
+            </span>
+          )}
+          {seasonBadge && (
+            <span className="max-w-full truncate rounded-full bg-accent/85 px-2 py-1 font-mono text-2xs font-semibold leading-none text-accent-ink backdrop-blur-md">
+              {seasonBadge}
             </span>
           )}
         </div>
@@ -755,11 +764,13 @@ export function ReleasePicker({
   onGrabbed,
   fallbackPosterSrc,
   downloads = [],
+  showSeasonSelect = false,
 }: {
   params: { type: "movie" | "series"; id: number; seasonNumber?: number };
   onGrabbed?: () => void;
   fallbackPosterSrc?: string | null;
   downloads?: DownloadItem[];
+  showSeasonSelect?: boolean;
 }) {
   const [releases, setReleases] = useState<ReleaseOption[] | null>(null);
   const [releaseQuery, setReleaseQuery] = useState("");
@@ -768,11 +779,29 @@ export function ReleasePicker({
   const [busyGuid, setBusyGuid] = useState<string | null>(null);
   const [grabbedHashes, setGrabbedHashes] = useState<Record<string, string>>({});
   const toast = useToast();
+  const seasonSelectEnabled = showSeasonSelect && params.type === "series";
+  const [seasons, setSeasons] = useState<SeasonSummary[]>([]);
+  const [season, setSeason] = useState<number | undefined>(params.seasonNumber);
+  const effectiveSeason = seasonSelectEnabled ? season : params.seasonNumber;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedReleaseQuery(releaseQuery.trim()), 350);
     return () => window.clearTimeout(timer);
   }, [releaseQuery]);
+
+  useEffect(() => {
+    if (!seasonSelectEnabled) {
+      setSeasons([]);
+      return;
+    }
+    let alive = true;
+    getReleaseSeasons("series", params.id).then((s) => {
+      if (alive) setSeasons(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [seasonSelectEnabled, params.id]);
 
   useEffect(() => {
     let alive = true;
@@ -781,6 +810,7 @@ export function ReleasePicker({
     setGrabbedHashes({});
     searchReleaseOptions({
       ...params,
+      seasonNumber: effectiveSeason,
       query: debouncedReleaseQuery || undefined,
       limit: 50,
     }).then((r) => {
@@ -792,7 +822,7 @@ export function ReleasePicker({
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.type, params.id, params.seasonNumber, debouncedReleaseQuery]);
+  }, [params.type, params.id, effectiveSeason, debouncedReleaseQuery]);
 
   // Грабим один релиз и помечаем карточку как отправленную.
   const grabOne = async (r: ReleaseOption): Promise<{ ok: boolean; error: string | null }> => {
@@ -801,7 +831,7 @@ export function ReleasePicker({
       id: params.id,
       guid: r.guid,
       indexerId: r.indexerId ?? r.indexer,
-      seasonNumber: params.seasonNumber,
+      seasonNumber: effectiveSeason,
     });
     if (res.ok) {
       if (res.infohash) setGrabbedHashes((p) => ({ ...p, [r.guid]: res.infohash! }));
@@ -984,6 +1014,23 @@ export function ReleasePicker({
           title="Релизы"
           count={releases.length}
           countLabel={`${releases.length} раздач · по сидам`}
+          headerActions={
+            seasonSelectEnabled && seasons.length > 0 ? (
+              <select
+                className={media.select}
+                value={season ?? ""}
+                onChange={(e) => setSeason(e.target.value === "" ? undefined : Number(e.target.value))}
+                aria-label="Сезон"
+              >
+                <option value="">Все сезоны</option>
+                {seasons.map((s) => (
+                  <option key={s.seasonNumber} value={s.seasonNumber}>
+                    {s.airYear ? `Сезон ${s.seasonNumber} · ${s.airYear}` : `Сезон ${s.seasonNumber}`}
+                  </option>
+                ))}
+              </select>
+            ) : undefined
+          }
         >
           {releases.map((r) => {
             const download = findReleaseDownload(downloads, grabbedHashes[r.guid]);

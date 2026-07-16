@@ -89,7 +89,6 @@ function AddTorrentDrawer({
   const [lookingUp, setLookingUp] = useState(false);
   const [addedIds, setAddedIds] = useState<Record<number, boolean>>({});
   const [pickerFor, setPickerFor] = useState<number | null>(null);
-  const [pickSeason, setPickSeason] = useState(1);
 
   const [showManual, setShowManual] = useState(false);
   const [magnet, setMagnet] = useState("");
@@ -264,32 +263,14 @@ function AddTorrentDrawer({
                     </div>
                     {pickerOn && (
                       <div className="px-0.5 pb-2 pt-1">
-                        {it.kind === "series" && (
-                          <div className={cn(ms.field, "items-center")}>
-                            <span className={cn(ms.label, "m-0")}>Сезон</span>
-                            <input
-                              className={cn(ms.input, "w-[70px] flex-none")}
-                              type="number"
-                              min={1}
-                              value={pickSeason}
-                              onChange={(e) =>
-                                setPickSeason(
-                                  Math.max(0, Number(e.target.value) || 1),
-                                )
-                              }
-                            />
-                          </div>
-                        )}
                         <ReleasePicker
+                          key={it.id}
                           params={
                             it.kind === "series"
-                              ? {
-                                  type: "series",
-                                  id: it.id,
-                                  seasonNumber: pickSeason,
-                                }
+                              ? { type: "series", id: it.id }
                               : { type: "movie", id: it.id }
                           }
+                          showSeasonSelect={it.kind === "series"}
                           downloads={downloads}
                           onGrabbed={onGrabbed}
                         />

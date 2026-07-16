@@ -631,6 +631,7 @@ export function MediaSeriesPage({
         <div style={{ marginTop: 16 }}>
           <ReleasePicker
             params={{ type: "series", id: tmdbId }}
+            showSeasonSelect
             downloads={media.downloads}
             fallbackPosterSrc={posterSrc}
             onGrabbed={() => {

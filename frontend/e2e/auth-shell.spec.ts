@@ -141,3 +141,129 @@ test("admin approves a pending user and assigns a role", async ({ page }) => {
   await expect.poll(() => approvedRole).toBe("admin");
   await expect(page.getByText("Новых заявок нет")).toBeVisible();
 });
+
+test("admin sees live Jellyfin activity and recent viewing history", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("mc-auth-token", "test-token");
+  });
+  await page.route("**/healthz", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) }),
+  );
+  await page.route("**/api/version", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ version: "test" }) }),
+  );
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ id: "admin-1", username: "owner", role: "admin" }),
+    }),
+  );
+  await page.route("**/api/docker/containers", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ configured: false, containers: [] }),
+    }),
+  );
+  await page.route("**/api/adguard", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ configured: false }),
+    }),
+  );
+  await page.route("**/api/tasks", (route) =>
+    route.fulfill({ contentType: "application/json", body: "[]" }),
+  );
+  await page.route("**/api/settings/jellyfin-users", (route) =>
+    route.fulfill({ contentType: "application/json", body: "[]" }),
+  );
+  await page.route("**/api/settings/users", (route) =>
+    route.fulfill({ contentType: "application/json", body: "[]" }),
+  );
+  await page.route("**/api/settings/users/activity", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        configured: true,
+        updatedAt: "2026-07-24T12:30:45.000Z",
+        summary: { users: 2, online: 1, watching: 1, liveBitrate: 8_000_000 },
+        users: [
+          {
+            id: "app:admin-1",
+            appUserId: "admin-1",
+            jellyfinUserId: "jf-admin",
+            username: "owner",
+            displayName: "Алексей",
+            role: "admin",
+            linked: true,
+            online: true,
+            lastSeenAt: "2026-07-24T12:30:40.000Z",
+            liveBitrate: 8_000_000,
+            devices: [{ name: "Apple TV", client: "Jellyfin tvOS" }],
+            nowPlaying: [
+              {
+                sessionId: "session-1",
+                name: "Знакомство",
+                seriesName: "Разделение",
+                itemType: "Episode",
+                imageItemId: "series-1",
+                seasonNumber: 1,
+                episodeNumber: 1,
+                progressPct: 42,
+                paused: false,
+                deviceName: "Apple TV",
+                client: "Jellyfin tvOS",
+                playMethod: "DirectPlay",
+                resolution: "3840×2160",
+                bitrate: 8_000_000,
+              },
+            ],
+            history: [
+              {
+                id: "episode-1",
+                name: "Хорошие новости об аде",
+                seriesName: "Разделение",
+                itemType: "Episode",
+                imageItemId: "series-1",
+                seasonNumber: 1,
+                episodeNumber: 1,
+                playedAt: "2026-07-23T20:15:00.000Z",
+                progressPct: 100,
+                played: true,
+                playCount: 1,
+              },
+            ],
+          },
+          {
+            id: "jellyfin:guest",
+            appUserId: null,
+            jellyfinUserId: "guest",
+            username: "guest",
+            displayName: "Гость",
+            role: null,
+            linked: false,
+            online: false,
+            lastSeenAt: null,
+            liveBitrate: 0,
+            devices: [],
+            nowPlaying: [],
+            history: [],
+          },
+        ],
+      }),
+    }),
+  );
+
+  await page.goto("/settings");
+  await page.getByRole("tab", { name: "Активность" }).click();
+
+  await expect(page.getByText("Активность Jellyfin")).toBeVisible();
+  await expect(page.getByText("8 Мбит/с").first()).toBeVisible();
+  await expect(page.getByText("Смотрит сейчас")).toBeVisible();
+  await expect(page.getByText("Разделение").first()).toBeVisible();
+  await expect(page.getByText("Apple TV · Jellyfin tvOS")).toBeVisible();
+  await expect(page.getByText("только Jellyfin")).toBeVisible();
+
+  await page.getByRole("button", { name: /Недавние просмотры/ }).first().click();
+  await expect(page.getByText("S01E01 · Хорошие новости об аде")).toBeVisible();
+  await expect(page.getByText("просмотрено")).toBeVisible();
+});

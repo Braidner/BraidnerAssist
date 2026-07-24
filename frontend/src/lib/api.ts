@@ -214,6 +214,71 @@ export interface JellyfinUserRef {
   name: string;
 }
 
+export interface JellyfinHistoryItem {
+  id: string;
+  imageItemId: string;
+  name: string;
+  seriesName: string | null;
+  type: string;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  playedAt: string;
+  played: boolean;
+  progressPct: number | null;
+  playCount: number;
+  runtimeMinutes: number | null;
+}
+
+export interface JellyfinNowPlaying {
+  sessionId: string;
+  itemId: string;
+  imageItemId: string;
+  name: string;
+  seriesName: string | null;
+  type: string;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  deviceName: string;
+  client: string;
+  paused: boolean;
+  muted: boolean;
+  progressPct: number | null;
+  bitrate: number | null;
+  playMethod: "Transcode" | "DirectStream" | "DirectPlay";
+  resolution: string | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+}
+
+export interface JellyfinUserActivity {
+  id: string;
+  appUserId: string | null;
+  jellyfinUserId: string | null;
+  username: string;
+  displayName: string;
+  role: string | null;
+  linked: boolean;
+  active: boolean;
+  online: boolean;
+  lastSeenAt: string | null;
+  devices: Array<{ name: string; client: string }>;
+  liveBitrate: number;
+  nowPlaying: JellyfinNowPlaying[];
+  history: JellyfinHistoryItem[];
+}
+
+export interface JellyfinUserActivityData {
+  configured: boolean;
+  updatedAt: string;
+  summary: {
+    users: number;
+    online: number;
+    watching: number;
+    liveBitrate: number;
+  };
+  users: JellyfinUserActivity[];
+}
+
 export interface EnvField {
   key: string;
   label: string;
@@ -273,6 +338,12 @@ export async function getJellyfinUsers(): Promise<JellyfinUserRef[]> {
   } catch {
     return [];
   }
+}
+
+export async function getJellyfinUserActivity(): Promise<JellyfinUserActivityData> {
+  const res = await apiFetch("/api/settings/users/activity");
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as JellyfinUserActivityData;
 }
 
 export async function createUser(input: {

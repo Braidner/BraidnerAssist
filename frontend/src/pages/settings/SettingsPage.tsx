@@ -43,6 +43,7 @@ import {
 import type { UserRole } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { ui } from "@/lib/ui";
+import { UserActivityTab } from "./UserActivityTab";
 
 const roleLabel: Record<UserRole, string> = {
   admin: "Админ",
@@ -71,6 +72,9 @@ export function SettingsPage() {
           <TabsTrigger value="users" className="h-9 px-1">
             Пользователи
           </TabsTrigger>
+          <TabsTrigger value="activity" className="h-9 px-1">
+            Активность
+          </TabsTrigger>
           <TabsTrigger value="services" className="h-9 px-1">
             Сервисы
           </TabsTrigger>
@@ -80,6 +84,9 @@ export function SettingsPage() {
         </TabsList>
         <TabsContent value="users">
           <UsersTab />
+        </TabsContent>
+        <TabsContent value="activity">
+          <UserActivityTab />
         </TabsContent>
         <TabsContent value="services">
           <ServicesTab />

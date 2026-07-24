@@ -10,6 +10,7 @@ import {
   updateUser,
 } from "../auth/users.js";
 import { listJellyfinUsers } from "../integrations/jellyfinUsers.js";
+import { getJellyfinUserActivity } from "../integrations/jellyfinUserActivity.js";
 import { getEnvSettings, updateEnvSettings } from "../settings/envSettings.js";
 
 export const settingsRouter = Router();
@@ -43,6 +44,14 @@ settingsRouter.get("/users", async (_req, res) => {
 settingsRouter.get("/jellyfin-users", async (_req, res) => {
   try {
     res.json(await listJellyfinUsers());
+  } catch (e) {
+    res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+settingsRouter.get("/users/activity", async (_req, res) => {
+  try {
+    res.json(await getJellyfinUserActivity());
   } catch (e) {
     res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
   }

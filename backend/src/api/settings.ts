@@ -2,6 +2,7 @@ import { Router } from "express";
 import { readServicesConfig, writeServicesConfig, invalidateServicesCache, type ServiceConfig } from "../integrations/services.js";
 import { requireAdmin } from "../middleware/jwtAuth.js";
 import {
+  approveUser,
   createUser,
   deleteUser,
   isUserRole,
@@ -55,6 +56,18 @@ settingsRouter.post("/users", async (req, res) => {
   try {
     const user = await createUser({ username, password, displayName, role });
     res.status(201).json(user);
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+settingsRouter.post("/users/:id/approve", async (req, res) => {
+  const { role } = req.body ?? {};
+  if (!isUserRole(role)) {
+    return res.status(400).json({ error: "valid role required" });
+  }
+  try {
+    res.json(await approveUser(req.params.id, role));
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }

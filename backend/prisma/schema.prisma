@@ -13,12 +13,14 @@ model AppUser {
   displayName  String?
   passwordHash String
   role         String   @default("media") // admin | media
+  approvalStatus String @default("approved") // pending | approved
   jellyfinUserId String?
   jellyfinAccessToken String?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([approvalStatus])
   @@index([jellyfinUserId])
 }
 

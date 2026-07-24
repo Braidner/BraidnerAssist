@@ -17,3 +17,127 @@ test("renders the Mission Control auth shell", async ({ page }) => {
     page.getByRole("button", { name: /Войти|Создать администратора/ }),
   ).toBeVisible();
 });
+
+test("registers a user into the approval queue", async ({ page }) => {
+  await page.route("**/api/auth/setup-status", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ setupRequired: false }),
+    });
+  });
+  await page.route("**/api/auth/register", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "pending",
+        user: { id: "pending-1", username: "viewer", displayName: "Viewer" },
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Нет аккаунта? Зарегистрироваться" }).click();
+  await page.getByLabel("Логин").fill("viewer");
+  await page.getByLabel("Имя").fill("Viewer");
+  await page.getByLabel("Пароль", { exact: true }).fill("viewer-secret");
+  await page.getByLabel("Повтор пароля").fill("viewer-secret");
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+  await expect(page.getByRole("heading", { name: "Регистрация отправлена" })).toBeVisible();
+  await expect(page.getByText(/Администратор должен подтвердить/)).toBeVisible();
+});
+
+test("admin approves a pending user and assigns a role", async ({ page }) => {
+  let approved = false;
+  let approvedRole = "";
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("mc-auth-token", "test-token");
+  });
+  await page.route("**/healthz", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true }) }),
+  );
+  await page.route("**/api/version", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ version: "test" }) }),
+  );
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ id: "admin-1", username: "owner", role: "admin" }),
+    }),
+  );
+  await page.route("**/api/settings/jellyfin-users", (route) =>
+    route.fulfill({ contentType: "application/json", body: "[]" }),
+  );
+  await page.route("**/api/docker/containers", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ configured: false, containers: [] }),
+    }),
+  );
+  await page.route("**/api/adguard", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ configured: false }),
+    }),
+  );
+  await page.route("**/api/tasks", (route) =>
+    route.fulfill({ contentType: "application/json", body: "[]" }),
+  );
+  await page.route("**/api/settings/users**", async (route) => {
+    if (route.request().url().endsWith("/approve")) {
+      approvedRole = ((await route.request().postDataJSON()) as { role: string }).role;
+      approved = true;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "pending-1",
+          username: "viewer",
+          displayName: "Viewer",
+          role: approvedRole,
+          approvalStatus: "approved",
+          jellyfinUserId: null,
+          jellyfinAuthStatus: "not_linked",
+          active: true,
+          createdAt: "2026-07-24T10:00:00.000Z",
+          updatedAt: "2026-07-24T10:00:00.000Z",
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(
+        approved
+          ? []
+          : [
+              {
+                id: "pending-1",
+                username: "viewer",
+                displayName: "Viewer",
+                role: "media",
+                approvalStatus: "pending",
+                jellyfinUserId: null,
+                jellyfinAuthStatus: "not_linked",
+                active: true,
+                createdAt: "2026-07-24T10:00:00.000Z",
+                updatedAt: "2026-07-24T10:00:00.000Z",
+              },
+            ],
+      ),
+    });
+  });
+
+  await page.goto("/settings");
+  await expect(page.getByText("Ожидают подтверждения")).toBeVisible();
+  await expect(page.getByText("@viewer")).toBeVisible();
+
+  await page.getByLabel("Роль после подтверждения").click();
+  await page.getByRole("option", { name: "Админ" }).click();
+  await page.getByRole("button", { name: "Подтвердить" }).click();
+
+  await expect.poll(() => approvedRole).toBe("admin");
+  await expect(page.getByText("Новых заявок нет")).toBeVisible();
+});

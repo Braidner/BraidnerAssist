@@ -10,12 +10,14 @@ import {
 } from "../integrations/jellyfinUsers.js";
 
 export type UserRole = "admin" | "media";
+export type UserApprovalStatus = "pending" | "approved";
 
 export interface PublicUser {
   id: string;
   username: string;
   displayName: string | null;
   role: UserRole;
+  approvalStatus: UserApprovalStatus;
   jellyfinUserId: string | null;
   jellyfinAuthStatus: "not_linked" | "token_ok" | "needs_auth";
   active: boolean;
@@ -24,9 +26,14 @@ export interface PublicUser {
 }
 
 const ROLES = new Set<UserRole>(["admin", "media"]);
+const APPROVAL_STATUSES = new Set<UserApprovalStatus>(["pending", "approved"]);
 
 export function isUserRole(value: unknown): value is UserRole {
   return typeof value === "string" && ROLES.has(value as UserRole);
+}
+
+function isApprovalStatus(value: unknown): value is UserApprovalStatus {
+  return typeof value === "string" && APPROVAL_STATUSES.has(value as UserApprovalStatus);
 }
 
 export function toPublicUser(user: AppUser): PublicUser {
@@ -35,6 +42,7 @@ export function toPublicUser(user: AppUser): PublicUser {
     username: user.username,
     displayName: user.displayName,
     role: isUserRole(user.role) ? user.role : "media",
+    approvalStatus: isApprovalStatus(user.approvalStatus) ? user.approvalStatus : "approved",
     jellyfinUserId: user.jellyfinUserId,
     jellyfinAuthStatus: !user.jellyfinUserId
       ? "not_linked"
@@ -53,7 +61,7 @@ export async function hasUsers(): Promise<boolean> {
 
 export async function verifyUserCredentials(username: string, password: string) {
   const user = await prisma.appUser.findUnique({ where: { username } });
-  if (!user || !user.active) return null;
+  if (!user) return null;
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   return ok ? user : null;
@@ -61,13 +69,13 @@ export async function verifyUserCredentials(username: string, password: string) 
 
 export async function getActiveUser(id: string) {
   return prisma.appUser.findFirst({
-    where: { id, active: true },
+    where: { id, active: true, approvalStatus: "approved" },
   });
 }
 
 export async function listUsers(): Promise<PublicUser[]> {
   const users = await prisma.appUser.findMany({
-    orderBy: [{ role: "asc" }, { username: "asc" }],
+    orderBy: [{ approvalStatus: "desc" }, { role: "asc" }, { username: "asc" }],
   });
   return users.map(toPublicUser);
 }
@@ -109,8 +117,50 @@ export async function createUser(input: {
       displayName: input.displayName?.trim() || null,
       passwordHash: await bcrypt.hash(input.password, 10),
       role: input.role,
+      approvalStatus: "approved",
       jellyfinUserId: jellyfinAuth?.userId ?? jellyfinUser?.id ?? null,
       jellyfinAccessToken: jellyfinAuth?.accessToken ?? null,
+      active: true,
+    },
+  });
+  return toPublicUser(user);
+}
+
+export async function createPendingUser(input: {
+  username: string;
+  password: string;
+  displayName?: string | null;
+}): Promise<PublicUser> {
+  const username = input.username.trim();
+  if (!username) throw new Error("username required");
+  if (input.password.length < 6) throw new Error("password must be at least 6 chars");
+  if (await prisma.appUser.findUnique({ where: { username }, select: { id: true } })) {
+    throw new Error("username already exists");
+  }
+
+  const user = await prisma.appUser.create({
+    data: {
+      username,
+      displayName: input.displayName?.trim() || null,
+      passwordHash: await bcrypt.hash(input.password, 10),
+      role: "media",
+      approvalStatus: "pending",
+      active: true,
+    },
+  });
+  return toPublicUser(user);
+}
+
+export async function approveUser(id: string, role: UserRole): Promise<PublicUser> {
+  const current = await prisma.appUser.findUnique({ where: { id } });
+  if (!current) throw new Error("user not found");
+  if (current.approvalStatus !== "pending") throw new Error("user is not pending approval");
+
+  const user = await prisma.appUser.update({
+    where: { id },
+    data: {
+      role,
+      approvalStatus: "approved",
       active: true,
     },
   });
@@ -173,6 +223,24 @@ export async function updateUser(
 }
 
 export async function refreshUserJellyfinTokenOnLogin(user: AppUser, password: string): Promise<void> {
+  if (!user.jellyfinUserId) {
+    await (async () => {
+      const jellyfinUser = await ensureJellyfinUser({ username: user.username, password });
+      const auth = jellyfinUser
+        ? await authenticateJellyfinUser({ username: jellyfinUser.name, password })
+        : null;
+      if (jellyfinUser) {
+        await prisma.appUser.update({
+          where: { id: user.id },
+          data: {
+            jellyfinUserId: auth?.userId ?? jellyfinUser.id,
+            jellyfinAccessToken: auth?.accessToken ?? null,
+          },
+        });
+      }
+    })().catch(() => {});
+    return;
+  }
   await refreshJellyfinAccessTokenForUser({ appUserId: user.id, password }).catch(() => {});
 }
 

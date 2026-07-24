@@ -1,5 +1,15 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, KeyRound, Plus, RotateCcw, Save, Trash2, UserRound } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Clock3,
+  KeyRound,
+  Plus,
+  RotateCcw,
+  Save,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  approveUser,
   createUser,
   deleteUser,
   getServicesConfig,
@@ -283,90 +294,211 @@ function UsersTab() {
       setDraft({ username: "", displayName: "", password: "", role: "media" });
     });
 
+  const pendingUsers = users.filter((user) => user.approvalStatus === "pending");
+  const approvedUsers = users.filter((user) => user.approvalStatus === "approved");
+
   return (
-    <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className={cn(ui.panel, "p-0")}>
-        <div className="grid grid-cols-[minmax(130px,1fr)_110px_150px_110px_100px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
-          <span>Пользователь</span>
-          <span>Роль</span>
-          <span>Jellyfin</span>
-          <span>Токен</span>
-          <span>Статус</span>
-          <span className="text-right">Действия</span>
+    <section className="flex flex-col gap-5">
+      <PendingUsersPanel
+        users={pendingUsers}
+        busy={busy}
+        onApprove={(id, role) =>
+          run(`approve-${id}`, () => approveUser(id, role).then(() => undefined))
+        }
+        onDelete={(id) => run(`delete-${id}`, () => deleteUser(id))}
+      />
+
+      {error && (
+        <div className="rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-body text-bad">
+          {error}
         </div>
+      )}
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className={cn(ui.panel, "p-0")}>
+          <div className="grid grid-cols-[minmax(130px,1fr)_110px_150px_110px_100px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
+            <span>Пользователь</span>
+            <span>Роль</span>
+            <span>Jellyfin</span>
+            <span>Токен</span>
+            <span>Статус</span>
+            <span className="text-right">Действия</span>
+          </div>
+          <div className="divide-y divide-hair">
+            {approvedUsers.map((user) => (
+              <UserRow
+                key={user.id}
+                user={user}
+                jellyfinUsers={jellyfinUsers}
+                busy={busy}
+                onUpdate={(input) =>
+                  run(user.id, () => updateUser(user.id, input).then(() => undefined))
+                }
+                onDelete={() => run(`delete-${user.id}`, () => deleteUser(user.id))}
+              />
+            ))}
+            {approvedUsers.length === 0 && (
+              <div className="px-5 py-8 text-body text-ink-soft">
+                Подтверждённых пользователей пока нет.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <aside className={ui.panel}>
+          <div className={ui.panelHead}>
+            <div className={ui.panelTitle}>
+              <UserRound className="size-4" />
+              Новый пользователь
+            </div>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Field label="Логин">
+              <Input
+                autoComplete="off"
+                value={draft.username}
+                onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
+              />
+            </Field>
+            <Field label="Имя">
+              <Input
+                value={draft.displayName}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, displayName: e.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Пароль">
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={draft.password}
+                onChange={(e) => setDraft((d) => ({ ...d, password: e.target.value }))}
+              />
+            </Field>
+            <Field label="Роль">
+              <RoleSelect
+                value={draft.role}
+                onChange={(role) => setDraft((d) => ({ ...d, role }))}
+              />
+            </Field>
+            <div className="rounded-[10px] border border-hair bg-groove px-3 py-2 text-cell text-ink-soft">
+              Jellyfin-профиль будет создан или привязан автоматически по логину.
+            </div>
+            <Button
+              className="mt-1"
+              onClick={addUser}
+              disabled={busy === "create" || !draft.username || draft.password.length < 6}
+            >
+              <Plus />
+              Создать
+            </Button>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function PendingUsersPanel({
+  users,
+  busy,
+  onApprove,
+  onDelete,
+}: {
+  users: AppUser[];
+  busy: string | null;
+  onApprove: (id: string, role: UserRole) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className={cn(ui.panel, "p-0")}>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hair px-5 py-4">
+        <div className={ui.panelTitle}>
+          <Clock3 className="size-4 text-warn" />
+          Ожидают подтверждения
+        </div>
+        <Badge variant={users.length ? "warn" : "outline"}>{users.length}</Badge>
+      </div>
+
+      {users.length === 0 ? (
+        <div className="px-5 py-6 text-body text-ink-soft">
+          Новых заявок нет. Они появятся здесь после регистрации.
+        </div>
+      ) : (
         <div className="divide-y divide-hair">
           {users.map((user) => (
-            <UserRow
+            <PendingUserRow
               key={user.id}
               user={user}
-              jellyfinUsers={jellyfinUsers}
               busy={busy}
-              onUpdate={(input) =>
-                run(user.id, () => updateUser(user.id, input).then(() => undefined))
-              }
-              onDelete={() => run(`delete-${user.id}`, () => deleteUser(user.id))}
+              onApprove={onApprove}
+              onDelete={onDelete}
             />
           ))}
-          {users.length === 0 && (
-            <div className="px-5 py-8 text-body text-muted">
-              Пользователей пока нет.
-            </div>
-          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PendingUserRow({
+  user,
+  busy,
+  onApprove,
+  onDelete,
+}: {
+  user: AppUser;
+  busy: string | null;
+  onApprove: (id: string, role: UserRole) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [role, setRole] = useState<UserRole>("media");
+  const approving = busy === `approve-${user.id}`;
+  const deleting = busy === `delete-${user.id}`;
+
+  return (
+    <div className="grid items-center gap-4 px-5 py-4 md:grid-cols-[minmax(0,1fr)_150px_auto]">
+      <div className="min-w-0">
+        <div className="truncate text-body font-semibold text-ink">
+          {user.displayName || user.username}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-cell text-ink-soft">
+          <span>@{user.username}</span>
+          <span>
+            Заявка {new Date(user.createdAt).toLocaleDateString("ru-RU")}
+          </span>
         </div>
       </div>
 
-      <aside className={ui.panel}>
-        <div className={ui.panelHead}>
-          <div className={ui.panelTitle}>
-            <UserRound className="size-4" />
-            Новый пользователь
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          <Field label="Логин">
-            <Input
-              autoComplete="off"
-              value={draft.username}
-              onChange={(e) => setDraft((d) => ({ ...d, username: e.target.value }))}
-            />
-          </Field>
-          <Field label="Имя">
-            <Input
-              value={draft.displayName}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, displayName: e.target.value }))
-              }
-            />
-          </Field>
-          <Field label="Пароль">
-            <Input
-              type="password"
-              autoComplete="new-password"
-              value={draft.password}
-              onChange={(e) => setDraft((d) => ({ ...d, password: e.target.value }))}
-            />
-          </Field>
-          <Field label="Роль">
-            <RoleSelect
-              value={draft.role}
-              onChange={(role) => setDraft((d) => ({ ...d, role }))}
-            />
-          </Field>
-          <div className="rounded-[10px] border border-hair bg-groove px-3 py-2 text-cell text-muted">
-            Jellyfin-профиль будет создан или привязан автоматически по логину.
-          </div>
-          <Button
-            className="mt-1"
-            onClick={addUser}
-            disabled={busy === "create" || !draft.username || draft.password.length < 6}
-          >
-            <Plus />
-            Создать
-          </Button>
-          {error && <div className="text-cell text-bad">{error}</div>}
-        </div>
-      </aside>
-    </section>
+      <Field label="Роль после подтверждения">
+        <RoleSelect
+          value={role}
+          ariaLabel="Роль после подтверждения"
+          onChange={setRole}
+        />
+      </Field>
+
+      <div className="flex flex-wrap justify-end gap-2 md:self-end">
+        <Button
+          variant="destructive"
+          size="sm"
+          disabled={approving || deleting}
+          onClick={() => onDelete(user.id)}
+        >
+          <Trash2 />
+          Отклонить
+        </Button>
+        <Button
+          size="sm"
+          disabled={approving || deleting}
+          onClick={() => onApprove(user.id, role)}
+        >
+          <Check />
+          {approving ? "Подтверждаю…" : "Подтвердить"}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -489,14 +621,16 @@ function JellyfinUserSelect({
 
 function RoleSelect({
   value,
+  ariaLabel,
   onChange,
 }: {
   value: UserRole;
+  ariaLabel?: string;
   onChange: (role: UserRole) => void;
 }) {
   return (
     <Select value={value} onValueChange={(role) => onChange(role as UserRole)}>
-      <SelectTrigger className="w-full bg-surface">
+      <SelectTrigger className="w-full bg-surface" aria-label={ariaLabel}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

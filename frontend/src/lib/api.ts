@@ -201,6 +201,7 @@ export interface AppUser {
   username: string;
   displayName: string | null;
   role: UserRole;
+  approvalStatus: "pending" | "approved";
   jellyfinUserId: string | null;
   jellyfinAuthStatus: "not_linked" | "token_ok" | "needs_auth";
   active: boolean;
@@ -300,6 +301,16 @@ export async function updateUser(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as AppUser;
+}
+
+export async function approveUser(id: string, role: UserRole): Promise<AppUser> {
+  const res = await apiFetch(`/api/settings/users/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
   });
   if (!res.ok) throw new Error(await errorText(res));
   return (await res.json()) as AppUser;

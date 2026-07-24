@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Target } from "lucide-react";
-import { getSetupRequired, login, setupAdmin } from "../../lib/auth.ts";
+import { Clock3, Target } from "lucide-react";
+import { getSetupRequired, login, register, setupAdmin } from "../../lib/auth.ts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,8 @@ export function LoginForm({ onSuccess }: Props) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [setupMode, setSetupMode] = useState(false);
+  const [registerMode, setRegisterMode] = useState(false);
+  const [registrationPending, setRegistrationPending] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,21 +27,57 @@ export function LoginForm({ onSuccess }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (setupMode && password !== confirm) {
+    if ((setupMode || registerMode) && password !== confirm) {
       setError("Пароли не совпадают");
       return;
     }
     setLoading(true);
-    const user = setupMode
-      ? await setupAdmin({ username, password, displayName })
-      : await login(username, password);
+    if (setupMode) {
+      const user = await setupAdmin({ username, password, displayName });
+      setLoading(false);
+      if (user) onSuccess(user);
+      else setError("Не удалось создать администратора");
+      return;
+    }
+    if (registerMode) {
+      const result = await register({ username, password, displayName });
+      setLoading(false);
+      if (result.ok) {
+        setRegistrationPending(true);
+      } else {
+        setError(
+          result.error === "username already exists"
+            ? "Такой логин уже занят"
+            : result.error === "password must be at least 6 chars"
+              ? "Пароль должен содержать минимум 6 символов"
+              : "Не удалось зарегистрироваться",
+        );
+      }
+      return;
+    }
+
+    const result = await login(username, password);
     setLoading(false);
-    if (user) {
-      onSuccess(user);
+    if (result.user) {
+      onSuccess(result.user);
     } else {
-      setError(setupMode ? "Не удалось создать администратора" : "Неверный логин или пароль");
+      const messages = {
+        approval_pending: "Регистрация ожидает подтверждения администратора",
+        user_disabled: "Учётная запись отключена администратором",
+        invalid_credentials: "Неверный логин или пароль",
+        unknown: "Не удалось войти. Проверьте подключение к серверу",
+      };
+      setError(messages[result.error ?? "unknown"]);
     }
   }
+
+  const switchMode = (nextRegisterMode: boolean) => {
+    setRegisterMode(nextRegisterMode);
+    setRegistrationPending(false);
+    setError("");
+    setPassword("");
+    setConfirm("");
+  };
 
   return (
     <div className="grid min-h-screen w-full place-items-center bg-[radial-gradient(circle_at_20%_20%,color-mix(in_srgb,var(--accent)_16%,transparent),transparent_32%),var(--page)] px-4">
@@ -53,16 +91,43 @@ export function LoginForm({ onSuccess }: Props) {
             Mission Control
           </div>
           <div className="mt-1 text-xs tracking-3 text-muted">
-            {setupMode ? "создание администратора" : "braidner · self-hosted · LAN-only"}
+            {setupMode
+              ? "создание администратора"
+              : registerMode
+                ? "новая учётная запись"
+                : "braidner · self-hosted · LAN-only"}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+        {registrationPending ? (
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="grid size-12 place-items-center rounded-full border border-warn/30 bg-warn/10 text-warn">
+              <Clock3 className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-title font-semibold text-ink">Регистрация отправлена</h1>
+              <p className="mt-2 text-body text-ink-soft">
+                Администратор должен подтвердить учётную запись и назначить роль. После этого
+                можно будет войти.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => switchMode(false)}
+            >
+              Вернуться ко входу
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-1.5">
-            <Label className="text-data uppercase tracking-4 text-muted">
+            <Label htmlFor="auth-username" className="text-data uppercase tracking-4 text-muted">
               Логин
             </Label>
             <Input
+              id="auth-username"
               type="text"
               autoComplete="username"
               autoFocus
@@ -72,12 +137,13 @@ export function LoginForm({ onSuccess }: Props) {
             />
           </div>
 
-          {setupMode && (
+          {(setupMode || registerMode) && (
             <div className="flex flex-col gap-1.5">
-              <Label className="text-data uppercase tracking-4 text-muted">
+              <Label htmlFor="auth-display-name" className="text-data uppercase tracking-4 text-muted">
                 Имя
               </Label>
               <Input
+                id="auth-display-name"
                 type="text"
                 autoComplete="name"
                 value={displayName}
@@ -88,24 +154,26 @@ export function LoginForm({ onSuccess }: Props) {
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label className="text-data uppercase tracking-4 text-muted">
+            <Label htmlFor="auth-password" className="text-data uppercase tracking-4 text-muted">
               Пароль
             </Label>
             <Input
+              id="auth-password"
               type="password"
-              autoComplete="current-password"
+              autoComplete={setupMode || registerMode ? "new-password" : "current-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
             />
           </div>
 
-          {setupMode && (
+          {(setupMode || registerMode) && (
             <div className="flex flex-col gap-1.5">
-              <Label className="text-data uppercase tracking-4 text-muted">
+              <Label htmlFor="auth-password-confirm" className="text-data uppercase tracking-4 text-muted">
                 Повтор пароля
               </Label>
               <Input
+                id="auth-password-confirm"
                 type="password"
                 autoComplete="new-password"
                 value={confirm}
@@ -124,12 +192,30 @@ export function LoginForm({ onSuccess }: Props) {
               loading ||
               !username ||
               password.length < 6 ||
-              (setupMode && !confirm)
+              ((setupMode || registerMode) && !confirm)
             }
           >
-            {loading ? "Секунду…" : setupMode ? "Создать администратора" : "Войти"}
+            {loading
+              ? "Секунду…"
+              : setupMode
+                ? "Создать администратора"
+                : registerMode
+                  ? "Зарегистрироваться"
+                  : "Войти"}
           </Button>
+
+          {!setupMode && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => switchMode(!registerMode)}
+            >
+              {registerMode ? "Уже есть аккаунт? Войти" : "Нет аккаунта? Зарегистрироваться"}
+            </Button>
+          )}
         </form>
+        )}
       </div>
     </div>
   );

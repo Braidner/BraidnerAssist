@@ -159,7 +159,9 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     `DELETE /api/media/titles/:kind/:tmdbId` (empty registry-title only),
     `POST /api/media/release/search`, `POST /api/media/release/grab`, `POST /api/media/torrent`,
     `POST /api/media/torrent/:hash/:action`, `POST /api/media/scan`, Jellyfin playback/detail/
-    devices/play-to routes, and Discovery routes. Removed active endpoints include
+    devices/play-to routes, `POST /api/media/download/:id/ticket` + потоковый
+    `GET /api/media/file/:ticket` для скачивания оригинального файла, and Discovery routes.
+    Removed active endpoints include
     quality-profiles, repair, monitor, calendar, import candidates/execute and torrent picker.
     **Hermes MCP active media tools**: `search_releases`, `grab_release`, `get_media_status`,
     `add_torrent`, `list_jackett_indexers`, `test_jackett_search`, discovery preference tools,

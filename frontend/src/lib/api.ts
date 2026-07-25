@@ -1975,6 +1975,21 @@ export async function getMediaPlayUrl(id: string): Promise<MediaPlayInfo | null>
   }
 }
 
+export async function getMediaDownloadUrl(id: string): Promise<string | null> {
+  try {
+    const res = await apiFetch(`/api/media/download/${encodeURIComponent(id)}/ticket`, {
+      method: "POST",
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { url?: string };
+    return typeof body.url === "string" && body.url.startsWith("/api/media/file/")
+      ? body.url
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getMediaTrickplayPlaylist(
   itemId: string,
   mediaSourceId?: string | null,

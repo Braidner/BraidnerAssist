@@ -24,6 +24,7 @@ import {
 	getMediaTitleDetail,
 	addTitle,
 	getMediaPlayUrl,
+	getMediaDownloadUrl,
 	jellyfinPosterUrl,
 	posterUrl,
 	getMediaLibrary,
@@ -67,6 +68,7 @@ export function MediaMoviePage({
 	const [library, setLibrary] = useState<LibraryItem[]>([]);
 	const [player, setPlayer] = useState<DetailPlayer>(null);
 	const [busy, setBusy] = useState(false);
+	const [downloadBusy, setDownloadBusy] = useState(false);
 	const [act, setAct] = useState<string | null>(null);
 	const [showPicker, setShowPicker] = useState(false);
 	const [queuedInLibrary, setQueuedInLibrary] = useState(false);
@@ -132,6 +134,27 @@ export function MediaMoviePage({
 			});
 		}
 		else toast.error("Не удалось запустить воспроизведение");
+	};
+
+	const downloadMovie = async () => {
+		if (!det.jellyfinId) return;
+		try {
+			setDownloadBusy(true);
+			const url = await getMediaDownloadUrl(det.jellyfinId);
+			if (!url) {
+				toast.error("Не удалось подготовить скачивание");
+				return;
+			}
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = "";
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			toast.success("Скачивание фильма началось");
+		} finally {
+			setDownloadBusy(false);
+		}
 	};
 
 	// TMDB-подборки: похожее + франшиза (коллекция). Заводятся как только знаем tmdbId.
@@ -287,19 +310,25 @@ export function MediaMoviePage({
 									В библиотеке
 								</Button>
 							)}
+							{det.hasFile && det.jellyfinId && (
+								<Button
+									className={cn(ms.heroGhostBtn, "size-[46px] shrink-0 px-0 py-0 max-mob:size-[42px]")}
+									loading={downloadBusy}
+									title="Скачать фильм на устройство"
+									aria-label="Скачать фильм на устройство"
+									onClick={downloadMovie}
+								>
+									<Download className="size-[18px]" strokeWidth={2.2}/>
+								</Button>
+							)}
 							<Button
-								className={cn(
-									ms.heroGhostBtn,
-									"size-[46px] shrink-0 px-0 py-0 max-mob:size-[42px]",
-									showPicker && "border-accent/70 bg-accent/15 text-white",
-								)}
+								className={ms.heroGhostBtn}
 								disabled={det.tmdbId == null}
-								title={det.tmdbId == null ? "Скачивание недоступно: нет TMDB ID" : "Скачать фильм"}
-								aria-label="Скачать фильм"
-								aria-pressed={showPicker}
+								title={det.tmdbId == null ? "Нет tmdbId" : ""}
+								aria-expanded={showPicker}
 								onClick={() => setShowPicker((v) => !v)}
 							>
-								<Download className="size-[18px]" strokeWidth={2.2}/>
+								{showPicker ? "Скрыть поиск" : "Поиск"}
 							</Button>
 						</>
 					}

@@ -70,6 +70,7 @@ import {
   type MediaPreferenceStatus,
 } from "../integrations/mediaPreferences.js";
 import { clearPosterCache, getPosterCacheStatus } from "../integrations/posterCache.js";
+import { createJellyfinDownloadTicket } from "./jellyfinDownload.js";
 import {
   assertUserCanDownload,
   DownloadQuotaExceededError,
@@ -619,6 +620,18 @@ apiRouter.get("/media/play/:id", async (req, res) => {
   } catch (e) {
     logRouteError("jellyfin", req, e);
     res.status(502).json({ error: String(e) });
+  }
+});
+
+// Авторизованный шаг перед прямым скачиванием: сам большой файл пойдёт через
+// короткоживущий непрозрачный ticket, поэтому JWT не попадает в URL или access log.
+apiRouter.post("/media/download/:id/ticket", (req, res) => {
+  if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
+  try {
+    const ticket = createJellyfinDownloadTicket(req.params.id);
+    res.json({ url: `/api/media/file/${ticket}` });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
   }
 });
 

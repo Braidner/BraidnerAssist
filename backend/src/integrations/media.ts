@@ -1025,6 +1025,20 @@ export async function jellyfinProxy(subpath: string, query: URLSearchParams): Pr
   return fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(30_000) });
 }
 
+// Оригинальный файл из Jellyfin для браузерного download endpoint. Здесь намеренно
+// нет короткого timeout: после получения заголовков соединение может часами передавать
+// большой фильм. Range пробрасывается для докачки и повторных запросов браузера.
+export async function jellyfinDownload(itemId: string, range?: string): Promise<Response> {
+  if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
+  if (!/^[a-f0-9-]{16,64}$/i.test(itemId)) throw new Error("invalid Jellyfin item id");
+  return fetch(`${config.media.jellyfin.url}/Items/${encodeURIComponent(itemId)}/Download`, {
+    headers: {
+      ...jfHeaders(),
+      ...(range ? { Range: range } : {}),
+    },
+  });
+}
+
 // ── qBittorrent ─────────────────────────────────────────────────────────
 let qbSid: { value: string; at: number } | null = null;
 

@@ -2,7 +2,7 @@
 // метаданными, встроенный плеер, поиск релизов и rail привязанных раздач.
 
 import {useEffect, useRef, useState} from "react";
-import { CheckCircle2, Plus } from "lucide-react";
+import { CheckCircle2, Download, Plus } from "lucide-react";
 import {useParams, useNavigate, useLocation, useSearchParams} from "react-router-dom";
 import {
 	ReleasePicker,
@@ -71,6 +71,7 @@ export function MediaMoviePage({
 	const [showPicker, setShowPicker] = useState(false);
 	const [queuedInLibrary, setQueuedInLibrary] = useState(false);
 	const autoplayConsumedRef = useRef<string | null>(null);
+	const releasePickerRef = useRef<HTMLDivElement>(null);
 	const locationState = location.state as AutoplayLocationState;
 	const backTarget = locationState?.from ?? (source === "discover" ? "/media/discover" : "/media");
 	const goBack = () => {
@@ -96,6 +97,14 @@ export function MediaMoviePage({
 		getMediaLibrary().then(setLibrary);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [id, source]);
+
+	useEffect(() => {
+		if (!showPicker) return;
+		const frame = window.requestAnimationFrame(() => {
+			releasePickerRef.current?.scrollIntoView({behavior: "smooth", block: "start"});
+		});
+		return () => window.cancelAnimationFrame(frame);
+	}, [showPicker]);
 
 	const play = async () => {
 		const playId = d && d !== "loading" ? d.jellyfinId : "";
@@ -278,14 +287,20 @@ export function MediaMoviePage({
 									В библиотеке
 								</Button>
 							)}
-								<Button
-									className={ms.heroGhostBtn}
-									disabled={det.tmdbId == null}
-									title={det.tmdbId == null ? "Нет tmdbId" : ""}
-									onClick={() => setShowPicker((v) => !v)}
-								>
-									{showPicker ? "Скрыть поиск" : "Поиск"}
-								</Button>
+							<Button
+								className={cn(
+									ms.heroGhostBtn,
+									"size-[46px] shrink-0 px-0 py-0 max-mob:size-[42px]",
+									showPicker && "border-accent/70 bg-accent/15 text-white",
+								)}
+								disabled={det.tmdbId == null}
+								title={det.tmdbId == null ? "Скачивание недоступно: нет TMDB ID" : "Скачать фильм"}
+								aria-label="Скачать фильм"
+								aria-pressed={showPicker}
+								onClick={() => setShowPicker((v) => !v)}
+							>
+								<Download className="size-[18px]" strokeWidth={2.2}/>
+							</Button>
 						</>
 					}
 					onBack={goBack}
@@ -295,17 +310,19 @@ export function MediaMoviePage({
 			</div>
 
 			{showPicker && det.tmdbId != null && (
-				<ReleasePicker
-					params={{type: "movie", id: det.tmdbId}}
-					downloads={media.downloads}
-					fallbackPosterSrc={posterSrc}
-					onGrabbed={() => {
-						setQueuedInLibrary(true);
-						onMediaUpdate();
-						refreshTitleTorrents();
-						window.setTimeout(refreshTitleTorrents, 2_000);
-					}}
-				/>
+				<div ref={releasePickerRef} className="scroll-mt-6">
+					<ReleasePicker
+						params={{type: "movie", id: det.tmdbId}}
+						downloads={media.downloads}
+						fallbackPosterSrc={posterSrc}
+						onGrabbed={() => {
+							setQueuedInLibrary(true);
+							onMediaUpdate();
+							refreshTitleTorrents();
+							window.setTimeout(refreshTitleTorrents, 2_000);
+						}}
+					/>
+				</div>
 			)}
 			{collection && collection.items.length > 1 && (
 				<CardRail

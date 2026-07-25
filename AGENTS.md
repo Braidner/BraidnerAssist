@@ -321,7 +321,9 @@ Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
   `navigator.standalone`; CSS tokens `--safe-top`/`--safe-bottom` используют
   `env(safe-area-inset-*)`. `TopBar` получает top safe padding только в standalone, media pages
   и hero-player controls учитывают bottom safe area. Цель — edge-to-edge PWA под status bar,
-  но iOS часы/батарея/Dynamic Island не скрываются.
+  но iOS часы/батарея/Dynamic Island не скрываются. Workbox navigation fallback исключает
+  `/api/*`, `/jf/*` и `/healthz`, а `/api/media/file/*` использует `NetworkOnly`: iOS считает
+  `<a download>` навигацией, поэтому download-поток нельзя подменять `index.html` или кэшировать.
 - **StatStrip**: одна горизонтальная полоса мини-тайлов с прокруткой — погода (широкий) +
   один объединённый Proxmox-тайл (CPU/RAM/DISK гейджи в ряд, диск/RAM в ГБ) + по тайлу на
   каждую VM/LXC (cpu/ram/статус) + по тайлу на каждый сервис. Панель «Статус системы»

@@ -42,7 +42,17 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // iOS treats an <a download> click as a navigation. Never let the SPA
+        // navigation fallback replace API/Jellyfin responses with index.html.
+        navigateFallbackDenylist: [/^\/api\//, /^\/jf(?:\/|$)/, /^\/healthz$/],
         runtimeCaching: [
+          {
+            // Original movie files can be tens of gigabytes. Stream them from
+            // the backend only; cloning one into Cache Storage would corrupt
+            // mobile downloads and quickly exhaust device storage.
+            urlPattern: /^\/api\/media\/file\//,
+            handler: "NetworkOnly",
+          },
           {
             urlPattern: /^\/api\/poster/,
             handler: "CacheFirst",

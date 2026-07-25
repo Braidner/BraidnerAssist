@@ -32,7 +32,9 @@ import {
   getEnvSettings,
   putServicesConfig,
   putEnvSettings,
+  resetUserDownloadLimit,
   updateUser,
+  updateUserDownloadLimits,
   type AppUser,
   type EnvField,
   type EnvSettings,
@@ -72,9 +74,6 @@ export function SettingsPage() {
           <TabsTrigger value="users" className="h-9 px-1">
             Пользователи
           </TabsTrigger>
-          <TabsTrigger value="activity" className="h-9 px-1">
-            Активность
-          </TabsTrigger>
           <TabsTrigger value="services" className="h-9 px-1">
             Сервисы
           </TabsTrigger>
@@ -84,9 +83,6 @@ export function SettingsPage() {
         </TabsList>
         <TabsContent value="users">
           <UsersTab />
-        </TabsContent>
-        <TabsContent value="activity">
-          <UserActivityTab />
         </TabsContent>
         <TabsContent value="services">
           <ServicesTab />
@@ -272,6 +268,7 @@ function UsersTab() {
   });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activityRefresh, setActivityRefresh] = useState(0);
 
   const reload = () => Promise.all([getUsers(), getJellyfinUsers()]).then(([nextUsers, nextJellyfinUsers]) => {
     setUsers(nextUsers);
@@ -288,6 +285,7 @@ function UsersTab() {
     try {
       await fn();
       await reload();
+      setActivityRefresh((value) => value + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
     } finally {
@@ -321,45 +319,34 @@ function UsersTab() {
         </div>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className={cn(ui.panel, "p-0")}>
-          <div className="grid grid-cols-[minmax(130px,1fr)_110px_150px_110px_100px_130px] gap-3 border-b border-hair px-5 py-3 font-mono text-label uppercase tracking-3 text-muted max-md:hidden">
-            <span>Пользователь</span>
-            <span>Роль</span>
-            <span>Jellyfin</span>
-            <span>Токен</span>
-            <span>Статус</span>
-            <span className="text-right">Действия</span>
-          </div>
-          <div className="divide-y divide-hair">
-            {approvedUsers.map((user) => (
-              <UserRow
-                key={user.id}
-                user={user}
-                jellyfinUsers={jellyfinUsers}
-                busy={busy}
-                onUpdate={(input) =>
-                  run(user.id, () => updateUser(user.id, input).then(() => undefined))
-                }
-                onDelete={() => run(`delete-${user.id}`, () => deleteUser(user.id))}
-              />
-            ))}
-            {approvedUsers.length === 0 && (
-              <div className="px-5 py-8 text-body text-ink-soft">
-                Подтверждённых пользователей пока нет.
-              </div>
-            )}
-          </div>
-        </div>
+      <UserActivityTab
+        admin={{
+          users: approvedUsers,
+          jellyfinUsers,
+          busy,
+          refreshKey: activityRefresh,
+          onUpdate: (id, input) =>
+            run(`update-${id}`, () => updateUser(id, input).then(() => undefined)),
+          onDelete: (id) => run(`delete-${id}`, () => deleteUser(id)),
+          onLimits: (id, limits) =>
+            run(`limits-${id}`, () =>
+              updateUserDownloadLimits(id, limits).then(() => undefined),
+            ),
+          onReset: (id, period) =>
+            run(`reset-${id}-${period}`, () =>
+              resetUserDownloadLimit(id, period).then(() => undefined),
+            ),
+        }}
+      />
 
-        <aside className={ui.panel}>
+      <aside className={ui.panel}>
           <div className={ui.panelHead}>
             <div className={ui.panelTitle}>
               <UserRound className="size-4" />
               Новый пользователь
             </div>
           </div>
-          <div className="flex flex-col gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field label="Логин">
               <Input
                 autoComplete="off"
@@ -389,11 +376,11 @@ function UsersTab() {
                 onChange={(role) => setDraft((d) => ({ ...d, role }))}
               />
             </Field>
-            <div className="rounded-[10px] border border-hair bg-groove px-3 py-2 text-cell text-ink-soft">
+            <div className="rounded-[10px] border border-hair bg-groove px-3 py-2 text-cell text-ink-soft sm:col-span-2 lg:col-span-3">
               Jellyfin-профиль будет создан или привязан автоматически по логину.
             </div>
             <Button
-              className="mt-1"
+              className="self-end"
               onClick={addUser}
               disabled={busy === "create" || !draft.username || draft.password.length < 6}
             >
@@ -401,8 +388,7 @@ function UsersTab() {
               Создать
             </Button>
           </div>
-        </aside>
-      </div>
+      </aside>
     </section>
   );
 }
@@ -418,6 +404,20 @@ function PendingUsersPanel({
   onApprove: (id: string, role: UserRole) => void;
   onDelete: (id: string) => void;
 }) {
+  if (users.length === 0) {
+    return (
+      <div className={cn(ui.panel, "flex flex-wrap items-center justify-between gap-3 py-3.5")}>
+        <div className="flex items-center gap-2 text-body text-ink-soft">
+          <Clock3 className="size-4 text-muted" />
+          Новых заявок нет
+        </div>
+        <span className="text-cell text-muted">
+          Регистрации появятся здесь автоматически
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className={cn(ui.panel, "p-0")}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hair px-5 py-4">
@@ -428,23 +428,17 @@ function PendingUsersPanel({
         <Badge variant={users.length ? "warn" : "outline"}>{users.length}</Badge>
       </div>
 
-      {users.length === 0 ? (
-        <div className="px-5 py-6 text-body text-ink-soft">
-          Новых заявок нет. Они появятся здесь после регистрации.
-        </div>
-      ) : (
-        <div className="divide-y divide-hair">
-          {users.map((user) => (
-            <PendingUserRow
-              key={user.id}
-              user={user}
-              busy={busy}
-              onApprove={onApprove}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      )}
+      <div className="divide-y divide-hair">
+        {users.map((user) => (
+          <PendingUserRow
+            key={user.id}
+            user={user}
+            busy={busy}
+            onApprove={onApprove}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -506,123 +500,6 @@ function PendingUserRow({
         </Button>
       </div>
     </div>
-  );
-}
-
-function UserRow({
-  user,
-  jellyfinUsers,
-  busy,
-  onUpdate,
-  onDelete,
-}: {
-  user: AppUser;
-  jellyfinUsers: JellyfinUserRef[];
-  busy: string | null;
-  onUpdate: (input: Parameters<typeof updateUser>[1]) => void;
-  onDelete: () => void;
-}) {
-  const [password, setPassword] = useState("");
-
-  return (
-    <div className="grid grid-cols-[minmax(130px,1fr)_110px_150px_110px_100px_130px] items-center gap-3 px-5 py-4 max-md:grid-cols-1">
-      <div className="min-w-0">
-        <div className="truncate text-body font-semibold text-ink">{user.username}</div>
-        <Input
-          className="mt-2 h-8"
-          value={user.displayName ?? ""}
-          placeholder="Имя"
-          onChange={(e) => onUpdate({ displayName: e.target.value })}
-        />
-      </div>
-
-      <RoleSelect value={user.role} onChange={(role) => onUpdate({ role })} />
-
-      <JellyfinUserSelect
-        value={user.jellyfinUserId}
-        users={jellyfinUsers}
-        onChange={(jellyfinUserId) => onUpdate({ jellyfinUserId })}
-      />
-      <JellyfinAuthBadge status={user.jellyfinAuthStatus} />
-
-      <button
-        type="button"
-        className="w-fit"
-        onClick={() => onUpdate({ active: !user.active })}
-      >
-        <Badge variant={user.active ? "ok" : "outline"}>
-          {user.active ? "Активен" : "Отключен"}
-        </Badge>
-      </button>
-
-      <div className="flex justify-end gap-2 max-md:justify-start">
-        <Input
-          className="h-8 w-28"
-          type="password"
-          placeholder="пароль"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <Button
-          variant="outline"
-          size="icon"
-          title="Сохранить пароль"
-          disabled={password.length > 0 && password.length < 6}
-          onClick={() => {
-            if (!password) return;
-            onUpdate({ password });
-            setPassword("");
-          }}
-        >
-          <Save />
-        </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-          title="Удалить"
-          disabled={busy === `delete-${user.id}`}
-          onClick={onDelete}
-        >
-          <Trash2 />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function JellyfinAuthBadge({ status }: { status: AppUser["jellyfinAuthStatus"] }) {
-  const map = {
-    not_linked: { label: "не привязан", variant: "outline" as const },
-    token_ok: { label: "token ok", variant: "ok" as const },
-    needs_auth: { label: "нужен вход", variant: "warn" as const },
-  };
-  const item = map[status] ?? map.not_linked;
-  return <Badge variant={item.variant}>{item.label}</Badge>;
-}
-
-function JellyfinUserSelect({
-  value,
-  users,
-  onChange,
-}: {
-  value: string | null;
-  users: JellyfinUserRef[];
-  onChange: (jellyfinUserId: string | null) => void;
-}) {
-  return (
-    <Select value={value ?? "__none"} onValueChange={(next) => onChange(next === "__none" ? null : next)}>
-      <SelectTrigger className="w-full bg-surface">
-        <SelectValue placeholder="Не привязан" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="__none">Не привязан</SelectItem>
-        {users.map((user) => (
-          <SelectItem key={user.id} value={user.id}>
-            {user.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 

@@ -20,6 +20,9 @@ export interface PublicUser {
   approvalStatus: UserApprovalStatus;
   jellyfinUserId: string | null;
   jellyfinAuthStatus: "not_linked" | "token_ok" | "needs_auth";
+  downloadLimitTotal: number | null;
+  downloadLimitDaily: number | null;
+  downloadLimitWeekly: number | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +52,9 @@ export function toPublicUser(user: AppUser): PublicUser {
       : user.jellyfinAccessToken
         ? "token_ok"
         : "needs_auth",
+    downloadLimitTotal: user.downloadLimitTotal,
+    downloadLimitDaily: user.downloadLimitDaily,
+    downloadLimitWeekly: user.downloadLimitWeekly,
     active: user.active,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,

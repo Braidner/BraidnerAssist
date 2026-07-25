@@ -240,8 +240,8 @@ export function CommandPalette({ role }: { role: UserRole }) {
       hint: "Скачать",
       run: async () => {
         if (r.url) {
-          const ok = await addTorrent(r.url);
-          done(ok ? "В qBittorrent ✓" : "Ошибка");
+          const result = await addTorrent(r.url);
+          done(result.ok ? "В qBittorrent ✓" : result.error ?? "Ошибка");
         }
       },
     })),

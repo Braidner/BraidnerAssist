@@ -1,6 +1,11 @@
 import { config } from "../config.js";
 import { prisma } from "../db/client.js";
 import { listJellyfinUsers, type JellyfinUserRef } from "./jellyfinUsers.js";
+import {
+  buildDownloadQuotaSnapshot,
+  type DownloadQuotaSnapshot,
+  type DownloadQuotaSource,
+} from "./downloadQuota.js";
 
 const ONLINE_WINDOW_MS = 5 * 60_000;
 const HISTORY_LIMIT = 8;
@@ -56,6 +61,7 @@ export interface JellyfinUserActivity {
   liveBitrate: number;
   nowPlaying: JellyfinNowPlaying[];
   history: JellyfinHistoryItem[];
+  quota: DownloadQuotaSnapshot | null;
 }
 
 export interface JellyfinUserActivityData {
@@ -132,7 +138,7 @@ export interface JellyfinHistoryItemDto {
   };
 }
 
-interface AppUserActivitySource {
+interface AppUserActivitySource extends DownloadQuotaSource {
   id: string;
   username: string;
   displayName: string | null;
@@ -281,6 +287,7 @@ export function buildJellyfinUserActivity(input: BuildActivityInput): JellyfinUs
     role: string | null;
     active: boolean;
     linked: boolean;
+    quota: DownloadQuotaSnapshot | null;
   }> = [
     ...input.appUsers.map((user) => {
       const jellyfinUser = user.jellyfinUserId
@@ -295,6 +302,7 @@ export function buildJellyfinUserActivity(input: BuildActivityInput): JellyfinUs
         role: user.role,
         active: user.active,
         linked: Boolean(jellyfinUser),
+        quota: buildDownloadQuotaSnapshot(user, now),
       };
     }),
     ...input.jellyfinUsers
@@ -308,6 +316,7 @@ export function buildJellyfinUserActivity(input: BuildActivityInput): JellyfinUs
         role: null,
         active: true,
         linked: false,
+        quota: null,
       })),
   ];
 
@@ -409,6 +418,13 @@ export async function getJellyfinUserActivity(): Promise<JellyfinUserActivityDat
         role: true,
         active: true,
         jellyfinUserId: true,
+        downloadLimitTotal: true,
+        downloadLimitDaily: true,
+        downloadLimitWeekly: true,
+        downloadTotalResetAt: true,
+        downloadDailyResetAt: true,
+        downloadWeeklyResetAt: true,
+        downloads: { select: { addedAt: true } },
       },
     }),
     listJellyfinUsers(),

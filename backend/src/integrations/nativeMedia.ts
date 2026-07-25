@@ -16,6 +16,10 @@ import {
   type SeriesTitleIdType,
 } from "./media.js";
 import {
+  assertUserCanDownload,
+  recordUserDownload,
+} from "./downloadQuota.js";
+import {
   tmdbDetails,
   tmdbFindByTvdb,
   tmdbSearch,
@@ -460,6 +464,7 @@ export async function nativeGrabRelease(
   guid: string,
   indexerId: number | string,
   seasonNumber?: number,
+  appUserId?: string | null,
 ): Promise<{ ok: true; infohash: string; added: boolean }> {
   keepCacheFresh();
   const title = await ensureTitle(kind, id);
@@ -471,6 +476,7 @@ export async function nativeGrabRelease(
   }
   assertMovieReleaseMatchesTitle(kind, title, item);
   assertReleaseMatchAllowsGrab(item);
+  await assertUserCanDownload(appUserId, item.infoHash);
   const source = String(item.url);
   const detail = await tmdbDetails(kind, title.tmdbId).catch(() => null);
   const savePath = titleSavePath(kind, title, detail);
@@ -504,6 +510,12 @@ export async function nativeGrabRelease(
       category: LIBRARY_CATEGORY,
       seasonNumber: item.seasonNumber ?? null,
     },
+  });
+  await recordUserDownload({
+    userId: appUserId,
+    infohash,
+    releaseTitle: item.title,
+    size: item.size,
   });
   await jellyfinRefresh().catch(() => {});
   return { ok: true, infohash, added: true };

@@ -22,6 +22,12 @@ test("self-registration stays pending until an admin approves a role", async () 
         "approvalStatus" TEXT NOT NULL DEFAULT 'approved',
         "jellyfinUserId" TEXT,
         "jellyfinAccessToken" TEXT,
+        "downloadLimitTotal" INTEGER,
+        "downloadLimitDaily" INTEGER,
+        "downloadLimitWeekly" INTEGER,
+        "downloadTotalResetAt" DATETIME,
+        "downloadDailyResetAt" DATETIME,
+        "downloadWeeklyResetAt" DATETIME,
         "active" BOOLEAN NOT NULL DEFAULT true,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" DATETIME NOT NULL

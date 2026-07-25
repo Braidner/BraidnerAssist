@@ -85,6 +85,19 @@ test("admin approves a pending user and assigns a role", async ({ page }) => {
   await page.route("**/api/tasks", (route) =>
     route.fulfill({ contentType: "application/json", body: "[]" }),
   );
+  await page.route("**/api/media/quota", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        configured: false,
+        userId: "admin-1",
+        periods: [],
+        available: null,
+        blockingPeriod: null,
+        updatedAt: "2026-07-25T12:00:00.000Z",
+      }),
+    }),
+  );
   await page.route("**/api/settings/users**", async (route) => {
     if (route.request().url().endsWith("/approve")) {
       approvedRole = ((await route.request().postDataJSON()) as { role: string }).role;
@@ -131,6 +144,7 @@ test("admin approves a pending user and assigns a role", async ({ page }) => {
   });
 
   await page.goto("/settings");
+  await expect(page.getByRole("button", { name: /Доступно загрузок/ })).toHaveCount(0);
   await expect(page.getByText("Ожидают подтверждения")).toBeVisible();
   await expect(page.getByText("@viewer")).toBeVisible();
 
@@ -143,6 +157,8 @@ test("admin approves a pending user and assigns a role", async ({ page }) => {
 });
 
 test("admin sees live Jellyfin activity and recent viewing history", async ({ page }) => {
+  let resetPeriod = "";
+  let savedWeeklyLimit: number | null = null;
   await page.addInitScript(() => {
     window.localStorage.setItem("mc-auth-token", "test-token");
   });
@@ -173,11 +189,62 @@ test("admin sees live Jellyfin activity and recent viewing history", async ({ pa
   await page.route("**/api/tasks", (route) =>
     route.fulfill({ contentType: "application/json", body: "[]" }),
   );
+  await page.route("**/api/media/quota", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        configured: true,
+        userId: "admin-1",
+        periods: [
+          {
+            key: "daily",
+            label: "Сегодня",
+            limit: 5,
+            used: 2,
+            remaining: 3,
+            percent: 40,
+            resetsAt: "2026-07-25T21:00:00.000Z",
+          },
+          {
+            key: "weekly",
+            label: "Эта неделя",
+            limit: 12,
+            used: 4,
+            remaining: 8,
+            percent: 33,
+            resetsAt: "2026-07-26T21:00:00.000Z",
+          },
+        ],
+        available: 3,
+        blockingPeriod: null,
+        updatedAt: "2026-07-25T12:00:00.000Z",
+      }),
+    }),
+  );
   await page.route("**/api/settings/jellyfin-users", (route) =>
     route.fulfill({ contentType: "application/json", body: "[]" }),
   );
   await page.route("**/api/settings/users", (route) =>
-    route.fulfill({ contentType: "application/json", body: "[]" }),
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "admin-1",
+          username: "owner",
+          displayName: "Алексей",
+          role: "admin",
+          approvalStatus: "approved",
+          jellyfinUserId: "jf-admin",
+          jellyfinAuthStatus: "token_ok",
+          downloadLimitTotal: null,
+          downloadLimitDaily: 5,
+          downloadLimitWeekly: 12,
+          active: true,
+          createdAt: "2026-07-01T12:00:00.000Z",
+          updatedAt: "2026-07-25T12:00:00.000Z",
+        },
+      ]),
+    }),
   );
   await page.route("**/api/settings/users/activity", (route) =>
     route.fulfill({
@@ -232,6 +299,33 @@ test("admin sees live Jellyfin activity and recent viewing history", async ({ pa
                 playCount: 1,
               },
             ],
+            quota: {
+              configured: true,
+              userId: "admin-1",
+              periods: [
+                {
+                  key: "daily",
+                  label: "Сегодня",
+                  limit: 5,
+                  used: 2,
+                  remaining: 3,
+                  percent: 40,
+                  resetsAt: "2026-07-25T21:00:00.000Z",
+                },
+                {
+                  key: "weekly",
+                  label: "Эта неделя",
+                  limit: 12,
+                  used: 4,
+                  remaining: 8,
+                  percent: 33,
+                  resetsAt: "2026-07-26T21:00:00.000Z",
+                },
+              ],
+              available: 3,
+              blockingPeriod: null,
+              updatedAt: "2026-07-25T12:00:00.000Z",
+            },
           },
           {
             id: "jellyfin:guest",
@@ -247,14 +341,43 @@ test("admin sees live Jellyfin activity and recent viewing history", async ({ pa
             devices: [],
             nowPlaying: [],
             history: [],
+            quota: null,
           },
         ],
       }),
     }),
   );
+  await page.route("**/api/settings/users/admin-1/download-limits/daily/reset", async (route) => {
+    resetPeriod = "daily";
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        configured: true,
+        userId: "admin-1",
+        periods: [],
+        available: null,
+        blockingPeriod: null,
+        updatedAt: "2026-07-25T12:00:00.000Z",
+      }),
+    });
+  });
+  await page.route("**/api/settings/users/admin-1/download-limits", async (route) => {
+    const body = (await route.request().postDataJSON()) as { weekly: number | null };
+    savedWeeklyLimit = body.weekly;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        configured: true,
+        userId: "admin-1",
+        periods: [],
+        available: null,
+        blockingPeriod: null,
+        updatedAt: "2026-07-25T12:00:00.000Z",
+      }),
+    });
+  });
 
   await page.goto("/settings");
-  await page.getByRole("tab", { name: "Активность" }).click();
 
   await expect(page.getByText("Активность Jellyfin")).toBeVisible();
   await expect(page.getByText("8 Мбит/с").first()).toBeVisible();
@@ -262,8 +385,22 @@ test("admin sees live Jellyfin activity and recent viewing history", async ({ pa
   await expect(page.getByText("Разделение").first()).toBeVisible();
   await expect(page.getByText("Apple TV · Jellyfin tvOS")).toBeVisible();
   await expect(page.getByText("только Jellyfin")).toBeVisible();
+  await expect(page.getByText("3 загрузок доступно")).toBeVisible();
 
   await page.getByRole("button", { name: /Недавние просмотры/ }).first().click();
   await expect(page.getByText("S01E01 · Хорошие новости об аде")).toBeVisible();
   await expect(page.getByText("просмотрено")).toBeVisible();
+
+  await page.getByRole("button", { name: "Управление" }).click();
+  await expect(page.getByText("Лимиты загрузок")).toBeVisible();
+  await expect(page.getByText("2 из 5")).toBeVisible();
+  await page.getByRole("button", { name: "Сбросить дневной счётчик" }).click();
+  await expect.poll(() => resetPeriod).toBe("daily");
+  await page.getByRole("spinbutton", { name: "Недельный лимит" }).fill("15");
+  await page.getByRole("button", { name: "Сохранить лимиты" }).click();
+  await expect.poll(() => savedWeeklyLimit).toBe(15);
+
+  await page.getByRole("button", { name: /Доступно загрузок: 3/ }).click();
+  await expect(page.getByText("Считаются добавленные торренты")).toBeVisible();
+  await expect(page.getByText("2 / 5 · 40%")).toBeVisible();
 });

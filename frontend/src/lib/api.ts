@@ -204,8 +204,32 @@ export interface AppUser {
   approvalStatus: "pending" | "approved";
   jellyfinUserId: string | null;
   jellyfinAuthStatus: "not_linked" | "token_ok" | "needs_auth";
+  downloadLimitTotal: number | null;
+  downloadLimitDaily: number | null;
+  downloadLimitWeekly: number | null;
   active: boolean;
   createdAt: string;
+  updatedAt: string;
+}
+
+export type DownloadQuotaPeriodKey = "absolute" | "daily" | "weekly";
+
+export interface DownloadQuotaPeriod {
+  key: DownloadQuotaPeriodKey;
+  label: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  percent: number;
+  resetsAt: string | null;
+}
+
+export interface DownloadQuotaSnapshot {
+  configured: boolean;
+  userId: string | null;
+  periods: DownloadQuotaPeriod[];
+  available: number | null;
+  blockingPeriod: DownloadQuotaPeriodKey | null;
   updatedAt: string;
 }
 
@@ -265,6 +289,7 @@ export interface JellyfinUserActivity {
   liveBitrate: number;
   nowPlaying: JellyfinNowPlaying[];
   history: JellyfinHistoryItem[];
+  quota: DownloadQuotaSnapshot | null;
 }
 
 export interface JellyfinUserActivityData {
@@ -375,6 +400,45 @@ export async function updateUser(
   });
   if (!res.ok) throw new Error(await errorText(res));
   return (await res.json()) as AppUser;
+}
+
+export async function updateUserDownloadLimits(
+  id: string,
+  limits: {
+    absolute: number | null;
+    daily: number | null;
+    weekly: number | null;
+  },
+): Promise<DownloadQuotaSnapshot> {
+  const res = await apiFetch(`/api/settings/users/${id}/download-limits`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(limits),
+  });
+  if (!res.ok) throw new Error(await errorText(res));
+  const quota = (await res.json()) as DownloadQuotaSnapshot;
+  window.dispatchEvent(new Event("download-quota-changed"));
+  return quota;
+}
+
+export async function resetUserDownloadLimit(
+  id: string,
+  period: DownloadQuotaPeriodKey,
+): Promise<DownloadQuotaSnapshot> {
+  const res = await apiFetch(
+    `/api/settings/users/${id}/download-limits/${period}/reset`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(await errorText(res));
+  const quota = (await res.json()) as DownloadQuotaSnapshot;
+  window.dispatchEvent(new Event("download-quota-changed"));
+  return quota;
+}
+
+export async function getDownloadQuota(): Promise<DownloadQuotaSnapshot> {
+  const res = await apiFetch("/api/media/quota");
+  if (!res.ok) throw new Error(await errorText(res));
+  return (await res.json()) as DownloadQuotaSnapshot;
 }
 
 export async function approveUser(id: string, role: UserRole): Promise<AppUser> {
@@ -1855,6 +1919,7 @@ export async function grabRelease(p: {
     });
     if (!res.ok) return { ok: false, error: await readMediaSearchError(res) };
     const body = (await res.json()) as { infohash?: string; added?: boolean };
+    window.dispatchEvent(new Event("download-quota-changed"));
     return { ok: true, error: null, infohash: body.infohash, added: body.added };
   } catch {
     return { ok: false, error: "Ошибка сети" };
@@ -2107,30 +2172,40 @@ export async function playOnDevice(
   }
 }
 
-export async function addTorrent(url: string): Promise<boolean> {
+export async function addTorrent(
+  url: string,
+): Promise<{ ok: boolean; error: string | null }> {
   try {
     const res = await apiFetch("/api/media/torrent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
-    return res.ok;
+    if (!res.ok) return { ok: false, error: await errorText(res) };
+    window.dispatchEvent(new Event("download-quota-changed"));
+    return { ok: true, error: null };
   } catch {
-    return false;
+    return { ok: false, error: "Ошибка сети" };
   }
 }
 
 export async function torrentAction(
   hash: string,
   action: "pause" | "resume" | "delete",
+  deleteFiles = false,
 ): Promise<boolean> {
   try {
     const res = await apiFetch(
       `/api/media/torrent/${encodeURIComponent(hash)}/${action}`,
       {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: action === "delete" ? JSON.stringify({ deleteFiles }) : undefined,
       },
     );
+    if (res.ok && action === "delete" && deleteFiles) {
+      window.dispatchEvent(new Event("download-quota-changed"));
+    }
     return res.ok;
   } catch {
     return false;

@@ -3,6 +3,12 @@
 import { useMemo } from "react";
 import { DownloadCloud, Pause, Play, Plus, Trash2 } from "lucide-react";
 import { Card } from "../../components/ui/Card.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MediaFileBrowser } from "./shared/MediaFileBrowser.tsx";
 import {
   torrserverStreamUrl,
@@ -38,7 +44,11 @@ function DownloadCard({
 }: {
   download: DownloadItem;
   busy: string | null;
-  onTorrent: (hash: string, action: "pause" | "resume" | "delete") => void;
+  onTorrent: (
+    hash: string,
+    action: "pause" | "resume" | "delete",
+    deleteFiles?: boolean,
+  ) => void;
 }) {
   const isQb = download.source === "qbittorrent";
   const paused = /paused|stopped/i.test(download.state);
@@ -143,14 +153,38 @@ function DownloadCard({
                     <Pause className="size-3.5" fill="currentColor" />
                   </button>
                 )}
-                <button
-                  className={ms.button.iconSm}
-                  title="Удалить"
-                  disabled={actionBusy("delete")}
-                  onClick={() => onTorrent(download.hash, "delete")}
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={ms.button.iconSm}
+                      title="Удалить"
+                      disabled={actionBusy("delete")}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onSelect={() => onTorrent(download.hash, "delete", false)}
+                    >
+                      Удалить раздачу
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => {
+                        if (
+                          window.confirm(
+                            "Удалить раздачу и все скачанные файлы? Это действие нельзя отменить.",
+                          )
+                        ) {
+                          onTorrent(download.hash, "delete", true);
+                        }
+                      }}
+                    >
+                      Удалить раздачу и файлы
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>
@@ -168,7 +202,11 @@ interface MediaSystemTabProps {
   busy: string | null;
   onWatchNow: (url: string, title: string, key: string) => Promise<void>;
   onSetPlayer: (p: { url: string; title: string; direct: boolean }) => void;
-  onTorrent: (hash: string, action: "pause" | "resume" | "delete") => void;
+  onTorrent: (
+    hash: string,
+    action: "pause" | "resume" | "delete",
+    deleteFiles?: boolean,
+  ) => void;
   onSetAddOpen: (v: boolean) => void;
   onRemoveStream: (hash: string) => void;
   onScanLibrary: () => void | Promise<void>;

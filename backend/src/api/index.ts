@@ -70,6 +70,13 @@ import {
   type MediaPreferenceStatus,
 } from "../integrations/mediaPreferences.js";
 import { clearPosterCache, getPosterCacheStatus } from "../integrations/posterCache.js";
+import {
+  assertUserCanDownload,
+  DownloadQuotaExceededError,
+  getUserDownloadQuota,
+  recordUserDownload,
+  releaseUserDownload,
+} from "../integrations/downloadQuota.js";
 import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integrations/files.js";
 import { listTitleTorrentFiles, repairSeriesEpisode } from "../integrations/mediaRepair.js";
 import { log, getEntries, errorDetail } from "../logger.js";
@@ -79,6 +86,28 @@ export const apiRouter = Router();
 function mediaUserContext(res: { locals: { user?: { id?: string } } }): MediaUserContext {
   const appUserId = res.locals.user?.id ?? null;
   return { appUserId, allowFallback: appUserId === "app-token" };
+}
+
+function quotaUserId(res: { locals: { user?: { id?: string } } }): string | null {
+  const id = res.locals.user?.id ?? null;
+  return id === "app-token" ? null : id;
+}
+
+function magnetInfohash(value: string): string | null {
+  const match = value.match(/[?&]xt=urn:btih:([a-f0-9]{40})(?:&|$)/i);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function sendMediaError(res: Response, error: unknown): void {
+  if (error instanceof DownloadQuotaExceededError) {
+    res.status(429).json({
+      error: error.message,
+      code: error.code,
+      period: error.period,
+    });
+    return;
+  }
+  res.status(502).json({ error: String(error) });
 }
 
 function logRouteError(
@@ -120,6 +149,14 @@ apiRouter.use((req, res, next) => {
 
 apiRouter.use("/tasks", tasksRouter);
 apiRouter.use("/settings", settingsRouter);
+
+apiRouter.get("/media/quota", async (_req, res) => {
+  try {
+    res.json(await getUserDownloadQuota(quotaUserId(res)));
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
 
 apiRouter.get("/weather", async (_req, res) => {
   try {
@@ -724,10 +761,19 @@ apiRouter.post("/media/release/grab", async (req, res) => {
   const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
   if (!Number.isFinite(id) || id <= 0 || !guid || !indexerId) return res.status(400).json({ error: "id, guid and indexerId required" });
   try {
-    res.json(await nativeGrabRelease(kind, id, guid, indexerId, seasonNumber));
+    res.json(
+      await nativeGrabRelease(
+        kind,
+        id,
+        guid,
+        indexerId,
+        seasonNumber,
+        quotaUserId(res),
+      ),
+    );
   } catch (e) {
     logRouteError("jackett", req, e, { kind, id, guid, indexerId, seasonNumber });
-    res.status(502).json({ error: String(e) });
+    sendMediaError(res, e);
   }
 });
 
@@ -763,11 +809,18 @@ apiRouter.post("/media/torrent", async (req, res) => {
   const url = String(req.body?.url ?? req.body?.magnet ?? "").trim();
   if (!url) return res.status(400).json({ error: "url/magnet required" });
   try {
-    await qbAdd(url);
-    res.json({ ok: true });
+    const userId = quotaUserId(res);
+    await assertUserCanDownload(userId, magnetInfohash(url));
+    const addedIds = await qbAdd(url);
+    await Promise.all(
+      addedIds.map((infohash) =>
+        recordUserDownload({ userId, infohash }),
+      ),
+    );
+    res.json({ ok: true, added: addedIds.length, infohashes: addedIds });
   } catch (e) {
     logRouteError("qbittorrent", req, e);
-    res.status(502).json({ error: String(e) });
+    sendMediaError(res, e);
   }
 });
 
@@ -1026,7 +1079,16 @@ apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
     return res.status(400).json({ error: "Недопустимое действие. Разрешены: pause, resume, delete" });
   }
   try {
-    await qbAction(hash, action);
+    const deleteFiles = action === "delete" && Boolean(req.body?.deleteFiles);
+    await qbAction(hash, action, { deleteFiles });
+    if (deleteFiles) {
+      await Promise.all([
+        releaseUserDownload(hash),
+        prisma.mediaTorrent.deleteMany({
+          where: { infohash: hash.trim().toLowerCase() },
+        }),
+      ]);
+    }
     res.json({ ok: true });
   } catch (e) {
     logRouteError("qbittorrent", req, e, { hash, action });

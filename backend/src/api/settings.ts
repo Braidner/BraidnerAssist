@@ -11,6 +11,11 @@ import {
 } from "../auth/users.js";
 import { listJellyfinUsers } from "../integrations/jellyfinUsers.js";
 import { getJellyfinUserActivity } from "../integrations/jellyfinUserActivity.js";
+import {
+  resetUserDownloadQuota,
+  updateUserDownloadLimits,
+  type DownloadQuotaPeriodKey,
+} from "../integrations/downloadQuota.js";
 import { getEnvSettings, updateEnvSettings } from "../settings/envSettings.js";
 
 export const settingsRouter = Router();
@@ -54,6 +59,32 @@ settingsRouter.get("/users/activity", async (_req, res) => {
     res.json(await getJellyfinUserActivity());
   } catch (e) {
     res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+settingsRouter.put("/users/:id/download-limits", async (req, res) => {
+  try {
+    res.json(
+      await updateUserDownloadLimits(req.params.id, {
+        absolute: req.body?.absolute,
+        daily: req.body?.daily,
+        weekly: req.body?.weekly,
+      }),
+    );
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+settingsRouter.post("/users/:id/download-limits/:period/reset", async (req, res) => {
+  const period = String(req.params.period) as DownloadQuotaPeriodKey;
+  if (!["absolute", "daily", "weekly"].includes(period)) {
+    return res.status(400).json({ error: "invalid quota period" });
+  }
+  try {
+    res.json(await resetUserDownloadQuota(req.params.id, period));
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 

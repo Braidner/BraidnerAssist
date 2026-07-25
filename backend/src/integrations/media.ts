@@ -1226,8 +1226,8 @@ export async function qbAddRaw(
 }
 
 // Добавить торрент в qBittorrent (magnet или http(s) .torrent URL).
-export async function qbAdd(urlOrMagnet: string): Promise<void> {
-  await qbAddRaw(urlOrMagnet);
+export async function qbAdd(urlOrMagnet: string): Promise<string[]> {
+  return qbAddRaw(urlOrMagnet);
 }
 
 // ── qBittorrent: пофайловый контроль (Media v2) ──────────────────────────
@@ -1341,14 +1341,21 @@ const QB_ENDPOINTS: Record<string, string[]> = {
 };
 
 // Управление торрентом по хешу.
-export async function qbAction(hash: string, action: string): Promise<void> {
+export async function qbAction(
+  hash: string,
+  action: string,
+  options: { deleteFiles?: boolean } = {},
+): Promise<void> {
   if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
   const candidates = QB_ENDPOINTS[action];
   if (!candidates) throw new Error(`Недопустимое действие: ${action}`);
   const sid = await qbLogin();
   const body =
     action === "delete"
-      ? new URLSearchParams({ hashes: hash, deleteFiles: "false" })
+      ? new URLSearchParams({
+          hashes: hash,
+          deleteFiles: options.deleteFiles ? "true" : "false",
+        })
       : new URLSearchParams({ hashes: hash });
 
   let lastStatus = 0;

@@ -1,23 +1,20 @@
 import { useEffect, useState } from "react";
 import {LogOut, Moon, Sun} from "lucide-react";
 import type {Theme} from "@/theme.ts";
-import type {VersionData} from "@/lib/api.ts";
 import {useTabsState} from "../../lib/tabsContext.tsx";
-import {cn} from "../../lib/cn.ts";
 import {Button} from "@/components/ui/button";
 import {Tabs, TabsList, TabsTrigger} from "@/components/ui/tabs.tsx";
 import { icons } from "../icons.tsx";
-
-type Backend = "up" | "down" | "checking";
+import type { DownloadQuotaSnapshot } from "@/lib/api.ts";
+import { DownloadQuotaGauge } from "./DownloadQuotaGauge";
 
 interface TopBarProps {
-	backend: Backend;
 	menuOpen: boolean;
 	theme: Theme;
 	onToggleTheme: () => void;
 	onLogout: () => void;
 	onMenu: () => void;
-	versionData: VersionData | null;
+	downloadQuota: DownloadQuotaSnapshot | null;
 }
 
 const days = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
@@ -37,13 +34,12 @@ const months = [
 ];
 
 export function TopBar({
-	                       backend,
 	                       menuOpen,
 	                       theme,
 	                       onToggleTheme,
 	                       onLogout,
 	                       onMenu,
-	                       versionData,
+	                       downloadQuota,
                        }: TopBarProps) {
 	const {tabs, activeTab, onTabChange} = useTabsState();
 	const [now, setNow] = useState(new Date());
@@ -54,12 +50,6 @@ export function TopBar({
 
 	const hh = String(now.getHours()).padStart(2, "0");
 	const mm = String(now.getMinutes()).padStart(2, "0");
-
-	const versionLabel = versionData
-		? `v${versionData.version}${versionData.sha ? " " + versionData.sha.slice(0, 7) : ""}`
-		: "";
-	const backendTone = backend === "up" ? "bg-accent" : backend === "down" ? "bg-bad" : "bg-warn";
-	const backendLabel = backend === "up" ? "Backend online" : backend === "down" ? "Backend offline" : "Backend check";
 
 	return (
 		<header className="app-topbar sticky top-0 z-40 w-full border-b border-hair bg-page/92 backdrop-blur-xl">
@@ -107,32 +97,7 @@ export function TopBar({
 					</Tabs>
 				</div>
 				<div className="flex flex-none items-center gap-2.5">
-					{versionLabel && (
-						<span
-							className={cn(
-								"hidden rounded-lg border border-hair bg-surface px-2.5 py-1 font-mono text-label tracking-1 text-muted sm:inline-flex",
-								versionData?.hasUpdate && "border-warn/50 text-warn",
-							)}
-							title={
-								versionData ? `${versionData.version} · ${versionData.sha}` : ""
-							}
-						>
-              {versionData?.hasUpdate ? (
-	              <>
-		              v{versionData.version}
-		              <span style={{opacity: 0.55, margin: "0 2px"}}>→</span>v
-		              {versionData.latest}
-	              </>
-              ) : (
-	              versionLabel
-              )}
-            </span>
-					)}
-					<span
-						className={cn("size-2.5 rounded-full shadow-[var(--accent-glow-sm)]", backendTone)}
-						title={backendLabel}
-					/>
-					<div className="h-6 w-px bg-hair"/>
+					<DownloadQuotaGauge quota={downloadQuota} />
 					<Button
 						variant="ghost"
 						size="icon"

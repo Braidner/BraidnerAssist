@@ -16,12 +16,34 @@ model AppUser {
   approvalStatus String @default("approved") // pending | approved
   jellyfinUserId String?
   jellyfinAccessToken String?
+  downloadLimitTotal  Int?
+  downloadLimitDaily  Int?
+  downloadLimitWeekly Int?
+  downloadTotalResetAt  DateTime?
+  downloadDailyResetAt  DateTime?
+  downloadWeeklyResetAt DateTime?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  downloads    UserDownload[]
 
   @@index([approvalStatus])
   @@index([jellyfinUserId])
+}
+
+// Учёт пользовательских загрузок для абсолютного, дневного и недельного лимита.
+// Запись удаляется только при удалении торрента вместе с файлами.
+model UserDownload {
+  id           String   @id @default(cuid())
+  appUserId    String
+  appUser      AppUser  @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  infohash     String   @unique
+  releaseTitle String?
+  size         Float?
+  addedAt      DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([appUserId, addedAt])
 }
 
 // Локальная задача (источник "local"). GitLab-задачи не хранятся в БД —

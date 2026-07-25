@@ -625,17 +625,17 @@ export function MediaPage({
   };
 
   const onAdd = async (url: string, key: string) => {
-    let ok = false;
+    let result: { ok: boolean; error: string | null } = { ok: false, error: null };
     try {
       setBusy(key);
-      ok = await addTorrent(url);
+      result = await addTorrent(url);
     } finally {
       setBusy(null);
     }
-    if (ok) {
+    if (result.ok) {
       toast.success("Торрент добавлен в qBittorrent");
       onMediaUpdate();
-    } else toast.error("Не удалось добавить торрент");
+    } else toast.error(result.error ?? "Не удалось добавить торрент");
   };
 
   const onAddTitle = async (
@@ -713,15 +713,18 @@ export function MediaPage({
   const onTorrent = async (
     hash: string,
     action: "pause" | "resume" | "delete",
+    deleteFiles = false,
   ) => {
     let ok = false;
     try {
       setBusy(hash + action);
-      ok = await torrentAction(hash, action);
+      ok = await torrentAction(hash, action, deleteFiles);
     } finally {
       setBusy(null);
     }
-    if (ok && action === "delete") toast.success("Раздача удалена");
+    if (ok && action === "delete") {
+      toast.success(deleteFiles ? "Раздача и файлы удалены" : "Раздача удалена, файлы сохранены");
+    }
     onMediaUpdate();
   };
 

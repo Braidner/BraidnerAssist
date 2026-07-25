@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
+  getDownloadQuota,
   getCurrentUser,
-  getVersion,
   setUnauthorizedHandler,
-  type VersionData,
+  type DownloadQuotaSnapshot,
 } from "./lib/api.ts";
 import { TabsProvider } from "./lib/tabsContext.tsx";
 import { TasksProvider } from "./lib/tasksContext.tsx";
@@ -22,8 +22,6 @@ import { MediaRoutes } from "./pages/media/MediaRoutes.tsx";
 import { OverviewPage } from "./pages/overview/OverviewPage.tsx";
 import { CommandPalette } from "./components/layout/CommandPalette.tsx";
 import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
-
-type Backend = "up" | "down" | "checking";
 
 export function App() {
   const { theme, toggle } = useTheme();
@@ -54,8 +52,7 @@ export function App() {
   }, []);
 
   // ── UI state ──────────────────────────────────────────────────────
-  const [backend, setBackend] = useState<Backend>("checking");
-  const [versionData, setVersionData] = useState<VersionData | null>(null);
+  const [downloadQuota, setDownloadQuota] = useState<DownloadQuotaSnapshot | null>(null);
   const [showLogs, setShowLogs] = useState(false);
   const [sbOpen, setSbOpen] = useState(false);
 
@@ -86,12 +83,16 @@ export function App() {
       }
     });
 
-    fetch("/healthz")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then(() => setBackend("up"))
-      .catch(() => setBackend("down"));
-
-    getVersion().then(setVersionData);
+    const loadQuota = () => {
+      if (!document.hidden) getDownloadQuota().then(setDownloadQuota).catch(() => {});
+    };
+    loadQuota();
+    const quotaTimer = window.setInterval(loadQuota, 15_000);
+    window.addEventListener("download-quota-changed", loadQuota);
+    return () => {
+      window.clearInterval(quotaTimer);
+      window.removeEventListener("download-quota-changed", loadQuota);
+    };
   }, [authed]);
 
   // ── Handlers ─────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ export function App() {
     clearToken();
     setAuthed(false);
     setUser(null);
+    setDownloadQuota(null);
   };
 
   // ── Render ────────────────────────────────────────────────────────
@@ -130,13 +132,12 @@ export function App() {
           <Drawer />
 
           <TopBar
-            backend={backend}
             menuOpen={sbOpen}
             theme={theme}
             onToggleTheme={toggle}
             onLogout={onLogout}
             onMenu={() => setSbOpen((open) => !open)}
-            versionData={versionData}
+            downloadQuota={downloadQuota}
           />
 
           <div className={ui.content}>

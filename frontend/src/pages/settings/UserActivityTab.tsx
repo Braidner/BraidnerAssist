@@ -4,18 +4,33 @@ import {
   ChevronDown,
   CircleGauge,
   Clock3,
+  HardDriveDownload,
   Eye,
+  KeyRound,
   Link2Off,
   Monitor,
   Pause,
   Play,
   Radio,
   RefreshCw,
+  RotateCcw,
+  Save,
+  Settings2,
+  Trash2,
   UsersRound,
   Wifi,
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getJellyfinUserActivity,
@@ -24,13 +39,44 @@ import {
   type JellyfinNowPlaying,
   type JellyfinUserActivity,
   type JellyfinUserActivityData,
+  type AppUser,
+  type DownloadQuotaPeriodKey,
+  type JellyfinUserRef,
 } from "@/lib/api";
+import type { UserRole } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { ui } from "@/lib/ui";
 
 const POLL_MS = 15_000;
 
-export function UserActivityTab() {
+export interface UserActivityAdminControls {
+  users: AppUser[];
+  jellyfinUsers: JellyfinUserRef[];
+  busy: string | null;
+  refreshKey: number;
+  onUpdate: (
+    userId: string,
+    input: {
+      displayName?: string | null;
+      role?: UserRole;
+      active?: boolean;
+      password?: string;
+      jellyfinUserId?: string | null;
+    },
+  ) => void;
+  onDelete: (userId: string) => void;
+  onLimits: (
+    userId: string,
+    limits: { absolute: number | null; daily: number | null; weekly: number | null },
+  ) => void;
+  onReset: (userId: string, period: DownloadQuotaPeriodKey) => void;
+}
+
+export function UserActivityTab({
+  admin,
+}: {
+  admin?: UserActivityAdminControls;
+}) {
   const [data, setData] = useState<JellyfinUserActivityData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -54,6 +100,10 @@ export function UserActivityTab() {
     }, POLL_MS);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (admin?.refreshKey) load(true);
+  }, [admin?.refreshKey]);
 
   if (!data && !error) return <ActivitySkeleton />;
 
@@ -158,7 +208,12 @@ export function UserActivityTab() {
         {data.users.length ? (
           <div className="divide-y divide-hair">
             {data.users.map((user) => (
-              <UserActivityRow key={user.id} user={user} />
+              <UserActivityRow
+                key={user.id}
+                user={user}
+                appUser={admin?.users.find((item) => item.id === user.appUserId) ?? null}
+                admin={admin}
+              />
             ))}
           </div>
         ) : (
@@ -206,8 +261,16 @@ function SummaryMetric({
   );
 }
 
-function UserActivityRow({ user }: { user: JellyfinUserActivity }) {
-  const [expanded, setExpanded] = useState(false);
+function UserActivityRow({
+  user,
+  appUser,
+  admin,
+}: {
+  user: JellyfinUserActivity;
+  appUser: AppUser | null;
+  admin?: UserActivityAdminControls;
+}) {
+  const [expanded, setExpanded] = useState<"history" | "settings" | null>(null);
   const initials = user.displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -276,49 +339,72 @@ function UserActivityRow({ user }: { user: JellyfinUserActivity }) {
         </div>
 
         <div className="flex items-start justify-between gap-4 lg:flex-col lg:items-end">
-          <div className="text-left lg:text-right">
-            <div className="font-mono text-label uppercase tracking-3 text-muted">Трафик сейчас</div>
-            <div className="mt-1 font-mono text-body font-semibold tabular-nums text-ink">
-              {user.nowPlaying.length ? formatBitrate(user.liveBitrate) : "0 бит/с"}
+          {user.quota?.configured ? (
+            <QuotaCompact quota={user.quota} />
+          ) : (
+            <div className="text-left lg:text-right">
+              <div className="font-mono text-label uppercase tracking-3 text-muted">
+                Трафик сейчас
+              </div>
+              <div className="mt-1 font-mono text-body font-semibold tabular-nums text-ink">
+                {user.nowPlaying.length ? formatBitrate(user.liveBitrate) : "0 бит/с"}
+              </div>
             </div>
-          </div>
+          )}
           <div className="text-left text-cell text-ink-soft lg:text-right">
-            {user.nowPlaying.length
-              ? `${user.nowPlaying.length} ${pluralStream(user.nowPlaying.length)}`
-              : recent.length
-                ? `Последний просмотр ${formatRelativeTime(recent[0]!.playedAt)}`
-                : "Нет просмотров"}
+            {user.quota?.configured
+              ? `${user.quota.available ?? 0} загрузок доступно`
+              : user.nowPlaying.length
+                ? `${user.nowPlaying.length} ${pluralStream(user.nowPlaying.length)}`
+                : recent.length
+                  ? `Последний просмотр ${formatRelativeTime(recent[0]!.playedAt)}`
+                  : "Нет просмотров"}
           </div>
         </div>
       </div>
 
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-4 border-t border-hair bg-groove/55 px-5 py-3 text-left transition-colors duration-150 motion-reduce:transition-none hover:bg-surface focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent/60"
-        aria-expanded={expanded}
-        onClick={() => setExpanded((value) => !value)}
-      >
-        <span className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hair bg-groove/55 px-5 py-2.5">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent/60"
+          aria-expanded={expanded === "history"}
+          onClick={() =>
+            setExpanded((value) => (value === "history" ? null : "history"))
+          }
+        >
           <span className="font-mono text-label uppercase tracking-3 text-muted">
             Недавние просмотры
           </span>
-          <span className="ml-3 text-cell text-ink-soft">
+          <span className="truncate text-cell text-ink-soft">
             {recent.length
               ? recent.map(historyTitle).join(" · ")
               : user.jellyfinUserId
                 ? "история пока пуста"
                 : "сначала привяжите Jellyfin"}
           </span>
-        </span>
-        <ChevronDown
-          className={cn(
-            "size-4 flex-none text-muted transition-transform duration-200 motion-reduce:transition-none",
-            expanded && "rotate-180",
-          )}
-        />
-      </button>
+          <ChevronDown
+            className={cn(
+              "ml-auto size-4 flex-none text-muted transition-transform duration-200 motion-reduce:transition-none",
+              expanded === "history" && "rotate-180",
+            )}
+          />
+        </button>
+        {appUser && admin && (
+          <Button
+            variant={expanded === "settings" ? "outline" : "ghost"}
+            size="sm"
+            onClick={() =>
+              setExpanded((value) => (value === "settings" ? null : "settings"))
+            }
+            aria-expanded={expanded === "settings"}
+          >
+            <Settings2 />
+            Управление
+          </Button>
+        )}
+      </div>
 
-      {expanded && (
+      {expanded === "history" && (
         <div className="border-t border-hair bg-surface/45 px-5 py-2">
           {user.history.length ? (
             <div className="divide-y divide-hair">
@@ -335,7 +421,285 @@ function UserActivityRow({ user }: { user: JellyfinUserActivity }) {
           )}
         </div>
       )}
+      {expanded === "settings" && appUser && admin && (
+        <UserAdminPanel user={appUser} activity={user} admin={admin} />
+      )}
     </article>
+  );
+}
+
+function QuotaCompact({
+  quota,
+}: {
+  quota: NonNullable<JellyfinUserActivity["quota"]>;
+}) {
+  const tightest = quota.periods.reduce((current, period) =>
+    period.remaining < current.remaining ? period : current,
+  );
+  return (
+    <div className="w-full min-w-28 lg:text-right">
+      <div className="flex items-center justify-between gap-3 lg:justify-end">
+        <span className="font-mono text-label uppercase tracking-3 text-muted">
+          Лимит
+        </span>
+        <span className="font-mono text-cell tabular-nums text-ink">
+          {tightest.used}/{tightest.limit}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-faint">
+        <div
+          className={cn(
+            "h-full rounded-full bg-accent",
+            tightest.remaining === 0 && "bg-bad",
+          )}
+          style={{ width: `${tightest.percent}%` }}
+        />
+      </div>
+      <div className="mt-1 font-mono text-[10px] text-muted">{tightest.label}</div>
+    </div>
+  );
+}
+
+function UserAdminPanel({
+  user,
+  activity,
+  admin,
+}: {
+  user: AppUser;
+  activity: JellyfinUserActivity;
+  admin: UserActivityAdminControls;
+}) {
+  const [displayName, setDisplayName] = useState(user.displayName ?? "");
+  const [password, setPassword] = useState("");
+  const [limits, setLimits] = useState({
+    absolute: user.downloadLimitTotal?.toString() ?? "",
+    daily: user.downloadLimitDaily?.toString() ?? "",
+    weekly: user.downloadLimitWeekly?.toString() ?? "",
+  });
+
+  useEffect(() => {
+    setDisplayName(user.displayName ?? "");
+    setLimits({
+      absolute: user.downloadLimitTotal?.toString() ?? "",
+      daily: user.downloadLimitDaily?.toString() ?? "",
+      weekly: user.downloadLimitWeekly?.toString() ?? "",
+    });
+  }, [user]);
+
+  const parseLimit = (value: string) => {
+    const parsed = Number(value);
+    return value.trim() && Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  return (
+    <div className="border-t border-hair bg-surface/45 px-5 py-5">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,1.15fr)]">
+        <section>
+          <div className="mb-4 flex items-center gap-2 text-body font-semibold text-ink">
+            <Settings2 className="size-4 text-muted" />
+            Профиль и доступ
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AdminField label="Имя">
+              <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+            </AdminField>
+            <AdminField label="Роль">
+              <Select
+                value={user.role}
+                onValueChange={(role) => admin.onUpdate(user.id, { role: role as UserRole })}
+              >
+                <SelectTrigger className="w-full bg-surface">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Админ</SelectItem>
+                  <SelectItem value="media">Медиа</SelectItem>
+                </SelectContent>
+              </Select>
+            </AdminField>
+            <AdminField label="Jellyfin">
+              <Select
+                value={user.jellyfinUserId ?? "__none"}
+                onValueChange={(value) =>
+                  admin.onUpdate(user.id, {
+                    jellyfinUserId: value === "__none" ? null : value,
+                  })
+                }
+              >
+                <SelectTrigger className="w-full bg-surface">
+                  <SelectValue placeholder="Не привязан" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">Не привязан</SelectItem>
+                  {admin.jellyfinUsers.map((jellyfinUser) => (
+                    <SelectItem key={jellyfinUser.id} value={jellyfinUser.id}>
+                      {jellyfinUser.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </AdminField>
+            <AdminField label="Новый пароль">
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="минимум 6 символов"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Сохранить пароль"
+                  disabled={password.length > 0 && password.length < 6}
+                  onClick={() => {
+                    if (!password) return;
+                    admin.onUpdate(user.id, { password });
+                    setPassword("");
+                  }}
+                >
+                  <KeyRound />
+                </Button>
+              </div>
+            </AdminField>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => admin.onUpdate(user.id, { active: !user.active })}
+              className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent/60"
+            >
+              <Badge variant={user.active ? "ok" : "outline"}>
+                {user.active ? "Активен" : "Отключен"}
+              </Badge>
+            </button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={displayName === (user.displayName ?? "")}
+                onClick={() => admin.onUpdate(user.id, { displayName })}
+              >
+                <Save />
+                Сохранить профиль
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={admin.busy === `delete-${user.id}`}
+                onClick={() => admin.onDelete(user.id)}
+              >
+                <Trash2 />
+                Удалить
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-1 flex items-center gap-2 text-body font-semibold text-ink">
+            <HardDriveDownload className="size-4 text-accent" />
+            Лимиты загрузок
+          </div>
+          <p className="mb-4 text-cell text-ink-soft">
+            Пустое поле означает без ограничений. Дневной и недельный периоды
+            начинаются в 00:00 по Москве.
+          </p>
+          <div className="space-y-3">
+            {([
+              ["absolute", "Абсолютный", limits.absolute],
+              ["daily", "Дневной", limits.daily],
+              ["weekly", "Недельный", limits.weekly],
+            ] as const).map(([key, label, value]) => {
+              const period = activity.quota?.periods.find((item) => item.key === key);
+              return (
+                <div
+                  key={key}
+                  className="grid grid-cols-[minmax(0,1fr)_84px_auto] items-center gap-2 sm:grid-cols-[110px_90px_minmax(0,1fr)_auto]"
+                >
+                  <Label className="font-mono text-label uppercase tracking-2 text-muted">
+                    {label}
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10_000}
+                    aria-label={`${label} лимит`}
+                    value={value}
+                    placeholder="∞"
+                    onChange={(event) =>
+                      setLimits((current) => ({ ...current, [key]: event.target.value }))
+                    }
+                  />
+                  <div className="order-4 col-span-3 min-w-0 sm:order-none sm:col-span-1">
+                    {period ? (
+                      <>
+                        <div className="flex justify-between font-mono text-[10px] text-ink-soft">
+                          <span>{period.used} из {period.limit}</span>
+                          <span>{period.remaining} осталось</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-faint">
+                          <div
+                            className={cn("h-full rounded-full bg-accent", period.remaining === 0 && "bg-bad")}
+                            style={{ width: `${period.percent}%` }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-cell text-muted">не задан</span>
+                    )}
+                  </div>
+                  <Button
+                    className="order-3 sm:order-none"
+                    variant="ghost"
+                    size="icon"
+                    title={`Сбросить ${label.toLowerCase()} счётчик`}
+                    disabled={!period || admin.busy === `reset-${user.id}-${key}`}
+                    onClick={() => admin.onReset(user.id, key)}
+                  >
+                    <RotateCcw />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              size="sm"
+              disabled={admin.busy === `limits-${user.id}`}
+              onClick={() =>
+                admin.onLimits(user.id, {
+                  absolute: parseLimit(limits.absolute),
+                  daily: parseLimit(limits.daily),
+                  weekly: parseLimit(limits.weekly),
+                })
+              }
+            >
+              <Save />
+              Сохранить лимиты
+            </Button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function AdminField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <Label className="font-mono text-label uppercase tracking-2 text-muted">
+        {label}
+      </Label>
+      {children}
+    </label>
   );
 }
 

@@ -224,3 +224,38 @@ test("shows a loading indicator until video starts playing", async ({ page }) =>
   });
   await expect(loading).toHaveCount(0);
 });
+
+test("restarts playback when buffering remains stalled", async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(() => {
+    (window as Window & { __playerPlayCalls?: number }).__playerPlayCalls = 0;
+    HTMLMediaElement.prototype.play = function () {
+      (window as Window & { __playerPlayCalls?: number }).__playerPlayCalls =
+        ((window as Window & { __playerPlayCalls?: number }).__playerPlayCalls ?? 0) + 1;
+      return Promise.resolve();
+    };
+  });
+  await mockAuthenticatedMedia(page, false);
+  await page.goto("/media/series/101");
+  await page.getByTitle("Воспроизвести").first().click();
+
+  await page.locator("video").evaluate((element) => {
+    (window as Window & { __playerPlayCalls?: number }).__playerPlayCalls = 0;
+    Object.defineProperties(element, {
+      paused: { configurable: true, value: false },
+      ended: { configurable: true, value: false },
+      duration: { configurable: true, value: 100 },
+      currentTime: { configurable: true, value: 12, writable: true },
+    });
+    element.dispatchEvent(new Event("waiting"));
+  });
+  await page.clock.fastForward(7_000);
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerPlayCalls?: number }).__playerPlayCalls ?? 0,
+      ),
+    )
+    .toBeGreaterThan(0);
+});

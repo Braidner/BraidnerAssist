@@ -437,6 +437,48 @@ export function useVideoPlayer(url: string | null, direct = false) {
     setVidLoading(Boolean(url));
     if (!url) { video.src = ""; video.load(); return; }
     let hls: Hls | null = null;
+    let recoveryTimer: number | null = null;
+    let recoveryAttempts = 0;
+    const clearRecovery = (resetAttempts = false) => {
+      if (recoveryTimer != null) window.clearTimeout(recoveryTimer);
+      recoveryTimer = null;
+      if (resetAttempts) recoveryAttempts = 0;
+    };
+    const recoverPlayback = () => {
+      recoveryTimer = null;
+      if (video.paused || video.ended || recoveryAttempts >= 3) return;
+      recoveryAttempts += 1;
+      const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      if (hls) {
+        hls.startLoad(Math.max(0, resumeAt - 0.25));
+        void playVideo(video);
+      } else {
+        const restorePosition = () => {
+          if (resumeAt > 0 && Number.isFinite(video.duration)) {
+            video.currentTime = Math.min(resumeAt, Math.max(0, video.duration - 0.1));
+          }
+          void playVideo(video);
+        };
+        video.addEventListener("loadedmetadata", restorePosition, { once: true });
+        video.load();
+      }
+      if (recoveryAttempts < 3) {
+        recoveryTimer = window.setTimeout(recoverPlayback, 6_000);
+      }
+    };
+    const scheduleRecovery = () => {
+      setVidLoading(true);
+      if (recoveryTimer != null || recoveryAttempts >= 3) return;
+      recoveryTimer = window.setTimeout(recoverPlayback, 6_000);
+    };
+    const markHealthy = () => clearRecovery(true);
+    const stopRecovery = () => clearRecovery();
+    video.addEventListener("waiting", scheduleRecovery);
+    video.addEventListener("stalled", scheduleRecovery);
+    video.addEventListener("playing", markHealthy);
+    video.addEventListener("timeupdate", markHealthy);
+    video.addEventListener("pause", stopRecovery);
+    video.addEventListener("ended", stopRecovery);
     if (direct) {
       video.src = url;
       void playVideo(video);
@@ -450,11 +492,32 @@ export function useVideoPlayer(url: string | null, direct = false) {
       hls.loadSource(url);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => void playVideo(video));
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          hls?.startLoad(Math.max(0, video.currentTime - 0.25));
+          scheduleRecovery();
+          return;
+        }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls?.recoverMediaError();
+          scheduleRecovery();
+        }
+      });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = url;
       void playVideo(video);
     }
-    return () => { hls?.destroy(); };
+    return () => {
+      clearRecovery();
+      video.removeEventListener("waiting", scheduleRecovery);
+      video.removeEventListener("stalled", scheduleRecovery);
+      video.removeEventListener("playing", markHealthy);
+      video.removeEventListener("timeupdate", markHealthy);
+      video.removeEventListener("pause", stopRecovery);
+      video.removeEventListener("ended", stopRecovery);
+      hls?.destroy();
+    };
   }, [url, direct]);
 
   useEffect(() => {

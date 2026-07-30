@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { LoaderCircle } from "lucide-react";
 import {
   getMediaTrickplayPlaylist,
   getMediaTrickplayTileBlobUrl,
@@ -325,6 +326,7 @@ export function DetailHero({
     vidTime,
     setVidTime,
     vidBufferedPct,
+    vidLoading,
     togglePlay,
     toggleMute,
     seekTo,
@@ -803,6 +805,17 @@ export function DetailHero({
           }}
         >
           {seekFeedback}
+        </div>
+      )}
+
+      {player && vidLoading && (
+        <div
+          role="status"
+          aria-label="Видео загружается"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-10 grid size-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md"
+        >
+          <LoaderCircle className="size-6 animate-spin motion-reduce:animate-none" strokeWidth={2} aria-hidden="true" />
+          <span className="sr-only">Видео загружается</span>
         </div>
       )}
 

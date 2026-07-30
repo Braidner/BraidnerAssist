@@ -210,3 +210,17 @@ test("shows buffered video separately from playback progress", async ({ page }) 
   await expect(page.getByTestId("player-buffered")).toHaveAttribute("style", /width: 65%/);
   await expect(page.getByTestId("player-progress")).toHaveAttribute("style", /width: 20%/);
 });
+
+test("shows a loading indicator until video starts playing", async ({ page }) => {
+  await mockAuthenticatedMedia(page, false);
+  await page.goto("/media/series/101");
+  await page.getByTitle("Воспроизвести").first().click();
+
+  const loading = page.getByRole("status", { name: "Видео загружается" });
+  await expect(loading).toBeVisible();
+
+  await page.locator("video").evaluate((element) => {
+    element.dispatchEvent(new Event("playing"));
+  });
+  await expect(loading).toHaveCount(0);
+});

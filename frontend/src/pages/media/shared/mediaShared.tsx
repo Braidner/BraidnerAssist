@@ -426,6 +426,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
   const [vidDuration, setVidDuration] = useState(0);
   const [vidTime, setVidTime] = useState(0);
   const [vidBufferedPct, setVidBufferedPct] = useState(0);
+  const [vidLoading, setVidLoading] = useState(false);
   const [pipSupported, setPipSupported] = useState(false);
   const [pipActive, setPipActive] = useState(false);
 
@@ -433,6 +434,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
     const video = videoRef.current;
     if (!video) return;
     setVidBufferedPct(0);
+    setVidLoading(Boolean(url));
     if (!url) { video.src = ""; video.load(); return; }
     let hls: Hls | null = null;
     if (direct) {
@@ -454,6 +456,27 @@ export function useVideoPlayer(url: string | null, direct = false) {
     }
     return () => { hls?.destroy(); };
   }, [url, direct]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const showLoading = () => setVidLoading(true);
+    const hideLoading = () => setVidLoading(false);
+    for (const event of ["loadstart", "waiting", "stalled", "seeking"] as const) {
+      video.addEventListener(event, showLoading);
+    }
+    for (const event of ["canplay", "playing", "seeked", "error"] as const) {
+      video.addEventListener(event, hideLoading);
+    }
+    return () => {
+      for (const event of ["loadstart", "waiting", "stalled", "seeking"] as const) {
+        video.removeEventListener(event, showLoading);
+      }
+      for (const event of ["canplay", "playing", "seeked", "error"] as const) {
+        video.removeEventListener(event, hideLoading);
+      }
+    };
+  }, [url]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -612,6 +635,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
     vidTime,
     setVidTime,
     vidBufferedPct,
+    vidLoading,
     togglePlay,
     toggleMute,
     seekTo,

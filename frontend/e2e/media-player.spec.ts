@@ -259,3 +259,19 @@ test("restarts playback when buffering remains stalled", async ({ page }) => {
     )
     .toBeGreaterThan(0);
 });
+
+test("removes the cinematic vignette while video is playing", async ({ page }) => {
+  await mockAuthenticatedMedia(page, false);
+  await page.goto("/media/series/101");
+  await page.getByTitle("Воспроизвести").first().click();
+
+  const video = page.locator("video");
+  const vignette = page.getByTestId("player-vignette");
+  await expect(vignette).toHaveAttribute("style", /opacity: 1/);
+
+  await video.evaluate((element) => element.dispatchEvent(new Event("play")));
+  await expect(vignette).toHaveAttribute("style", /opacity: 0/);
+
+  await video.evaluate((element) => element.dispatchEvent(new Event("pause")));
+  await expect(vignette).toHaveAttribute("style", /opacity: 1/);
+});

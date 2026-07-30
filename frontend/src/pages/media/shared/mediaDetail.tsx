@@ -663,10 +663,12 @@ export function DetailHero({
         }}
       />
       <div
-        className="absolute inset-0"
+        data-testid="player-vignette"
+        className="pointer-events-none absolute inset-0 transition-opacity duration-700 ease-out motion-reduce:duration-0"
         style={{
           background:
             "linear-gradient(to right, rgba(9,9,13,0.72) 0%, rgba(9,9,13,0.32) 44%, rgba(9,9,13,0.06) 72%, transparent 100%), linear-gradient(to top, rgba(9,9,13,0.58) 0%, rgba(9,9,13,0.12) 28%, transparent 52%)",
+          opacity: player && vidPlaying ? 0 : 1,
         }}
       />
 

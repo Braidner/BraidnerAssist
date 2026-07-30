@@ -680,14 +680,18 @@ export function MediaSeriesPage({
                         return (
                       <article
                         key={`${ep.seasonNumber}-${ep.episodeNumber}`}
+                        aria-label={`S${String(ep.seasonNumber).padStart(2, "0")}E${String(ep.episodeNumber ?? 0).padStart(2, "0")} ${ep.title}${ep.played ? " — просмотрено" : ""}`}
                         className={cn(
                           "group relative flex h-[150px] w-[280px] flex-none overflow-hidden rounded-[12px] border border-white/[0.08] bg-white/[0.035] text-left transition-all hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-white/[0.055]",
-                          ep.played ? "media-ep-played" : "",
+                          ep.played && "border-accent/20",
                         )}
                       >
                         {episodeImage ? (
                           <img
-                            className="absolute inset-0 z-0 size-full object-cover opacity-55 transition-transform duration-700 ease-out group-hover:scale-[1.04]"
+                            className={cn(
+                              "absolute inset-0 z-0 size-full object-cover transition-all duration-700 ease-out group-hover:scale-[1.04]",
+                              ep.played ? "opacity-35 saturate-50" : "opacity-55",
+                            )}
                             src={episodeImage}
                             alt=""
                             loading="lazy"
@@ -704,18 +708,25 @@ export function MediaSeriesPage({
                                 <span className="font-mono text-2xs uppercase tracking-2 text-white/62">
                                   S{String(ep.seasonNumber).padStart(2, "0")}E{String(ep.episodeNumber ?? 0).padStart(2, "0")}
                                 </span>
-                            <span
-                              className={cn(
-                                "whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-2xs",
-                                ep.hasFile
-                                  ? "bg-white/[0.12] text-white"
-                                  : missed
-                                    ? "bg-black/45 text-bad"
-                                    : "bg-black/45 text-white/58",
-                              )}
-                            >
-                                  {ep.hasFile ? "есть" : missed ? "пропущено" : "нет файла"}
-                                </span>
+                            {ep.played ? (
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-accent/18 px-2 py-0.5 font-mono text-2xs font-semibold text-white">
+                                <CheckCircle2 className="size-3 text-accent" aria-hidden="true" />
+                                Просмотрено
+                              </span>
+                            ) : (
+                              <span
+                                className={cn(
+                                  "whitespace-nowrap rounded-full px-2 py-0.5 font-mono text-2xs",
+                                  ep.hasFile
+                                    ? "bg-white/[0.12] text-white"
+                                    : missed
+                                      ? "bg-black/45 text-bad"
+                                      : "bg-black/45 text-white/58",
+                                )}
+                              >
+                                {ep.hasFile ? "есть" : missed ? "пропущено" : "нет файла"}
+                              </span>
+                            )}
                           </div>
                           <div className="line-clamp-2 text-row font-semibold text-white" title={ep.title}>
                             {ep.title}

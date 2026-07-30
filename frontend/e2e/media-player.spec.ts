@@ -51,7 +51,11 @@ const seriesDetail = {
   ],
 };
 
-async function mockAuthenticatedMedia(page: Page, resumeAfterDetail: boolean) {
+async function mockAuthenticatedMedia(
+  page: Page,
+  resumeAfterDetail: boolean,
+  detail = seriesDetail,
+) {
   let detailOpened = false;
 
   await page.addInitScript(() => {
@@ -91,7 +95,7 @@ async function mockAuthenticatedMedia(page: Page, resumeAfterDetail: boolean) {
     }
     if (path === "/api/media/detail/series/series-1" || path === "/api/media/title/series/101") {
       detailOpened = true;
-      return json(seriesDetail);
+      return json(detail);
     }
     if (path === "/api/media/continue") {
       return json(
@@ -149,4 +153,23 @@ test("refreshes continue watching after returning from a series", async ({ page 
 
   await expect(page.getByText("Тестовый сериал — Первая серия")).toBeVisible();
   await expect(page.getByText("37% просмотрено")).toBeVisible();
+});
+
+test("marks watched episodes in the season rail", async ({ page }) => {
+  const watchedDetail = {
+    ...seriesDetail,
+    seasons: seriesDetail.seasons.map((season) => ({
+      ...season,
+      episodes: season.episodes.map((episode, index) => ({
+        ...episode,
+        played: index === 0,
+      })),
+    })),
+  };
+  await mockAuthenticatedMedia(page, false, watchedDetail);
+  await page.goto("/media/series/101");
+
+  const watchedEpisode = page.getByRole("article", { name: /S01E01.*Первая серия/ });
+  await expect(watchedEpisode.getByText("Просмотрено")).toBeVisible();
+  await expect(page.getByRole("article", { name: /S01E02.*Вторая серия/ }).getByText("Просмотрено")).toHaveCount(0);
 });

@@ -458,6 +458,7 @@ export function MediaPage({
   const [watchlist, setWatchlist] = useState<MediaPreference[]>([]);
   const [titleStatuses, setTitleStatuses] = useState<MediaTitleStatus[]>([]);
   const [mediaHome, setMediaHome] = useState<MediaHome>({ hero: null });
+  const [resume, setResume] = useState<ResumeItem[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [player, setPlayer] = useState<{
@@ -482,13 +483,21 @@ export function MediaPage({
     if (!media.configured) return;
     let alive = true;
     const load = () =>
-      Promise.all([getTorrentRail(), getPendingMediaTitles(), getMediaTitleStatuses(), getMediaHome(), getMediaPreferences("watchlist")]).then(([items, pending, statuses, home, prefs]) => {
+      Promise.all([
+        getTorrentRail(),
+        getPendingMediaTitles(),
+        getMediaTitleStatuses(),
+        getMediaHome(),
+        getMediaPreferences("watchlist"),
+        getContinueWatching(),
+      ]).then(([items, pending, statuses, home, prefs, resumeItems]) => {
         if (!alive) return;
         setTorrentRail(items);
         setPendingTitles(pending);
         setTitleStatuses(statuses);
         setMediaHome(home);
         setWatchlist(prefs);
+        setResume(resumeItems);
       });
     load();
     const timer = window.setInterval(load, 15_000);
@@ -496,7 +505,7 @@ export function MediaPage({
       alive = false;
       window.clearInterval(timer);
     };
-  }, [media.configured, media.downloads]);
+  }, [location.pathname, media.configured, media.downloads]);
 
   // Discovery home (LAMPA/ZONA-style rails: hero + genres + rails + because-you-watched)
   const [discoverHome, setDiscoverHome] = useState<DiscoverHome>({
@@ -551,12 +560,6 @@ export function MediaPage({
     }, 350);
     return () => clearTimeout(t);
   }, [dq, media.tmdb]);
-
-  // Continue watching
-  const [resume, setResume] = useState<ResumeItem[]>([]);
-  useEffect(() => {
-    if (media.configured) getContinueWatching().then(setResume);
-  }, [media.configured]);
 
   // TorrServer streams
   const refreshTs = () => {

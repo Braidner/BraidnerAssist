@@ -114,6 +114,14 @@ async function mockAuthenticatedMedia(
       );
     }
     if (path === "/api/media/home") return json({ hero: null });
+    if (path === "/api/media/play/episode-1") {
+      return json({
+        url: "/api/media/jellyfin/test-stream.m3u8",
+        playSessionId: "play-session-1",
+        mediaSourceId: "episode-1",
+        linked: true,
+      });
+    }
     if (path === "/api/media/discover/rails") {
       return json({ configured: false, hero: null, genres: { movie: [], series: [] }, rails: [] });
     }
@@ -172,4 +180,33 @@ test("marks watched episodes in the season rail", async ({ page }) => {
   const watchedEpisode = page.getByRole("article", { name: /S01E01.*Первая серия/ });
   await expect(watchedEpisode.getByText("Просмотрено")).toBeVisible();
   await expect(page.getByRole("article", { name: /S01E02.*Вторая серия/ }).getByText("Просмотрено")).toHaveCount(0);
+});
+
+test("shows buffered video separately from playback progress", async ({ page }) => {
+  await mockAuthenticatedMedia(page, false);
+  await page.goto("/media/series/101");
+  await page.getByTitle("Воспроизвести").first().click();
+
+  const video = page.locator("video");
+  await expect(video).toBeVisible();
+  await video.evaluate((element) => {
+    Object.defineProperties(element, {
+      duration: { configurable: true, value: 100 },
+      currentTime: { configurable: true, value: 20, writable: true },
+      buffered: {
+        configurable: true,
+        value: {
+          length: 1,
+          start: () => 0,
+          end: () => 65,
+        },
+      },
+    });
+    element.dispatchEvent(new Event("durationchange"));
+    element.dispatchEvent(new Event("timeupdate"));
+    element.dispatchEvent(new Event("progress"));
+  });
+
+  await expect(page.getByTestId("player-buffered")).toHaveAttribute("style", /width: 65%/);
+  await expect(page.getByTestId("player-progress")).toHaveAttribute("style", /width: 20%/);
 });

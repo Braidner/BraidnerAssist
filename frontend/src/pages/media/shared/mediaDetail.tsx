@@ -324,6 +324,7 @@ export function DetailHero({
     setVidDuration,
     vidTime,
     setVidTime,
+    vidBufferedPct,
     togglePlay,
     toggleMute,
     seekTo,
@@ -909,8 +910,17 @@ export function DetailHero({
                   </div>
                 </div>
               )}
-              <div className="h-1 w-full overflow-hidden rounded-full bg-white/18">
-                <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: vidDuration > 0 ? `${(vidTime / vidDuration) * 100}%` : "0%" }} />
+              <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/18">
+                <div
+                  data-testid="player-buffered"
+                  className="absolute inset-y-0 left-0 rounded-full bg-white/35 transition-[width] duration-300"
+                  style={{ width: `${vidBufferedPct}%` }}
+                />
+                <div
+                  data-testid="player-progress"
+                  className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-500"
+                  style={{ width: vidDuration > 0 ? `${(vidTime / vidDuration) * 100}%` : "0%" }}
+                />
               </div>
             </div>
             {nextItem && (

@@ -425,12 +425,14 @@ export function useVideoPlayer(url: string | null, direct = false) {
   const [vidMuted, setVidMuted] = useState(false);
   const [vidDuration, setVidDuration] = useState(0);
   const [vidTime, setVidTime] = useState(0);
+  const [vidBufferedPct, setVidBufferedPct] = useState(0);
   const [pipSupported, setPipSupported] = useState(false);
   const [pipActive, setPipActive] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+    setVidBufferedPct(0);
     if (!url) { video.src = ""; video.load(); return; }
     let hls: Hls | null = null;
     if (direct) {
@@ -452,6 +454,42 @@ export function useVideoPlayer(url: string | null, direct = false) {
     }
     return () => { hls?.destroy(); };
   }, [url, direct]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const updateBuffered = () => {
+      const duration = video.duration;
+      if (!Number.isFinite(duration) || duration <= 0 || video.buffered.length === 0) {
+        setVidBufferedPct(0);
+        return;
+      }
+      let bufferedEnd = 0;
+      for (let index = 0; index < video.buffered.length; index += 1) {
+        const start = video.buffered.start(index);
+        const end = video.buffered.end(index);
+        if (video.currentTime >= start && video.currentTime <= end) {
+          bufferedEnd = end;
+          break;
+        }
+        if (end >= video.currentTime) bufferedEnd = Math.max(bufferedEnd, end);
+      }
+      setVidBufferedPct(Math.max(0, Math.min(100, (bufferedEnd / duration) * 100)));
+    };
+    const resetBuffered = () => setVidBufferedPct(0);
+    video.addEventListener("progress", updateBuffered);
+    video.addEventListener("durationchange", updateBuffered);
+    video.addEventListener("loadedmetadata", updateBuffered);
+    video.addEventListener("seeking", updateBuffered);
+    video.addEventListener("emptied", resetBuffered);
+    return () => {
+      video.removeEventListener("progress", updateBuffered);
+      video.removeEventListener("durationchange", updateBuffered);
+      video.removeEventListener("loadedmetadata", updateBuffered);
+      video.removeEventListener("seeking", updateBuffered);
+      video.removeEventListener("emptied", resetBuffered);
+    };
+  }, [url]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -573,6 +611,7 @@ export function useVideoPlayer(url: string | null, direct = false) {
     setVidDuration,
     vidTime,
     setVidTime,
+    vidBufferedPct,
     togglePlay,
     toggleMute,
     seekTo,

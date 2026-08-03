@@ -1927,7 +1927,7 @@ export async function grabRelease(p: {
 }
 
 // Постеры тащим через бэкенд-прокси: у клиентов часто нет IPv6-egress до BunnyCDN
-// (TMDB резолвится в AAAA) → прямой <img> виснет по таймауту. Бэкенд ходит по IPv4.
+// (TMDB резолвится в AAAA) → прямой запрос изображения виснет по таймауту. Бэкенд ходит по IPv4.
 export function posterUrl(
   remote: string | null | undefined,
   w: "w342" | "w780" | "w1280" | "original" = "w342",

@@ -46,7 +46,7 @@ export function TasksPanel() {
       <form onSubmit={submit} className="mb-3.5 flex items-stretch gap-2">
         <input
           ref={inputRef}
-          className={cn(ui.input, "flex-1 font-mono placeholder:text-muted")}
+          className={cn(ui.input, "flex-1 font-mono")}
           placeholder="$ новая задача…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -159,7 +159,7 @@ export function TasksPanel() {
             </div>
             {t.tag === "local" && (
               <button
-                className="grid size-8 flex-none place-items-center rounded-lg border border-transparent text-muted opacity-0 transition-opacity hover:border-bad/35 hover:text-bad focus-visible:opacity-100 group-hover:opacity-100"
+                className="grid size-8 flex-none place-items-center rounded-lg border border-transparent text-muted opacity-0 transition-opacity hover:border-bad/35 hover:text-bad focus-visible:opacity-100 group-hover:opacity-100 max-mob:size-10 max-mob:text-ink-soft max-mob:opacity-100 motion-reduce:transition-none"
                 title="Удалить задачу"
                 aria-label="Удалить задачу"
                 onClick={(e) => {

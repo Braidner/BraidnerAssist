@@ -17,7 +17,7 @@ export function Placeholder({ icon, title, phase }: PlaceholderProps) {
           <Ic className="size-5" />
         </span>
         <span className="text-body text-ink-soft">Не подключено</span>
-        <span className="font-mono text-data tracking-1 text-muted">
+        <span className="max-w-[65ch] font-mono text-body leading-relaxed tracking-1 text-ink-soft max-mob:text-sm">
           {phase}
         </span>
       </div>

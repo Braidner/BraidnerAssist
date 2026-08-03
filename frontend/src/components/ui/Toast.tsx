@@ -5,10 +5,19 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import {
+  CheckCircle2,
+  CircleX,
+  Info,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "../../lib/cn.ts";
 
 type ToastType = "success" | "error" | "info";
@@ -25,13 +34,21 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi | null>(null);
 
-const ICON: Record<ToastType, string> = { success: "✓", error: "✕", info: "ⓘ" };
+const ICON: Record<ToastType, LucideIcon> = {
+  success: CheckCircle2,
+  error: CircleX,
+  info: Info,
+};
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seq = useRef(0);
+  const timers = useRef(new Map<number, number>());
 
   const remove = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (timer != null) window.clearTimeout(timer);
+    timers.current.delete(id);
     setToasts((ts) => ts.filter((t) => t.id !== id));
   }, []);
 
@@ -39,51 +56,73 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (type: ToastType, message: string) => {
       const id = ++seq.current;
       setToasts((ts) => [...ts, { id, type, message }]);
-      setTimeout(() => remove(id), 3500);
+      const timer = window.setTimeout(() => remove(id), 3500);
+      timers.current.set(id, timer);
     },
     [remove],
   );
 
-  // Стабильный api (не пересоздаётся между рендерами).
-  const apiRef = useRef<ToastApi>({
-    success: (m) => push("success", m),
-    error: (m) => push("error", m),
-    info: (m) => push("info", m),
-  });
-  apiRef.current.success = (m) => push("success", m);
-  apiRef.current.error = (m) => push("error", m);
-  apiRef.current.info = (m) => push("info", m);
+  useEffect(
+    () => () => {
+      timers.current.forEach((timer) => window.clearTimeout(timer));
+      timers.current.clear();
+    },
+    [],
+  );
+
+  const api = useMemo<ToastApi>(
+    () => ({
+      success: (message) => push("success", message),
+      error: (message) => push("error", message),
+      info: (message) => push("info", message),
+    }),
+    [push],
+  );
 
   return (
-    <ToastContext.Provider value={apiRef.current}>
+    <ToastContext.Provider value={api}>
       {children}
-      <div className="fixed bottom-5 right-5 z-[500] flex w-[min(360px,calc(100vw-32px))] flex-col gap-2.5 max-narrow:bottom-4 max-narrow:right-4">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={cn(
-              "flex cursor-pointer items-start gap-3 rounded-[14px] border border-hair bg-raise px-4 py-3 text-body text-ink",
-              "animate-[toast-in_.22s_var(--ease)]",
-              t.type === "success" && "border-l-4 border-l-ok",
-              t.type === "error" && "border-l-4 border-l-bad",
-              t.type === "info" && "border-l-4 border-l-info",
-            )}
-            onClick={() => remove(t.id)}
-            role="status"
-          >
-            <span
+      <div
+        className="toast-viewport fixed flex w-[min(360px,calc(100vw-32px))] flex-col gap-2.5"
+        aria-label="Уведомления"
+      >
+        {toasts.map((toast) => {
+          const Icon = ICON[toast.type];
+          return (
+            <div
+              key={toast.id}
               className={cn(
-                "grid size-5 flex-none place-items-center rounded-full text-xs font-bold",
-                t.type === "success" && "bg-ok text-accent-ink",
-                t.type === "error" && "bg-bad text-white",
-                t.type === "info" && "bg-info text-white",
+                "flex items-start gap-3 rounded-xl border bg-raise px-4 py-3 text-body text-ink",
+                "animate-[toast-in_.22s_var(--ease)] motion-reduce:animate-none",
+                toast.type === "success" && "border-ok/30",
+                toast.type === "error" && "border-bad/35",
+                toast.type === "info" && "border-info/30",
               )}
+              role={toast.type === "error" ? "alert" : "status"}
+              aria-live={toast.type === "error" ? "assertive" : "polite"}
+              aria-atomic="true"
             >
-              {ICON[t.type]}
-            </span>
-            <span className="min-w-0 flex-1 leading-snug">{t.message}</span>
-          </div>
-        ))}
+              <Icon
+                aria-hidden="true"
+                className={cn(
+                  "mt-0.5 size-5 flex-none",
+                  toast.type === "success" && "text-ok",
+                  toast.type === "error" && "text-bad",
+                  toast.type === "info" && "text-info",
+                )}
+              />
+              <span className="min-w-0 flex-1 leading-snug">{toast.message}</span>
+              <button
+                type="button"
+                className="-mr-1 -mt-1 grid size-8 flex-none place-items-center rounded-lg text-ink-soft transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent/70 active:text-accent motion-reduce:transition-none"
+                onClick={() => remove(toast.id)}
+                aria-label="Закрыть уведомление"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

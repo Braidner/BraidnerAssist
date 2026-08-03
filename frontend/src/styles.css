@@ -111,9 +111,9 @@
 
   --font: "Syne", system-ui, -apple-system, sans-serif;
   --mono:  "Syne", system-ui, -apple-system, sans-serif;
-  /*--mono: "JetBrains Mono", "Inconsolata", ui-monospace, "SF Mono", Menlo, monospace;*/
   --font-ui: "Syne", system-ui, -apple-system, sans-serif;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --z-toast: 60;
 }
 
 /* ---------------- DARK (default) ---------------- */
@@ -218,6 +218,24 @@ body {
 /* lock body scroll while mobile sidebar is open */
 body.sb-locked {
   overflow: hidden;
+}
+
+.auth-screen {
+  padding-top: max(1rem, var(--safe-top));
+  padding-bottom: max(1rem, var(--safe-bottom));
+}
+
+.toast-viewport {
+  right: max(1.25rem, env(safe-area-inset-right, 0px));
+  bottom: calc(1.25rem + var(--safe-bottom));
+  z-index: var(--z-toast);
+}
+
+@media (max-width: 47.5rem) {
+  .toast-viewport {
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: calc(1rem + var(--safe-bottom));
+  }
 }
 
 .mc {

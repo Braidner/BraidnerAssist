@@ -9,6 +9,45 @@ interface Props {
   onSuccess: (user: import("../../lib/auth.ts").CurrentUser) => void;
 }
 
+type AuthErrorTarget =
+  | "credentials"
+  | "username"
+  | "password"
+  | "confirm"
+  | "form";
+
+function BrandLockup({ subtitle }: { subtitle: string }) {
+  return (
+    <div className="mb-7 flex flex-col items-center text-center">
+      <div className="mb-3 grid size-14 place-items-center rounded-2xl border border-hair bg-surface text-accent">
+        <Target className="size-6" />
+      </div>
+      <h1 className="m-0 font-mono text-lg font-bold uppercase tracking-5 text-ink">
+        Mission Control
+      </h1>
+      <div className="mt-1 text-xs tracking-3 text-ink-soft">{subtitle}</div>
+    </div>
+  );
+}
+
+export function SessionLoadingScreen() {
+  return (
+    <div className="auth-screen grid min-h-screen min-h-dvh w-full place-items-center bg-page px-4">
+      <div className="w-[min(390px,100%)] rounded-card border border-hair bg-raise p-7 max-mob:p-6">
+        <BrandLockup subtitle="braidner · self-hosted · LAN-only" />
+        <div
+          className="flex items-center justify-center gap-2.5 text-body text-ink-soft"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="size-2 animate-pulse rounded-full bg-accent shadow-[var(--accent-glow-sm)] motion-reduce:animate-none" />
+          Проверяем сессию…
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LoginForm({ onSuccess }: Props) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -18,7 +57,17 @@ export function LoginForm({ onSuccess }: Props) {
   const [registerMode, setRegisterMode] = useState(false);
   const [registrationPending, setRegistrationPending] = useState(false);
   const [error, setError] = useState("");
+  const [errorTarget, setErrorTarget] = useState<AuthErrorTarget | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const usernameInvalid = errorTarget === "credentials" || errorTarget === "username";
+  const passwordInvalid = errorTarget === "credentials" || errorTarget === "password";
+  const confirmInvalid = errorTarget === "confirm";
+  const loadingLabel = setupMode
+    ? "Создаём администратора…"
+    : registerMode
+      ? "Отправляем регистрацию…"
+      : "Входим…";
 
   useEffect(() => {
     getSetupRequired().then(setSetupMode);
@@ -27,8 +76,10 @@ export function LoginForm({ onSuccess }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setErrorTarget(null);
     if ((setupMode || registerMode) && password !== confirm) {
       setError("Пароли не совпадают");
+      setErrorTarget("confirm");
       return;
     }
     setLoading(true);
@@ -36,7 +87,10 @@ export function LoginForm({ onSuccess }: Props) {
       const user = await setupAdmin({ username, password, displayName });
       setLoading(false);
       if (user) onSuccess(user);
-      else setError("Не удалось создать администратора");
+      else {
+        setError("Не удалось создать администратора");
+        setErrorTarget("form");
+      }
       return;
     }
     if (registerMode) {
@@ -45,6 +99,13 @@ export function LoginForm({ onSuccess }: Props) {
       if (result.ok) {
         setRegistrationPending(true);
       } else {
+        setErrorTarget(
+          result.error === "username already exists"
+            ? "username"
+            : result.error === "password must be at least 6 chars"
+              ? "password"
+              : "form",
+        );
         setError(
           result.error === "username already exists"
             ? "Такой логин уже занят"
@@ -68,36 +129,35 @@ export function LoginForm({ onSuccess }: Props) {
         unknown: "Не удалось войти. Проверьте подключение к серверу",
       };
       setError(messages[result.error ?? "unknown"]);
+      setErrorTarget(result.error === "invalid_credentials" ? "credentials" : "form");
     }
   }
+
+  const clearError = () => {
+    setError("");
+    setErrorTarget(null);
+  };
 
   const switchMode = (nextRegisterMode: boolean) => {
     setRegisterMode(nextRegisterMode);
     setRegistrationPending(false);
-    setError("");
+    clearError();
     setPassword("");
     setConfirm("");
   };
 
   return (
-    <div className="grid min-h-screen w-full place-items-center bg-[radial-gradient(circle_at_20%_20%,color-mix(in_srgb,var(--accent)_16%,transparent),transparent_32%),var(--page)] px-4">
-      <div className="w-[min(390px,100%)] rounded-card border border-hair bg-raise p-7">
-        {/* Logo */}
-        <div className="mb-7 flex flex-col items-center text-center">
-          <div className="mb-3 grid size-14 place-items-center rounded-2xl border border-hair bg-surface text-accent">
-            <Target className="size-6" />
-          </div>
-          <div className="font-mono text-lg font-bold uppercase tracking-5 text-ink">
-            Mission Control
-          </div>
-          <div className="mt-1 text-xs tracking-3 text-muted">
-            {setupMode
+    <div className="auth-screen grid min-h-screen min-h-dvh w-full place-items-center bg-[radial-gradient(circle_at_20%_20%,color-mix(in_srgb,var(--accent)_16%,transparent),transparent_32%),var(--page)] px-4">
+      <div className="w-[min(390px,100%)] rounded-card border border-hair bg-raise p-7 max-mob:p-6">
+        <BrandLockup
+          subtitle={
+            setupMode
               ? "создание администратора"
               : registerMode
                 ? "новая учётная запись"
-                : "braidner · self-hosted · LAN-only"}
-          </div>
-        </div>
+                : "braidner · self-hosted · LAN-only"
+          }
+        />
 
         {registrationPending ? (
           <div className="flex flex-col items-center gap-4 text-center">
@@ -130,10 +190,18 @@ export function LoginForm({ onSuccess }: Props) {
               id="auth-username"
               type="text"
               autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               autoFocus
+              required
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                clearError();
+              }}
               placeholder="username"
+              aria-invalid={usernameInvalid}
+              aria-describedby={usernameInvalid ? "auth-error" : undefined}
             />
           </div>
 
@@ -147,7 +215,10 @@ export function LoginForm({ onSuccess }: Props) {
                 type="text"
                 autoComplete="name"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  clearError();
+                }}
                 placeholder="Admin"
               />
             </div>
@@ -161,9 +232,16 @@ export function LoginForm({ onSuccess }: Props) {
               id="auth-password"
               type="password"
               autoComplete={setupMode || registerMode ? "new-password" : "current-password"}
+              required
+              minLength={6}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearError();
+              }}
               placeholder="••••••••"
+              aria-invalid={passwordInvalid}
+              aria-describedby={passwordInvalid ? "auth-error" : undefined}
             />
           </div>
 
@@ -176,18 +254,36 @@ export function LoginForm({ onSuccess }: Props) {
                 id="auth-password-confirm"
                 type="password"
                 autoComplete="new-password"
+                required
+                minLength={6}
                 value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  clearError();
+                }}
                 placeholder="••••••••"
+                aria-invalid={confirmInvalid}
+                aria-describedby={confirmInvalid ? "auth-error" : undefined}
               />
             </div>
           )}
 
-          {error && <div className="text-center text-xs text-bad">{error}</div>}
+          {error && (
+            <div
+              id="auth-error"
+              className="rounded-lg border border-bad/30 bg-bad/10 px-3 py-2 text-center text-body text-ink"
+              role="alert"
+              aria-live="polite"
+            >
+              {error}
+            </div>
+          )}
 
           <Button
             type="submit"
             className="mt-1 w-full"
+            loading={loading}
+            loadingLabel={loadingLabel}
             disabled={
               loading ||
               !username ||
@@ -195,13 +291,11 @@ export function LoginForm({ onSuccess }: Props) {
               ((setupMode || registerMode) && !confirm)
             }
           >
-            {loading
-              ? "Секунду…"
-              : setupMode
-                ? "Создать администратора"
-                : registerMode
-                  ? "Зарегистрироваться"
-                  : "Войти"}
+            {setupMode
+              ? "Создать администратора"
+              : registerMode
+                ? "Зарегистрироваться"
+                : "Войти"}
           </Button>
 
           {!setupMode && (

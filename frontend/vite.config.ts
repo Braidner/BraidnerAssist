@@ -16,8 +16,8 @@ export default defineConfig({
         name: "Mission Control",
         short_name: "MC",
         description: "Personal life dashboard — self-hosted",
-        theme_color: "#292c33",
-        background_color: "#292c33",
+        theme_color: "#09090d",
+        background_color: "#09090d",
         display: "standalone",
         start_url: "/",
         icons: [

@@ -102,12 +102,13 @@ export function TopBar({
 						variant="ghost"
 						size="icon"
 						className="text-accent"
-						title="Тема"
+						title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+						aria-label={theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
 						onClick={onToggleTheme}
 					>
 						{theme === "dark" ? <Sun/> : <Moon/>}
 					</Button>
-					<Button variant="ghost" size="icon" title="Выход" onClick={onLogout}>
+					<Button variant="ghost" size="icon" title="Выйти" aria-label="Выйти" onClick={onLogout}>
 						<LogOut/>
 					</Button>
 					<div className="hidden h-6 w-px bg-hair sm:block"/>

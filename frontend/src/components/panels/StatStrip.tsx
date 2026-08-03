@@ -80,7 +80,7 @@ const miniLabel =
   "mb-2 [font-family:var(--mono)] text-tiny uppercase tracking-3 text-muted";
 const miniBar = "h-[3px] flex-1 overflow-hidden rounded-[3px] bg-groove";
 const miniBarFill =
-  "block h-full rounded-[3px] transition-[width] duration-700 ease-[cubic-bezier(0.22,0.61,0.36,1)]";
+  "block h-full w-full origin-left rounded-[3px] transition-transform duration-200 ease-[cubic-bezier(0.22,0.61,0.36,1)] motion-reduce:transition-none";
 
 function Bar({ pct }: { pct: number }) {
   return (
@@ -421,10 +421,10 @@ export function MiniWidgets() {
   const ramPct = proxmox?.resource ? Math.round(proxmox.resource.memPct) : 0;
   const diskPct = proxmox?.resource ? Math.round(proxmox.resource.diskPct) : 0;
   const ramVal = proxmox?.resource
-    ? `${Math.round(proxmox.resource.memUsed / 1024)}/${Math.round(proxmox.resource.memTotal / 1024)}G`
+    ? `${gb(proxmox.resource.memUsed)}/${gb(proxmox.resource.memTotal)} ГБ`
     : "—";
   const diskVal = proxmox?.resource
-    ? `${Math.round(proxmox.resource.diskUsed / 1024 / 1024)}/${Math.round(proxmox.resource.diskTotal / 1024 / 1024)}G`
+    ? `${gb(proxmox.resource.diskUsed)}/${gb(proxmox.resource.diskTotal)} ГБ`
     : "—";
 
   // weather code → emoji
@@ -498,16 +498,23 @@ export function MiniWidgets() {
                 <span className="w-7 shrink-0 [font-family:var(--mono)] text-tiny text-muted">
                   {r.k}
                 </span>
-                <div className={miniBar}>
+                <div
+                  className={miniBar}
+                  role="progressbar"
+                  aria-label={`${r.k}: ${Math.round(r.pct)}%`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.min(100, Math.max(0, Math.round(r.pct)))}
+                >
                   <i
                     className={miniBarFill}
                     style={{
-                      width: Math.min(r.pct, 100) + "%",
+                      transform: `scaleX(${Math.min(100, Math.max(0, r.pct)) / 100})`,
                       background: r.pct > 80 ? "var(--bad)" : "var(--accent)",
                     }}
                   />
                 </div>
-                <span className="w-[58px] shrink-0 text-right [font-family:var(--mono)] text-mini text-ink-soft">
+                <span className="w-16 shrink-0 text-right [font-family:var(--mono)] text-mini tabular-nums text-ink-soft">
                   {r.val}
                 </span>
               </div>

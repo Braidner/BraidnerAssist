@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useTheme } from "./theme.ts";
 import {
@@ -12,16 +12,76 @@ import { TasksProvider } from "./lib/tasksContext.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
 import { getToken, clearToken, type CurrentUser } from "./lib/auth.ts";
 import { ui } from "./lib/ui.ts";
-import { LoginForm } from "./components/overlays/LoginForm.tsx";
+import {
+  LoginForm,
+  SessionLoadingScreen,
+} from "./components/overlays/LoginForm.tsx";
 import { Drawer } from "./components/layout/Drawer.tsx";
 import { Sidebar } from "./components/layout/Sidebar.tsx";
 import { TopBar } from "./components/layout/TopBar.tsx";
-import { HermesPage } from "./pages/system/HermesPage.tsx";
-import { SystemPage } from "./pages/system/SystemPage.tsx";
-import { MediaRoutes } from "./pages/media/MediaRoutes.tsx";
-import { OverviewPage } from "./pages/overview/OverviewPage.tsx";
 import { CommandPalette } from "./components/layout/CommandPalette.tsx";
-import { SettingsPage } from "./pages/settings/SettingsPage.tsx";
+import { Skeleton } from "./components/ui/skeleton.tsx";
+
+const OverviewPage = lazy(() =>
+  import("./pages/overview/OverviewPage.tsx").then((module) => ({
+    default: module.OverviewPage,
+  })),
+);
+const HermesPage = lazy(() =>
+  import("./pages/system/HermesPage.tsx").then((module) => ({
+    default: module.HermesPage,
+  })),
+);
+const SystemPage = lazy(() =>
+  import("./pages/system/SystemPage.tsx").then((module) => ({
+    default: module.SystemPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/settings/SettingsPage.tsx").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+const MediaRoutes = lazy(() =>
+  import("./pages/media/MediaRoutes.tsx").then((module) => ({
+    default: module.MediaRoutes,
+  })),
+);
+
+function RouteLoading() {
+  return (
+    <div
+      className="flex flex-col gap-3 px-4 py-4 sm:px-6"
+      role="status"
+      aria-live="polite"
+      aria-label="Загрузка раздела"
+    >
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((key) => (
+          <div
+            key={key}
+            className="h-24 rounded-card border border-hair bg-raise p-4"
+          >
+            <Skeleton className="h-2.5 w-16 bg-faint" />
+            <Skeleton className="mt-4 h-5 w-2/3 bg-faint" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {[0, 1].map((key) => (
+          <div
+            key={key}
+            className="h-64 rounded-card border border-hair bg-raise p-6"
+          >
+            <Skeleton className="h-3 w-24 bg-faint" />
+            <Skeleton className="mt-6 h-8 w-full bg-faint" />
+            <Skeleton className="mt-3 h-8 w-5/6 bg-faint" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function App() {
   const { theme, toggle } = useTheme();
@@ -118,7 +178,11 @@ export function App() {
   }
 
   if (!user) {
-    return <div className={ui.shell} data-theme={theme} />;
+    return (
+      <div className={ui.shell} data-theme={theme}>
+        <SessionLoadingScreen />
+      </div>
+    );
   }
 
   const role = user.role;
@@ -148,20 +212,22 @@ export function App() {
             />
 
             <div id={"router-container"} className={ui.main}>
-              <Routes>
-                {role === "admin" && <Route path="/" element={<OverviewPage />} />}
-                {role === "admin" && <Route path="/hermes" element={<HermesPage />} />}
-                {role === "admin" && <Route path="/system" element={<SystemPage />} />}
-                {role === "admin" && <Route path="/settings" element={<SettingsPage />} />}
-                <Route
-                  path="/media/*"
-                  element={<MediaRoutes allowSystem={role === "admin"} />}
-                />
-                <Route
-                  path="*"
-                  element={<Navigate to={role === "media" ? "/media" : "/"} replace />}
-                />
-              </Routes>
+              <Suspense fallback={<RouteLoading />}>
+                <Routes>
+                  {role === "admin" && <Route path="/" element={<OverviewPage />} />}
+                  {role === "admin" && <Route path="/hermes" element={<HermesPage />} />}
+                  {role === "admin" && <Route path="/system" element={<SystemPage />} />}
+                  {role === "admin" && <Route path="/settings" element={<SettingsPage />} />}
+                  <Route
+                    path="/media/*"
+                    element={<MediaRoutes allowSystem={role === "admin"} />}
+                  />
+                  <Route
+                    path="*"
+                    element={<Navigate to={role === "media" ? "/media" : "/"} replace />}
+                  />
+                </Routes>
+              </Suspense>
             </div>
           </div>
         </div>

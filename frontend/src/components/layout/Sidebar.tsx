@@ -46,7 +46,7 @@ export function Sidebar({ open, onClose, role }: SidebarProps) {
         className={cn(
           "sticky top-12 z-30 flex h-[calc(100vh-3rem)] w-[76px] flex-none flex-col items-stretch gap-1.5 overflow-hidden border-r border-hair bg-page px-3.5 py-[22px] transition-[width,padding,transform] duration-300",
           open && "w-[260px] px-[18px]",
-          "max-mob:fixed max-mob:inset-0 max-mob:z-50 max-mob:h-screen max-mob:w-screen max-mob:-translate-x-full max-mob:border-r-0 max-mob:px-[22px] max-mob:py-6 max-mob:shadow-[30px_0_70px_rgba(0,0,0,0.34)]",
+          "max-mob:fixed max-mob:inset-0 max-mob:z-50 max-mob:h-screen max-mob:w-screen max-mob:-translate-x-full max-mob:border-r-0 max-mob:px-[22px] max-mob:pb-[calc(1.5rem+var(--safe-bottom))] max-mob:pt-[calc(1.5rem+var(--safe-top))] max-mob:shadow-[30px_0_70px_rgba(0,0,0,0.34)]",
           open && "max-mob:translate-x-0",
         )}
         aria-label="Главное меню"
@@ -57,6 +57,7 @@ export function Sidebar({ open, onClose, role }: SidebarProps) {
             <div className="mt-0.5 font-mono text-data tracking-1 text-muted">Mission Control</div>
           </div>
           <button
+            type="button"
             className={cn(ui.iconButton, "ml-auto")}
             onClick={onClose}
             aria-label="Закрыть"

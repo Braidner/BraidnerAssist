@@ -215,7 +215,7 @@ Two button systems coexist; both are flat, hairline-bordered, and h-8/h-9.
 - **States:** every variant carries default / hover / `focus-visible` (3px `ring-ring/50` = red ring) / `active` (translate-y-px press) / `disabled` (opacity-50). Buttons have a built-in async loading state (spinner + optional loading label) driven by returning a promise from `onClick`.
 
 ### Inputs / Fields
-- **Style:** h-8, `rounded-lg`, hairline border, transparent-to-Surface fill, 13px Ink text, Muted placeholder.
+- **Style:** h-8, `rounded-lg`, hairline border, transparent-to-Surface fill, 13px Ink text, Ink Soft placeholder. Muted stays reserved for structural labels; placeholder copy must remain readable in both themes.
 - **Focus:** border shifts to red (`focus-visible:border-ring`) with a 3px red ring (`ring-ring/50`) — the same focus signature as buttons.
 - **Error:** `aria-invalid` paints a destructive border + destructive ring. **Disabled:** dimmed fill, `cursor-not-allowed`, opacity-50.
 

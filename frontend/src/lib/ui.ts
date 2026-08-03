@@ -32,7 +32,7 @@ export const ui = {
       "border-accent/70 bg-accent text-accent-ink shadow-[var(--accent-glow-sm)] hover:bg-accent hover:text-accent-ink hover:shadow-[var(--accent-glow)] active:text-accent-ink",
   },
   input: cn(
-    "min-w-0 rounded-[10px] border border-hair bg-surface px-3 py-2 text-body text-ink outline-none transition-colors placeholder:text-muted",
+    "min-w-0 rounded-[10px] border border-hair bg-surface px-3 py-2 text-body text-ink outline-none transition-colors placeholder:text-ink-soft max-mob:text-base",
     "focus:border-accent/60 focus:outline focus:outline-2 focus:outline-accent/20 focus:outline-offset-1",
   ),
   iconButton: cn(

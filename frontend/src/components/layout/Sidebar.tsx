@@ -54,7 +54,7 @@ export function Sidebar({ open, onClose, role }: SidebarProps) {
         <div className="mb-3 hidden items-center gap-3 px-1 pb-2 pt-0.5 max-mob:flex">
           <div className="min-w-0">
             <div className="text-head font-bold tracking-normal text-ink">Навигация</div>
-            <div className="mt-0.5 font-mono text-data tracking-1 text-muted">Mission Control</div>
+            <div className="mt-0.5 font-mono text-data tracking-1 text-muted">Pultra</div>
           </div>
           <button
             type="button"

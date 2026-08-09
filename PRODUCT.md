@@ -14,7 +14,7 @@ A single operator — the owner — running the dashboard at home on the LAN, pl
 
 ## Product Purpose
 
-Mission Control is a self-hosted personal command center that unifies tasks, homelab services, home automation, media, and system status into one local surface. It exists so the owner doesn't have to juggle a dozen separate tools and dashboards, and so an AI agent can operate that same surface autonomously. Success is a board that is trusted and pleasant to open: state is legible at a glance, nothing feels stale or broken, and both human and agent can act without friction.
+Pultra is a self-hosted personal command center that unifies tasks, homelab services, home automation, media, and system status into one local surface. It exists so the owner doesn't have to juggle a dozen separate tools and dashboards, and so an AI agent can operate that same surface autonomously. Success is a board that is trusted and pleasant to open: state is legible at a glance, nothing feels stale or broken, and both human and agent can act without friction.
 
 ## Positioning
 

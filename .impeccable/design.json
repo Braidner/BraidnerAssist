@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-07-12T00:00:00Z",
-  "title": "Design System: Mission Control",
+  "title": "Design System: Pultra",
   "extensions": {
     "colorMeta": {
       "accent-red": { "role": "primary", "displayName": "Signal Red", "canonical": "#e53333", "tonalRamp": ["#2a0d0d", "#4a1414", "#701d1d", "#9c2626", "#c22c2c", "#e53333", "#ec5c5c", "#f39191"] },
@@ -95,7 +95,7 @@
   ],
   "narrative": {
     "northStar": "The Cinematic Cockpit",
-    "overview": "Mission Control is two surfaces sharing one shell: a tight instrument cluster (tasks, homelab services, agent logs, system gauges) where density is the point, and a full-bleed media theatre (hero backdrops, 68–84px titles, auto-hiding chrome, HLS into the hero background). The single red accent is the wire between them — it marks the live thing on the console and the play button in the theatre, and almost nothing else. The room is dark by default: near-black surfaces separated by tonal steps and hairline borders, never drop shadows. This is a flat system; the older 'neumorphism' language in CLAUDE.md has been fully replaced. It rejects soft embossing, pastel SaaS gradients, glassmorphism-as-default, and decorative motion.",
+    "overview": "Pultra is two surfaces sharing one shell: a tight instrument cluster (tasks, homelab services, agent logs, system gauges) where density is the point, and a full-bleed media theatre (hero backdrops, 68–84px titles, auto-hiding chrome, HLS into the hero background). The single red accent is the wire between them — it marks the live thing on the console and the play button in the theatre, and almost nothing else. The room is dark by default: near-black surfaces separated by tonal steps and hairline borders, never drop shadows. This is a flat system; the older 'neumorphism' language in CLAUDE.md has been fully replaced. It rejects soft embossing, pastel SaaS gradients, glassmorphism-as-default, and decorative motion.",
     "keyCharacteristics": [
       "Dark-first, near-black tonal layering; hairline borders instead of shadows.",
       "A single family (Syne) carries display, UI, labels, and tabular figures.",

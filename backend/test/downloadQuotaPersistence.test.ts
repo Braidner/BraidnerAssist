@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 test("quota enforcement and delete-with-files accounting use persisted downloads", async () => {
-  const tempDir = mkdtempSync(path.join(tmpdir(), "mission-control-quota-"));
+  const tempDir = mkdtempSync(path.join(tmpdir(), "pultra-quota-"));
   const databasePath = path.join(tempDir, "test.db");
   process.env.DATABASE_URL = `file:${databasePath}`;
 

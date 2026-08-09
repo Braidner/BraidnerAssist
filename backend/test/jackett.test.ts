@@ -2,7 +2,7 @@ import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import type { ReleaseQualityProfile } from "../src/integrations/releaseScore.js";
 
-process.env.DATABASE_URL ??= "file:./mission-control-test.db";
+process.env.DATABASE_URL ??= "file:./pultra-test.db";
 process.env.JACKETT_URL = "http://jackett.test";
 process.env.JACKETT_API_KEY = "test-key";
 process.env.JACKETT_INDEXERS = "all";

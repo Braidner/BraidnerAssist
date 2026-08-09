@@ -1,4 +1,4 @@
-# Mission Control — Personal Life Dashboard
+# Pultra — Personal Life Dashboard (ранее Mission Control)
 
 Персональный центр управления жизнью. Локальный self-hosted дашборд на Ubuntu
 Desktop (Proxmox VM). Используется человеком И AI-агентом **Hermes** (Codex-based),
@@ -15,7 +15,7 @@ Desktop (Proxmox VM). Используется человеком И AI-аген
 ## Структура
 
 ```
-mission-control/
+pultra/
 ├── frontend/          # React + TS + Vite
 ├── backend/
 │   ├── src/
@@ -287,7 +287,7 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
 
 На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на
 `/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Jackett, qBittorrent,
-TorrServer. Sonarr/Radarr/Prowlarr заменены simplified media pipeline внутри Mission Control:
+TorrServer. Sonarr/Radarr/Prowlarr заменены simplified media pipeline внутри Pultra:
 Jackett search → qB savePath прямо в Jellyfin folders → Jellyfin scan.
 Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
 `host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в

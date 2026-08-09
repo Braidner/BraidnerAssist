@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 test("self-registration stays pending until an admin approves a role", async () => {
-  const tempDir = mkdtempSync(path.join(tmpdir(), "mission-control-auth-"));
+  const tempDir = mkdtempSync(path.join(tmpdir(), "pultra-auth-"));
   const databasePath = path.join(tempDir, "test.db");
   const databaseUrl = `file:${databasePath}`;
 

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-process.env.DATABASE_URL ??= "file:./mission-control-test.db";
+process.env.DATABASE_URL ??= "file:./pultra-test.db";
 process.env.MEDIA_ROOT = "/media";
 process.env.QBITTORRENT_SAVE_ROOT = "/data";
 process.env.MEDIA_TV = "tv";

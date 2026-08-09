@@ -66,7 +66,7 @@ export function TopBar({
 					</span>
 					<span className="hidden min-w-0 sm:block">
 						<span className="block truncate text-body font-bold leading-none tracking-1 text-ink">
-							Mission Control
+							Pultra
 						</span>
 						<span className="mt-1 block font-mono text-tiny tracking-4 text-muted">
 							by Braidner

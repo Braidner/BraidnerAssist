@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MediaPreferenceItem } from "../src/integrations/mediaPreferences.js";
 
-process.env.DATABASE_URL ??= "file:./mission-control-test.db";
+process.env.DATABASE_URL ??= "file:./pultra-test.db";
 
 test("release matching blocks a movie with an explicit wrong year", async () => {
   const { buildReleaseMatch, applyReleaseMatch } = await import("../src/integrations/nativeMedia.js");

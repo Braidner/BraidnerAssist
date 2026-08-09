@@ -65,8 +65,8 @@ export const habits: Habit[] = [
 ];
 
 export const services: Service[] = [
-  { name: "mission-control-api", status: "ok", tag: "up · 14d 6h" },
-  { name: "mission-control-web", status: "ok", tag: "up · 14d 6h" },
+  { name: "pultra-api", status: "ok", tag: "up · 14d 6h" },
+  { name: "pultra-web", status: "ok", tag: "up · 14d 6h" },
   { name: "hermes-mcp-server", status: "ok", tag: "up · 3h 22m" },
   { name: "sqlite (prisma)", status: "ok", tag: "WAL · 41 MB" },
   { name: "nginx-proxy", status: "ok", tag: "up · 31d" },

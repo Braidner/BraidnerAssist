@@ -21,7 +21,7 @@ function ok(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
 }
 
-const INSTRUCTIONS = `Mission Control — personal dashboard for tasks, homelab services, Home Assistant and weather. You are Hermes, the agent operating it.
+const INSTRUCTIONS = `Pultra — personal dashboard for tasks, homelab services, Home Assistant and weather. You are Hermes, the agent operating it.
 
 WORKING ON A TASK (works for BOTH local and GitLab tasks):
 1. get_tasks → pick a task and copy its "id" field. GitLab ids look like "gl-issue-<project>-<iid>" or "gl-mr-<project>-<iid>"; local ids are cuids. Use this exact id everywhere below.
@@ -37,7 +37,7 @@ MEDIA & DNS: Discovery uses TMDB only. get_discovery_home/search_discovery are r
 
 export function createMcpServer() {
   const server = new McpServer(
-    { name: "mission-control", version: "0.1.0" },
+    { name: "pultra", version: "0.1.0" },
     { instructions: INSTRUCTIONS },
   );
 
@@ -255,7 +255,7 @@ export function createMcpServer() {
 
   server.tool(
     "grab_release",
-    "Force-grab a specific release returned by search_releases for the same title id (by id + guid + indexerId/indexer). Mission Control adds it to qBittorrent and saves it directly into the Jellyfin movies/tv library path.",
+    "Force-grab a specific release returned by search_releases for the same title id (by id + guid + indexerId/indexer). Pultra adds it to qBittorrent and saves it directly into the Jellyfin movies/tv library path.",
     { type: z.enum(["movie", "series"]), id: z.number(), guid: z.string(), indexerId: z.union([z.number(), z.string()]), season: z.number().optional() },
     async ({ type, id, guid, indexerId, season }) => {
       return ok(await nativeGrabRelease(type, id, guid, indexerId, season));
@@ -316,7 +316,7 @@ export function createMcpServer() {
 
   server.tool(
     "add_media_preference",
-    "Save a local discovery preference (watchlist/liked/disliked/hidden). This only affects Mission Control recommendations; it does not add or delete media.",
+    "Save a local discovery preference (watchlist/liked/disliked/hidden). This only affects Pultra recommendations; it does not add or delete media.",
     {
       kind: z.enum(["movie", "series"]),
       tmdbId: z.number(),
@@ -363,7 +363,7 @@ export function createMcpServer() {
 
   server.tool(
     "test_jackett_search",
-    "Run a raw Jackett Torznab search through Mission Control and return scored releases.",
+    "Run a raw Jackett Torznab search through Pultra and return scored releases.",
     { query: z.string(), type: z.enum(["movie", "series", "manual"]).optional() },
     async ({ query, type }) => ok(await jackettSearch(query, { kind: type ?? "manual" })),
   );

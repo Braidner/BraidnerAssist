@@ -1,5 +1,5 @@
 ---
-name: Mission Control
+name: Pultra
 description: A dark, red-glow instrument cockpit for a self-hosted personal life dashboard — dense control chrome married to a full-bleed media theatre.
 colors:
   accent-red: "#e53333"
@@ -112,13 +112,13 @@ components:
     padding: "2px 8px"
 ---
 
-# Design System: Mission Control
+# Design System: Pultra
 
 ## 1. Overview
 
 **Creative North Star: "The Cinematic Cockpit"**
 
-Mission Control is two surfaces sharing one shell. The first is a tight instrument cluster — tasks, homelab services, agent logs, system gauges — where information density is the whole point and nothing moves that doesn't have to. The second is a full-bleed media theatre — hero backdrops, 68–84px titles, auto-hiding chrome, HLS playing straight into the hero background. The single red accent (`#e53333`) is the wire that runs between them: it marks the live thing on the console and the play button in the theatre, and almost nothing else.
+Pultra is two surfaces sharing one shell. The first is a tight instrument cluster — tasks, homelab services, agent logs, system gauges — where information density is the whole point and nothing moves that doesn't have to. The second is a full-bleed media theatre — hero backdrops, 68–84px titles, auto-hiding chrome, HLS playing straight into the hero background. The single red accent (`#e53333`) is the wire that runs between them: it marks the live thing on the console and the play button in the theatre, and almost nothing else.
 
 The room is dark by default and stays dark. Surfaces are near-black and separated by tonal steps (`#09090d` → `#0e1018` → `#121622` → `#171b28`) and hairline borders (white at 4.5% opacity), never by drop shadows. This is a **flat** system — the CLAUDE.md still refers to an older "neomorphism" pass, but that soft-shadow language has been fully replaced; depth here is layering and light, not embossing. The one place real shadow appears is the media grid on hover, where a card lifts and casts a deep cinematic drop shadow. Everything is built for one operator reading many instruments at once: a dense fixed-rem type ramp (down to 8px), monospaced tabular figures, uppercase tracked labels, and a red glow that means "attention" wherever it lands.
 

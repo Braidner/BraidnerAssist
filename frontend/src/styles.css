@@ -97,7 +97,7 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ============================================================
-   Mission Control v4 — Tailwind tokens + flat design
+   Pultra v4 — Tailwind tokens + flat design
    ============================================================ */
 
 :root {

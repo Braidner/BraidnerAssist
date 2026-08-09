@@ -23,7 +23,7 @@ function BrandLockup({ subtitle }: { subtitle: string }) {
         <Target className="size-6" />
       </div>
       <h1 className="m-0 font-mono text-lg font-bold uppercase tracking-5 text-ink">
-        Mission Control
+        Pultra
       </h1>
       <div className="mt-1 text-xs tracking-3 text-ink-soft">{subtitle}</div>
     </div>

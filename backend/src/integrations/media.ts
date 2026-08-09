@@ -1139,7 +1139,7 @@ export async function resolveTorrent(
   const res = await request(src, {
     method: "GET",
     maxRedirections: 0,
-    headers: { "User-Agent": "MissionControl/1.0" },
+    headers: { "User-Agent": "Pultra/1.0" },
     headersTimeout: 15_000,
     bodyTimeout: 15_000,
   });

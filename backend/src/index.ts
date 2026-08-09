@@ -21,7 +21,7 @@ app.use(express.json());
 app.get("/healthz", (_req, res) => {
   res.json({
     ok: true,
-    service: "mission-control-backend",
+    service: "pultra-backend",
     integrations: {
       gitlab: config.gitlab.configured,
       homeAssistant: config.hass.configured,
@@ -56,7 +56,7 @@ app.use("/mcp", mcpRouter);
 
 app.listen(config.backendPort, () => {
   console.log(
-    `[mission-control] backend listening on :${config.backendPort} (${config.nodeEnv})`,
+    `[pultra] backend listening on :${config.backendPort} (${config.nodeEnv})`,
   );
   startSampler();
   startPosterCacheCleanup();

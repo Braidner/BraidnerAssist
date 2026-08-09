@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CachedRelease } from "../src/integrations/nativeMedia.js";
 
-process.env.DATABASE_URL ??= "file:./mission-control-test.db";
+process.env.DATABASE_URL ??= "file:./pultra-test.db";
 
 test("release cache is scoped by title tmdb id", async () => {
   const {

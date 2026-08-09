@@ -2,7 +2,7 @@
 
 Конфигурация homelab-стека на `hermes.lan` (Proxmox VM): AdGuard Home,
 Jellyfin, Jackett, qBittorrent, TorrServer. Sonarr/Radarr/Prowlarr заменены
-native media pipeline внутри Mission Control. Стек развёрнут в `/srv/stack/`
+native media pipeline внутри Pultra. Стек развёрнут в `/srv/stack/`
 на 1ТБ диске.
 
 `docker-compose.yml` здесь — каноничный источник конфигурации.
@@ -87,11 +87,11 @@ docker compose -f /srv/stack/docker-compose.yml up -d
 | AdGuard DNS | 53         | DNS (UDP+TCP), на LAN-IP 192.168.2.184   |
 | AdGuard UI  | 8053       | веб-интерфейс/API                        |
 | Jellyfin    | 8096       | медиа-сервер                             |
-| Jackett     | 9117       | Torznab индексеры для Mission Control    |
+| Jackett     | 9117       | Torznab индексеры для Pultra    |
 | qBittorrent | 8080       | торрент-клиент UI                        |
 | qBittorrent | 6881       | peer (TCP+UDP), macvlan 192.168.2.190    |
 
-## Интеграция Jackett → Mission Control
+## Интеграция Jackett → Pultra
 
 После того как Jackett поднят и в нём добавлены нужные индексеры (UI:
 Add Indexer → выбрать трекер → скопировать Torznab Feed URL):
@@ -99,4 +99,4 @@ Add Indexer → выбрать трекер → скопировать Torznab F
 1. В `.env` дашборда задать `JACKETT_URL=http://host.docker.internal:9117`.
 2. `JACKETT_API_KEY` взять из Jackett Dashboard.
 3. `JACKETT_INDEXERS=all` или список id через запятую.
-4. Mission Control ищет релизы напрямую через Torznab categories 2000/5000.
+4. Pultra ищет релизы напрямую через Torznab categories 2000/5000.

@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   # Jackett — Cardigann-индексер с широкой библиотекой определений
-  # (особенно для русских/нишевых трекеров). Mission Control ходит к нему
+  # (особенно для русских/нишевых трекеров). Pultra ходит к нему
   # напрямую через Torznab API.
   jackett:
     image: lscr.io/linuxserver/jackett:latest

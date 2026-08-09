@@ -1,4 +1,4 @@
-# Mission Control — Personal Life Dashboard
+# Pultra — Personal Life Dashboard (ранее Mission Control)
 
 Персональный центр управления жизнью. Локальный self-hosted дашборд на Ubuntu
 Desktop (Proxmox VM). Используется человеком И AI-агентом **Hermes** (Claude-based),
@@ -25,7 +25,7 @@ Desktop (Proxmox VM). Используется человеком И AI-аген
 ## Структура
 
 ```
-mission-control/
+pultra/
 ├── frontend/          # React + TS + Vite
 │   └── src/
 │       ├── App.tsx                    # auth + routing + UI chrome (lean)
@@ -344,14 +344,14 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
 На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на
 `/srv/stack`, **не** в этом репозитории): AdGuard Home, Jellyfin, Jackett, qBittorrent,
 TorrServer (YouROK, порт 8090, `ghcr.io/yourok/torrserver`). Sonarr/Radarr/Prowlarr заменены
-native media pipeline внутри Mission Control. Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
+native media pipeline внутри Pultra. Сервисы публикуются на хосте; backend-контейнер дашборда ходит к ним через
 `host.docker.internal:<port>` (есть `extra_hosts` в compose). Креды живут только в
 `/srv/stack/.creds` (chmod 600) и в server `.env` дашборда — в гит не коммитятся.
 
 ## UI / Дизайн-система (flat / «The Cinematic Cockpit»)
 
 Текущий визуальный стандарт фронтенда — **плоский (flat) дизайн** на Tailwind v4 + shadcn
-(`Mission Control v4`). Глубина — тональные слои поверхностей + hairline-бордеры, НЕ тени;
+(`Pultra v4`). Глубина — тональные слои поверхностей + hairline-бордеры, НЕ тени;
 единственная выразительная «тень» — красный accent-glow. Прежний неоморфизм (`.neu*`) удалён.
 Источник токенов и компонентных классов — `frontend/src/styles.css`. Полная визуальная спека
 с named-правилами — в `DESIGN.md` (frontmatter-токены + 6 секций) и `.impeccable/design.json`.

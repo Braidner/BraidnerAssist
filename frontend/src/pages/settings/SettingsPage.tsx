@@ -58,7 +58,7 @@ export function SettingsPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="font-mono text-label uppercase tracking-5 text-muted">
-            Mission Control
+            Pultra
           </div>
           <h1 className="mt-1 text-[28px] font-bold leading-tight text-ink">
             Настройки

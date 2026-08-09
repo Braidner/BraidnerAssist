@@ -13,8 +13,8 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
-        name: "Mission Control",
-        short_name: "MC",
+        name: "Pultra",
+        short_name: "Pultra",
         description: "Personal life dashboard — self-hosted",
         theme_color: "#09090d",
         background_color: "#09090d",

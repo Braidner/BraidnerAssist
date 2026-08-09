@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("renders the Mission Control auth shell", async ({ page }) => {
+test("renders the Pultra auth shell", async ({ page }) => {
   await page.route("**/api/auth/setup-status", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -10,7 +10,7 @@ test("renders the Mission Control auth shell", async ({ page }) => {
 
   await page.goto("/");
 
-  await expect(page.getByText("Mission Control")).toBeVisible();
+  await expect(page.getByText("Pultra")).toBeVisible();
   await expect(page.getByPlaceholder("username")).toBeVisible();
   await expect(page.locator('input[type="password"]').first()).toBeVisible();
   await expect(

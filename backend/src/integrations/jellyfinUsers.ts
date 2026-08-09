@@ -23,7 +23,7 @@ function jfHeaders(): Record<string, string> {
 }
 
 export function jellyfinClientAuthHeader(token: string): string {
-  return `MediaBrowser Client="Mission Control", Device="Mission Control", DeviceId="mission-control-dashboard", Version="0.1.0", Token="${token}"`;
+  return `MediaBrowser Client="Pultra", Device="Pultra", DeviceId="pultra-dashboard", Version="0.1.0", Token="${token}"`;
 }
 
 export function jellyfinUserHeaders(token: string): Record<string, string> {

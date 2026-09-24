@@ -4,8 +4,10 @@ import { Button } from "../../components/ui/button.tsx";
 import { Ring } from "../../components/ui/Ring.tsx";
 import { Placeholder } from "../../components/panels/Placeholder.tsx";
 import { BackendLogsCard } from "./BackendLogsCard.tsx";
+import { LlmModelsSection } from "./LlmModelsSection.tsx";
 import { cn } from "../../lib/cn.ts";
 import { ui } from "../../lib/ui.ts";
+import { humanBytes } from "../../lib/format.ts";
 import type {
   ProxmoxData,
   ServicesData,
@@ -32,18 +34,6 @@ const STAT_VAR: Record<"ok" | "warn" | "bad", string> = {
 
 function gb(bytes: number): number {
   return Math.round(bytes / 1024 ** 3);
-}
-
-function humanBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 Б";
-  const units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
-  let value = bytes;
-  let i = 0;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i += 1;
-  }
-  return `${value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
 }
 
 const statList = "flex flex-col gap-0";
@@ -515,6 +505,9 @@ export function SystemPage() {
           <PosterCacheCard cache={posterCache} onRefresh={setPosterCache} />
         </div>
       </div>
+
+      {/* LLM модели */}
+      <LlmModelsSection />
     </div>
   );
 }

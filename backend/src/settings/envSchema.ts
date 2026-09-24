@@ -69,6 +69,7 @@ export const ENV_GROUPS: EnvGroupDefinition[] = [
       { key: "ADGUARD_USER", label: "AdGuard user", type: "text", runtime: true },
       { key: "ADGUARD_PASSWORD", label: "AdGuard password", type: "secret", runtime: true },
       { key: "DOCKER_SOCKET", label: "Docker socket", type: "text", runtime: true },
+      { key: "LLM_MODELS_DIR", label: "LLM models dir", type: "text", runtime: true },
       { key: "SERVICES_FILE", label: "Services file", type: "text", runtime: true },
       { key: "HEALTH_EXPORT_PATH", label: "Health export path", type: "text", runtime: true },
     ],

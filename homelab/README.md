@@ -100,3 +100,22 @@ Add Indexer → выбрать трекер → скопировать Torznab F
 2. `JACKETT_API_KEY` взять из Jackett Dashboard.
 3. `JACKETT_INDEXERS=all` или список id через запятую.
 4. Pultra ищет релизы напрямую через Torznab categories 2000/5000.
+
+## LLM-модели (`/srv/stack/llm`)
+
+Библиотека локальных LLM-моделей на 1ТБ-диске: `/srv/stack/llm/<org>/<repo>/`.
+Pultra читает её read-only (`LLM_MODELS_DIR=/llm`, volume `${LLM_HOST_PATH:-/srv/stack/llm}:/llm:ro`)
+и показывает карточки моделей на `/system`; Hermes видит их через MCP `list_llm_models`.
+
+Скачивание с Hugging Face — `llm-pull.sh` (пишет `.pultra.json`-манифест для прогресса в UI,
+`.part`-файлы докачиваются при повторном запуске, лог — `<dir>/.download.log`):
+
+```bash
+cd ~/mission-control/homelab
+nohup ./llm-pull.sh JonathanColetti/Qwen3.8-27B-Uncensored-GGUF \
+  Qwen3.8-27B-Uncensored-Q4_K_M.gguf mmproj-Qwen3.8-27B-Uncensored-F16.gguf \
+  >/dev/null 2>&1 &
+```
+
+Список файлов репо (выбрать квант): `curl -s https://huggingface.co/api/models/<org>/<repo>/tree/main`.
+Для gated-репо — `HF_TOKEN=... ./llm-pull.sh ...`.

@@ -1,3 +1,16 @@
+// Человекочитаемый размер (Б/КБ/МБ/ГБ/ТБ) — общий помощник для панелей.
+export function humanBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 Б";
+  const units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
+  let value = bytes;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i += 1;
+  }
+  return `${value >= 10 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
+}
+
 // Относительное «… назад» для дат (общий помощник для панелей).
 export function fmtUpdated(iso: string): string {
   const d = new Date(iso);

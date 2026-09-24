@@ -8,6 +8,8 @@ services:
       # Docker Engine API (opt-in): раскомментировать и задать DOCKER_SOCKET в .env.
       # ВНИМАНИЕ: docker.sock = root-эквивалент на хосте — осознанный риск.
       # DOCKER_SOCKET: /var/run/docker.sock
+      # Библиотека локальных LLM-моделей (opt-in): раскомментировать и задать LLM_MODELS_DIR в .env.
+      # LLM_MODELS_DIR: /llm
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     volumes:
@@ -15,6 +17,8 @@ services:
       - ./.env:/app/.env.runtime:rw
       # Раскомментировать при использовании Docker-интеграции (rw для start/stop/restart):
       # - /var/run/docker.sock:/var/run/docker.sock:rw
+      # Раскомментировать при использовании библиотеки LLM-моделей (read-only):
+      # - ${LLM_HOST_PATH:-/srv/stack/llm}:/llm:ro
     restart: unless-stopped
 
   frontend:

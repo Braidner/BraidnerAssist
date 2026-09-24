@@ -10,6 +10,7 @@ import { getProxmox } from "../integrations/proxmox.js";
 import { getAutomations, toggleAutomation } from "../integrations/homeassistant.js";
 import { getContainers, containerAction } from "../integrations/docker.js";
 import { getAdguard, setAdguardProtection } from "../integrations/adguard.js";
+import { getLlmModels } from "../integrations/llmModels.js";
 import {
   getMedia,
   getLibrary,
@@ -368,6 +369,16 @@ apiRouter.get("/adguard", async (req, res) => {
     res.json(await getAdguard());
   } catch (e) {
     logRouteError("adguard", req, e);
+    res.status(502).json({ configured: false, error: String(e) });
+  }
+});
+
+// Библиотека локальных LLM-моделей (opt-in LLM_MODELS_DIR).
+apiRouter.get("/llm/models", async (req, res) => {
+  try {
+    res.json(await getLlmModels());
+  } catch (e) {
+    logRouteError("llm", req, e);
     res.status(502).json({ configured: false, error: String(e) });
   }
 });

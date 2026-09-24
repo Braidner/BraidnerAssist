@@ -934,6 +934,67 @@ export async function adguardProtection(
   }
 }
 
+// ─── LLM модели (локальный пайплайн загрузки) ─────────────────────────
+
+export type LlmFileKind = "model" | "mmproj" | "draft" | "other";
+
+export interface LlmModelFile {
+  name: string;
+  sizeBytes: number;
+  expectedBytes: number | null;
+  kind: LlmFileKind;
+  quant: string | null;
+  complete: boolean;
+}
+
+export type LlmModelStatus = "ready" | "downloading" | "stalled" | "error";
+
+export interface LlmModel {
+  id: string; // "org/repo"
+  org: string | null;
+  name: string; // repo name
+  source: "huggingface" | "local";
+  url: string | null; // HF page
+  format: "gguf" | "mlx" | "safetensors" | "other";
+  params: string | null; // "27B", "35B-A3B"
+  tags: string[]; // uncensored, abliterated, heretic, aggressive, mtp, instruct, coder, vision
+  status: LlmModelStatus;
+  error: string | null;
+  sizeBytes: number;
+  expectedBytes: number | null;
+  progressPct: number | null;
+  files: LlmModelFile[];
+  addedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface LlmModelsData {
+  configured: boolean;
+  root: string;
+  totalBytes: number;
+  disk: { totalBytes: number; freeBytes: number } | null;
+  models: LlmModel[];
+}
+
+const EMPTY_LLM_MODELS: LlmModelsData = {
+  configured: false,
+  root: "",
+  totalBytes: 0,
+  disk: null,
+  models: [],
+};
+
+export async function getLlmModels(): Promise<LlmModelsData> {
+  try {
+    const res = await apiFetch("/api/llm/models");
+    if (!res.ok) return EMPTY_LLM_MODELS;
+    return (await res.json()) as LlmModelsData;
+  } catch {
+    return EMPTY_LLM_MODELS;
+  }
+}
+
 // ─── Media stack ─────────────────────────────────────────────────────
 
 export interface NowPlaying {

@@ -338,6 +338,14 @@ nginx `body_bytes_sent` vs `Content-Length`; `curl` с `Connection: close` ма�
     создать задачу, рестарт Docker-контейнера (`dockerAction`), пауза/возобновление
     DNS-фильтрации AdGuard (`adguardProtection` → `POST /api/adguard/protection`). Данные
     (контейнеры, adguard) приходят пропсами из `App.tsx`. MCP `get_dns_stats` для Hermes.
+13. **LLM-модели** (opt-in `LLM_MODELS_DIR`) — библиотека локальных весов на hermes.lan
+    `/srv/stack/llm/<org>/<repo>/` (1ТБ-диск, в контейнер `:/llm:ro`, `LLM_HOST_PATH`).
+    Скачивание — `homelab/llm-pull.sh <org/repo> <files...>` (HF resolve + `.part`-докачка +
+    манифест `.pultra.json` с ожидаемыми размерами). `integrations/llmModels.ts` сканирует
+    директорию (модели без манифеста тоже), статус `ready|downloading|stalled|error` по
+    `.part`-mtime, парсит квант/параметры/теги. `GET /api/llm/models` → полноширинная группа
+    карточек «LLM модели» на `/system` (`LlmModelsSection.tsx`, поллинг 5с при загрузке/60с);
+    MCP `list_llm_models`.
 
 ## Homelab-стек на hermes.lan (отдельный Docker compose)
 

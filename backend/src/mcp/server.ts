@@ -12,6 +12,7 @@ import { nativeLookup, nativeReleaseSearch, nativeGrabRelease } from "../integra
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import { torrserverAdd, pickVideoFile, isBrowserPlayable } from "../integrations/torrserver.js";
 import { getAdguard } from "../integrations/adguard.js";
+import { getLlmModels } from "../integrations/llmModels.js";
 import { config } from "../config.js";
 import { getDiscoverHome } from "../integrations/discover.js";
 import { tmdbSearch } from "../integrations/tmdb.js";
@@ -33,7 +34,7 @@ Use report_status to reflect your overall state (active/idle/error) on the dashb
 
 SELF-HEALING: if a homelab service appears to be down (get_services returns "bad"), you can try restarting the corresponding Docker container with restart_container({ id }) — use the short container ID or name.
 
-MEDIA & DNS: Discovery uses TMDB only. get_discovery_home/search_discovery are read-only; add_media_preference/hide_discovery_title update the dashboard's local SQLite preferences (watchlist/hidden/liked/disliked). To get a movie or show into the Jellyfin library, use search_releases({ type, query, season? }) then grab_release({ type, guid, indexerId }). Release search uses Jackett Torznab; selected releases go to qBittorrent and are saved directly into the Jellyfin movies/tv folders. There is no native monitor, missing queue, hardlink importer, or manual import step. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library). get_media_status shows what's playing and the qBittorrent queue; get_dns_stats shows AdGuard query/block statistics.`;
+MEDIA & DNS: Discovery uses TMDB only. get_discovery_home/search_discovery are read-only; add_media_preference/hide_discovery_title update the dashboard's local SQLite preferences (watchlist/hidden/liked/disliked). To get a movie or show into the Jellyfin library, use search_releases({ type, query, season? }) then grab_release({ type, guid, indexerId }). Release search uses Jackett Torznab; selected releases go to qBittorrent and are saved directly into the Jellyfin movies/tv folders. There is no native monitor, missing queue, hardlink importer, or manual import step. watch_now({ magnet }) streams a magnet instantly via TorrServer (no full download, not added to the library). get_media_status shows what's playing and the qBittorrent queue; get_dns_stats shows AdGuard query/block statistics. list_llm_models shows the locally downloaded LLM models library (opt-in), with format/quant/params/status/progress — read-only.`;
 
 export function createMcpServer() {
   const server = new McpServer(
@@ -366,6 +367,31 @@ export function createMcpServer() {
     "Run a raw Jackett Torznab search through Pultra and return scored releases.",
     { query: z.string(), type: z.enum(["movie", "series", "manual"]).optional() },
     async ({ query, type }) => ok(await jackettSearch(query, { kind: type ?? "manual" })),
+  );
+
+  server.tool(
+    "list_llm_models",
+    "List locally downloaded LLM models from the opt-in models library (LLM_MODELS_DIR): id (org/repo), format, params size, quant(s), tags, status (ready/downloading/stalled/error) and download progress, plus total library size and free disk space on the models volume. Read-only.",
+    async () => {
+      const data = await getLlmModels();
+      if (!data.configured) return ok({ configured: false });
+      return ok({
+        configured: true,
+        root: data.root,
+        totalBytes: data.totalBytes,
+        disk: data.disk,
+        models: data.models.map((m) => ({
+          id: m.id,
+          format: m.format,
+          params: m.params,
+          quant: [...new Set(m.files.map((f) => f.quant).filter((q): q is string => Boolean(q)))],
+          tags: m.tags,
+          status: m.status,
+          progressPct: m.progressPct,
+          sizeBytes: m.sizeBytes,
+        })),
+      });
+    },
   );
 
   server.tool(

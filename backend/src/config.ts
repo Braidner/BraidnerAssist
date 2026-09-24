@@ -129,6 +129,13 @@ function buildConfig() {
       },
     },
 
+    llm: {
+      modelsDir: env("LLM_MODELS_DIR"),
+      get configured() {
+        return Boolean(this.modelsDir);
+      },
+    },
+
     media: {
       jellyfin: {
         url: env("JELLYFIN_URL"),

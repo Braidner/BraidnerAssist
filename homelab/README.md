@@ -119,3 +119,12 @@ nohup ./llm-pull.sh JonathanColetti/Qwen3.8-27B-Uncensored-GGUF \
 
 Список файлов репо (выбрать квант): `curl -s https://huggingface.co/api/models/<org>/<repo>/tree/main`.
 Для gated-репо — `HF_TOKEN=... ./llm-pull.sh ...`.
+
+### Сетевой диск для мака (Samba)
+
+Контейнер `samba` раздаёт `/srv/stack/llm` как `smb://hermes.lan/llm` (юзер `braidner`,
+пароль `SAMBA_PASSWORD` из `/srv/stack/.env`, rw). На маке: Finder → ⌘K → `smb://hermes.lan/llm`
+→ «Запомнить в связке ключей»; диск монтируется в `/Volumes/llm`. LM Studio: My Models →
+папка моделей `/Volumes/llm` (раскладка `<org>/<repo>` совпадает с LM Studio). Модель читается
+по сети один раз при загрузке (Wi-Fi ~15 MB/s, кабель ~110 MB/s); для GGUF выключить mmap,
+чтобы macOS не перечитывала выгруженные страницы весов по сети.

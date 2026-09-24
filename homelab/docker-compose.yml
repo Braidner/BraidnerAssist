@@ -1,5 +1,5 @@
 # Homelab stack: AdGuard Home (DNS) + native media dependencies
-# (Jellyfin, qBittorrent, Jackett, TorrServer).
+# (Jellyfin, qBittorrent, Jackett, TorrServer) + Samba-шара LLM-моделей.
 # Data/config + media library live on the 1TB disk at /srv/stack.
 #
 # Этот файл — каноничный источник конфигурации стека. На hermes.lan
@@ -111,4 +111,26 @@ services:
       - "8090:8090"
     volumes:
       - ./torrserver:/opt/ts
+    restart: unless-stopped
+
+  # Samba — сетевой диск с LLM-моделями (/srv/stack/llm) для мака: LM Studio / mlx-lm
+  # грузят веса прямо по сети. Finder: ⌘K → smb://hermes.lan/llm (юзер braidner,
+  # пароль SAMBA_PASSWORD из /srv/stack/.env). Только SMB 445 — avahi/wsdd/netbios
+  # в bridge-сети всё равно не работают. rw: модели можно класть/удалять с мака.
+  samba:
+    image: ghcr.io/servercontainers/samba:latest
+    container_name: samba
+    networks: [stack]
+    environment:
+      - TZ=${TZ}
+      - AVAHI_DISABLE=1
+      - WSDD2_DISABLE=1
+      - NETBIOS_DISABLE=1
+      - ACCOUNT_braidner=${SAMBA_PASSWORD:?SAMBA_PASSWORD не задан в /srv/stack/.env}
+      - UID_braidner=${PUID}
+      - SAMBA_VOLUME_CONFIG_llm=[llm]; path=/shares/llm; valid users = braidner; force user = braidner; guest ok = no; read only = no; browseable = yes
+    ports:
+      - "445:445"
+    volumes:
+      - ./llm:/shares/llm
     restart: unless-stopped

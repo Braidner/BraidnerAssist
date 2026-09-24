@@ -183,6 +183,22 @@ async function tryBuildModel(
     }
   }
 
+  // Файлы манифеста в подпапках репо (vae/…, text_encoders/…) — readdir выше их не видит.
+  for (const mf of manifest?.files ?? []) {
+    if (!mf || typeof mf.path !== "string" || !mf.path.includes("/") || mf.path.includes("..")) continue;
+    if (diskFiles.has(mf.path)) continue;
+    for (const [candidate, isPart] of [[mf.path, false], [`${mf.path}.part`, true]] as const) {
+      try {
+        const st = await fs.stat(path.join(dirPath, candidate));
+        if (isPart) partMtimes.push(st.mtimeMs);
+        diskFiles.set(mf.path, { sizeBytes: st.size, isPart, mtimeMs: st.mtimeMs });
+        break;
+      } catch {
+        // файла (ещё) нет
+      }
+    }
+  }
+
   const hasModelExt = [...diskFiles.keys()].some((n) =>
     MODEL_EXTENSIONS.some((ext) => n.toLowerCase().endsWith(ext)),
   );

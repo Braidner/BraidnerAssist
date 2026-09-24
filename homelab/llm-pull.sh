@@ -43,11 +43,14 @@ if os.path.exists(path):
     except Exception: pass
 sizes = {f["path"]: f.get("size", 0) for f in json.loads(os.environ["TREE"]) if f.get("type") == "file"}
 repo = os.environ["REPO"]
+# Докачка части репо (напр. vae/ к уже скачанному GGUF) — файлы прошлых запусков сохраняем.
+files = [f for f in prev.get("files", []) if f.get("path") not in sys.argv[1:]]
+files += [{"path": p, "size": sizes.get(p, 0)} for p in sys.argv[1:]]
 m = {
     "repo": repo,
     "source": "huggingface",
     "url": f"https://huggingface.co/{repo}",
-    "files": [{"path": p, "size": sizes.get(p, 0)} for p in sys.argv[1:]],
+    "files": files,
     "status": os.environ["STATUS"],
     "error": os.environ["ERROR"] or None,
     "startedAt": prev.get("startedAt") or now,
@@ -71,6 +74,7 @@ for f in "${FILES[@]}"; do
     continue
   fi
   echo "[$(date -Is)] get $f"
+  mkdir -p "$(dirname "$DIR/$f")"  # файлы в подпапках репо (vae/, text_encoders/)
   if ! curl -sSfL --retry 5 --retry-delay 10 -C - "${AUTH[@]}" \
       -o "$DIR/$f.part" "https://huggingface.co/$REPO/resolve/main/$f"; then
     echo "[$(date -Is)] FAILED $f"

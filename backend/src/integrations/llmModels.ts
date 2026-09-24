@@ -127,7 +127,10 @@ export function detectTags(id: string, fileNames: string[]): string[] {
   for (const kw of TAG_KEYWORDS) {
     if (haystack.includes(kw)) tags.push(kw);
   }
-  if (fileNames.some((n) => fileKind(n) === "mmproj")) tags.push("vision");
+  // GGUF: vision-проектор отдельным mmproj-файлом; MLX/HF: процессор картинок в конфиге.
+  if (fileNames.some((n) => fileKind(n) === "mmproj" || n === "preprocessor_config.json")) {
+    tags.push("vision");
+  }
   return tags;
 }
 
@@ -206,7 +209,8 @@ async function tryBuildModel(
       sizeBytes,
       expectedBytes,
       kind: fileKind(fname),
-      quant: parseQuant(fname),
+      // Шарды MLX/safetensors (model-00001-of-00004) кванта в имени не несут — берём из имени репо.
+      quant: parseQuant(fname) ?? (fileKind(fname) === "model" ? parseQuant(name) : null),
       complete,
     };
   });

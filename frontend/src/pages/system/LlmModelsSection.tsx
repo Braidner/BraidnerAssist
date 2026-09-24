@@ -119,6 +119,44 @@ function FileRow({ file }: { file: LlmModelFile }) {
   );
 }
 
+// Веса (model/mmproj/draft) — построчно; конфиги/токенизатор/README — одной свёрнутой строкой.
+function FileList({ files }: { files: LlmModelFile[] }) {
+  const [open, setOpen] = useState(false);
+  const main = files.filter((f) => f.kind !== "other");
+  const aux = files.filter((f) => f.kind === "other");
+  if (files.length === 0) return null;
+  const auxBytes = aux.reduce((s, f) => s + f.sizeBytes, 0);
+
+  return (
+    <div className="flex flex-col">
+      {main.map((f) => (
+        <FileRow key={f.name} file={f} />
+      ))}
+      {aux.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className={cn(
+              fileRow,
+              "w-full cursor-pointer bg-transparent text-left transition-colors hover:text-ink",
+              ui.focus,
+            )}
+          >
+            <span className={fileName}>
+              {open ? "−" : "+"} {aux.length} служебных файлов
+            </span>
+            <span className={fileTag}>CONFIG</span>
+            <span className={fileTag}>{humanBytes(auxBytes)}</span>
+          </button>
+          {open && aux.map((f) => <FileRow key={f.name} file={f} />)}
+        </>
+      )}
+    </div>
+  );
+}
+
 function ModelCard({ model }: { model: LlmModel }) {
   const quant = mainQuant(model);
   const addedLabel = model.addedAt ? fmtUpdated(model.addedAt) : null;
@@ -153,13 +191,7 @@ function ModelCard({ model }: { model: LlmModel }) {
 
       <StatusLine model={model} />
 
-      {model.files.length > 0 && (
-        <div className="flex flex-col">
-          {model.files.map((f) => (
-            <FileRow key={f.name} file={f} />
-          ))}
-        </div>
-      )}
+      <FileList files={model.files} />
 
       <div className="mt-auto flex items-center justify-between gap-2 pt-1">
         {model.url ? (

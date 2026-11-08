@@ -3,18 +3,23 @@ import cors from "cors";
 import { config } from "./config.js";
 import { apiRouter } from "./api/index.js";
 import { authRouter } from "./api/auth.js";
+import { musicTasteRouter } from "./api/musicTaste.js";
 import { versionRouter } from "./api/version.js";
 import { posterRouter } from "./api/poster.js";
 import { jellyfinGatewayRouter } from "./api/jellyfinGateway.js";
 import { torrserverStreamRouter } from "./api/torrserverStream.js";
 import { jellyfinDownloadRouter } from "./api/jellyfinDownload.js";
+import { musicLibraryRouter, musicStreamRouter } from "./api/musicLibrary.js";
 import { jwtAuth } from "./middleware/jwtAuth.js";
 import { mcpRouter } from "./mcp/handler.js";
 import { startSampler } from "./sampler.js";
+import { startMusicDownloadMonitor } from "./integrations/musicReleases.js";
 import { startPosterCacheCleanup } from "./integrations/posterCache.js";
 
 const app = express();
 app.use(cors());
+// Authenticate before parsing a potentially large playlist import.
+app.use("/api/music/taste", jwtAuth, musicTasteRouter);
 app.use(express.json());
 
 // Healthcheck (без авторизации — для docker/uptime).
@@ -43,13 +48,16 @@ app.use("/api/media/torrserver/stream", torrserverStreamRouter);
 // Download ticket already authorizes one library file; route streams it without
 // putting the user's JWT into a URL.
 app.use("/api/media/file", jellyfinDownloadRouter);
+app.use("/api/music/stream", musicStreamRouter);
 
 // Jellyfin-compatible gateway for native clients. It intentionally lives outside
 // /api because Jellyfin clients expect server endpoints at the configured base URL.
 app.use("/jf", jellyfinGatewayRouter);
 
 // All other /api routes require valid JWT
-app.use("/api", jwtAuth, apiRouter);
+app.use("/api", jwtAuth);
+app.use("/api/music", musicLibraryRouter);
+app.use("/api", apiRouter);
 
 // MCP Streamable HTTP — own auth + Origin guard inside mcpRouter
 app.use("/mcp", mcpRouter);
@@ -59,5 +67,6 @@ app.listen(config.backendPort, () => {
     `[pultra] backend listening on :${config.backendPort} (${config.nodeEnv})`,
   );
   startSampler();
+  startMusicDownloadMonitor();
   startPosterCacheCleanup();
 });

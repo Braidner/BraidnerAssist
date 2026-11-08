@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/Badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRegisterTabs } from "@/lib/tabsContext";
 import {
   approveUser,
   createUser,
@@ -52,45 +52,13 @@ const roleLabel: Record<UserRole, string> = {
   media: "Медиа",
 };
 
+const settingsTabs = ["Пользователи", "Сервисы", "Env"];
 export function SettingsPage() {
+  const [tab, setTab] = useState(0);
+  useRegisterTabs(settingsTabs, tab, setTab);
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-6 max-mob:px-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="font-mono text-label uppercase tracking-5 text-muted">
-            Pultra
-          </div>
-          <h1 className="mt-1 text-[28px] font-bold leading-tight text-ink">
-            Настройки
-          </h1>
-        </div>
-      </header>
-
-      <Tabs defaultValue="users" className="gap-5">
-        <TabsList
-          variant="line"
-          className="w-full justify-start gap-7 overflow-x-auto border-b border-hair pb-0"
-        >
-          <TabsTrigger value="users" className="h-9 px-1">
-            Пользователи
-          </TabsTrigger>
-          <TabsTrigger value="services" className="h-9 px-1">
-            Сервисы
-          </TabsTrigger>
-          <TabsTrigger value="env" className="h-9 px-1">
-            Env
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="users">
-          <UsersTab />
-        </TabsContent>
-        <TabsContent value="services">
-          <ServicesTab />
-        </TabsContent>
-        <TabsContent value="env">
-          <EnvTab />
-        </TabsContent>
-      </Tabs>
+    <main aria-label="Настройки" className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-6 max-mob:px-4">
+      {tab === 0 ? <UsersTab /> : tab === 1 ? <ServicesTab /> : <EnvTab />}
     </main>
   );
 }

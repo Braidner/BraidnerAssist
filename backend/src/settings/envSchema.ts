@@ -58,6 +58,7 @@ export const ENV_GROUPS: EnvGroupDefinition[] = [
       { key: "QBITTORRENT_SAVE_ROOT", label: "qB save root", type: "text", runtime: true },
       { key: "MEDIA_TV", label: "TV folder", type: "text", runtime: true },
       { key: "MEDIA_MOVIES", label: "Movies folder", type: "text", runtime: true },
+      { key: "MEDIA_MUSIC", label: "Music folder", type: "text", runtime: true },
     ],
   },
   {

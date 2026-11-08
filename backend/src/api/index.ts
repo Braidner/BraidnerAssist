@@ -3,6 +3,8 @@ import { Readable } from "node:stream";
 import { prisma } from "../db/client.js";
 import { config } from "../config.js";
 import { tasksRouter } from "./tasks.js";
+import { canControlLegacyTorrent } from "../integrations/musicReleases.js";
+import { musicReleasesRouter } from "./musicReleases.js";
 import { settingsRouter } from "./settings.js";
 import { getWeather } from "../integrations/weather.js";
 import { getServices } from "../integrations/services.js";
@@ -21,6 +23,7 @@ import {
   getPlaybackPath,
   jellyfinRefresh,
   jellyfinProxy,
+  canUseVideoTransport,
   jellyfinSessions,
   jellyfinPlayTo,
   qbAdd,
@@ -78,6 +81,7 @@ import {
   getUserDownloadQuota,
   recordUserDownload,
   releaseUserDownload,
+  withUserDownloadLock,
 } from "../integrations/downloadQuota.js";
 import { listDir, makeDir, renameEntry, moveEntry, removeEntry } from "../integrations/files.js";
 import { listTitleTorrentFiles, repairSeriesEpisode } from "../integrations/mediaRepair.js";
@@ -96,8 +100,10 @@ function quotaUserId(res: { locals: { user?: { id?: string } } }): string | null
 }
 
 function magnetInfohash(value: string): string | null {
-  const match = value.match(/[?&]xt=urn:btih:([a-f0-9]{40})(?:&|$)/i);
-  return match?.[1]?.toLowerCase() ?? null;
+  if (!value.startsWith("magnet:?")) return null;
+  const topics = new URLSearchParams(value.slice("magnet:?".length)).getAll("xt");
+  if (topics.length !== 1) return null;
+  return topics[0].match(/^urn:btih:([a-f0-9]{40})$/i)?.[1].toLowerCase() ?? null;
 }
 
 function sendMediaError(res: Response, error: unknown): void {
@@ -145,11 +151,12 @@ apiRouter.use((req, _res, next) => {
 
 apiRouter.use((req, res, next) => {
   if (res.locals.user?.role !== "media") return next();
-  if (req.path.startsWith("/media")) return next();
-  return res.status(403).json({ error: "media role can access media only" });
+  if (/^\/(media|music)(?:\/|$)/.test(req.path)) return next();
+  return res.status(403).json({ error: "media role can access media and music only" });
 });
 
 apiRouter.use("/tasks", tasksRouter);
+apiRouter.use("/music", musicReleasesRouter);
 apiRouter.use("/settings", settingsRouter);
 
 apiRouter.get("/media/quota", async (_req, res) => {
@@ -636,9 +643,10 @@ apiRouter.get("/media/play/:id", async (req, res) => {
 
 // Авторизованный шаг перед прямым скачиванием: сам большой файл пойдёт через
 // короткоживущий непрозрачный ticket, поэтому JWT не попадает в URL или access log.
-apiRouter.post("/media/download/:id/ticket", (req, res) => {
+apiRouter.post("/media/download/:id/ticket", async (req, res) => {
   if (!config.media.jellyfin.configured) return res.status(503).json({ configured: false });
   try {
+    if (!await canUseVideoTransport(req.params.id, mediaUserContext(res))) return res.status(404).end();
     const ticket = createJellyfinDownloadTicket(req.params.id);
     res.json({ url: `/api/media/file/${ticket}` });
   } catch (e) {
@@ -785,16 +793,11 @@ apiRouter.post("/media/release/grab", async (req, res) => {
   const seasonNumber = req.body?.seasonNumber != null ? Number(req.body.seasonNumber) : undefined;
   if (!Number.isFinite(id) || id <= 0 || !guid || !indexerId) return res.status(400).json({ error: "id, guid and indexerId required" });
   try {
-    res.json(
-      await nativeGrabRelease(
-        kind,
-        id,
-        guid,
-        indexerId,
-        seasonNumber,
-        quotaUserId(res),
-      ),
+    const userId = quotaUserId(res);
+    const result = await withUserDownloadLock(userId, () =>
+      nativeGrabRelease(kind, id, guid, indexerId, seasonNumber, userId),
     );
+    res.json(result);
   } catch (e) {
     logRouteError("jackett", req, e, { kind, id, guid, indexerId, seasonNumber });
     sendMediaError(res, e);
@@ -831,16 +834,18 @@ apiRouter.post("/media/play-to", async (req, res) => {
 apiRouter.post("/media/torrent", async (req, res) => {
   if (!config.media.qbittorrent.configured) return res.status(503).json({ configured: false });
   const url = String(req.body?.url ?? req.body?.magnet ?? "").trim();
-  if (!url) return res.status(400).json({ error: "url/magnet required" });
+  if (!url || /[\r\n\0]/.test(url)) return res.status(400).json({ error: "Требуется одна ссылка на торрент" });
   try {
     const userId = quotaUserId(res);
-    await assertUserCanDownload(userId, magnetInfohash(url));
-    const addedIds = await qbAdd(url);
-    await Promise.all(
-      addedIds.map((infohash) =>
-        recordUserDownload({ userId, infohash }),
-      ),
-    );
+    const addedIds = await withUserDownloadLock(userId, async () => {
+      const magnetHash = magnetInfohash(url);
+      await assertUserCanDownload(userId, magnetHash);
+      const ids = await qbAdd(url);
+      // qB 4.x returns plain "Ok." without IDs for an accepted magnet.
+      const hashes = ids.length || !magnetHash ? ids : [magnetHash];
+      await Promise.all(hashes.map(infohash => recordUserDownload({ userId, infohash })));
+      return ids;
+    });
     res.json({ ok: true, added: addedIds.length, infohashes: addedIds });
   } catch (e) {
     logRouteError("qbittorrent", req, e);
@@ -1102,16 +1107,22 @@ apiRouter.post("/media/torrent/:hash/:action", async (req, res) => {
   if (!["pause", "resume", "delete"].includes(action)) {
     return res.status(400).json({ error: "Недопустимое действие. Разрешены: pause, resume, delete" });
   }
+  const infohash = hash.toLowerCase();
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(infohash)) {
+    return res.status(400).json({ error: "Требуется хеш одного торрента" });
+  }
   try {
+    if (!await canControlLegacyTorrent(res.locals.user.id, infohash)) {
+      return res.status(404).json({ error: "Торрент не найден" });
+    }
     const deleteFiles = action === "delete" && Boolean(req.body?.deleteFiles);
-    await qbAction(hash, action, { deleteFiles });
+    await qbAction(infohash, action, { deleteFiles });
     if (deleteFiles) {
-      await Promise.all([
-        releaseUserDownload(hash),
-        prisma.mediaTorrent.deleteMany({
-          where: { infohash: hash.trim().toLowerCase() },
-        }),
-      ]);
+      await prisma.$transaction(async tx => {
+        await releaseUserDownload(infohash, tx);
+        await tx.musicDownload.deleteMany({ where: { infohash } });
+        await tx.mediaTorrent.deleteMany({ where: { infohash } });
+      });
     }
     res.json({ ok: true });
   } catch (e) {
@@ -1204,7 +1215,7 @@ apiRouter.all("/media/jellyfin/*", async (req, res) => {
   const subpath = (req.params as Record<string, string>)[0] ?? "";
   const query = new URLSearchParams(req.query as Record<string, string>);
   try {
-    const upstream = await jellyfinProxy(subpath, query);
+    const upstream = await jellyfinProxy(subpath, query, mediaUserContext(res));
     const ctype = upstream.headers.get("content-type") ?? "application/octet-stream";
     res.status(upstream.status);
 

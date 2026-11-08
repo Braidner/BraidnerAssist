@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock3, Target } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import { getSetupRequired, login, register, setupAdmin } from "../../lib/auth.ts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,8 @@ type AuthErrorTarget =
 function BrandLockup({ subtitle }: { subtitle: string }) {
   return (
     <div className="mb-7 flex flex-col items-center text-center">
-      <div className="mb-3 grid size-14 place-items-center rounded-2xl border border-hair bg-surface text-accent">
-        <Target className="size-6" />
-      </div>
-      <h1 className="m-0 font-mono text-lg font-bold uppercase tracking-5 text-ink">
+      <img src="/brand-icon.svg" alt="" className="mb-2 size-12" />
+      <h1 className="m-0 text-2xl font-extrabold tracking-tight text-ink">
         Pultra
       </h1>
       <div className="mt-1 text-xs tracking-3 text-ink-soft">{subtitle}</div>

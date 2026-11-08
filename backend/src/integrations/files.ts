@@ -7,16 +7,32 @@ import path from "node:path";
 import { config } from "../config.js";
 
 const root = () => config.mediaFs.root!;
+const musicRoot = () => path.resolve(root(), config.mediaFs.music);
+const within = (parent: string, candidate: string) => candidate === parent || candidate.startsWith(parent + path.sep);
 
 // Преобразовать относительный путь → абсолютный ВНУТРИ корня. Бросает при выходе
 // за пределы (../, абсолютные пути, нулевые байты). Лексическая проверка.
-function safe(rel: string): string {
+async function safe(rel: string, wholeSubtree = false): Promise<string> {
   if (!config.mediaFs.configured) throw new Error("MEDIA_ROOT не настроен");
   const clean = String(rel ?? "").replace(/\0/g, "").replace(/^[/\\]+/, "");
   const base = path.resolve(root());
   const abs = path.resolve(base, clean);
   if (abs !== base && !abs.startsWith(base + path.sep)) {
     throw new Error("Путь вне медиатеки");
+  }
+  const music = musicRoot();
+  if (within(music, abs) || (wholeSubtree && within(abs, music))) throw new Error("Музыкальная папка недоступна");
+  // The UI already omits symlinks. Also reject them in explicitly supplied paths,
+  // including existing components of a new destination created with recursive mkdir.
+  let cursor = base;
+  for (const part of path.relative(base, abs).split(path.sep).filter(Boolean)) {
+    cursor = path.join(cursor, part);
+    try {
+      if ((await fs.lstat(cursor)).isSymbolicLink()) throw new Error("Переход по симлинку недоступен");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") break;
+      throw error;
+    }
   }
   return abs;
 }
@@ -48,6 +64,7 @@ async function dirSize(abs: string): Promise<number> {
   for (const d of dirents) {
     if (d.name.startsWith(".") || d.isSymbolicLink()) continue;
     const childAbs = path.join(abs, d.name);
+    if (within(musicRoot(), childAbs)) continue;
     try {
       const st = await fs.lstat(childAbs);
       if (st.isSymbolicLink()) continue;
@@ -62,12 +79,13 @@ async function dirSize(abs: string): Promise<number> {
 
 // Список содержимого папки (по умолчанию — корень).
 export async function listDir(relPath = ""): Promise<{ path: string; entries: FileEntry[] }> {
-  const abs = safe(relPath);
+  const abs = await safe(relPath);
   const dirents = await fs.readdir(abs, { withFileTypes: true });
   const entries: FileEntry[] = [];
   for (const d of dirents) {
     if (d.name.startsWith(".")) continue; // скрытые/системные не показываем
     const childAbs = path.join(abs, d.name);
+    if (within(musicRoot(), childAbs)) continue;
     let size = 0;
     let mtime = 0;
     try {
@@ -95,27 +113,27 @@ export async function listDir(relPath = ""): Promise<{ path: string; entries: Fi
 
 export async function makeDir(parentRel: string, name: string): Promise<void> {
   if (!name.trim() || /[/\\]/.test(name)) throw new Error("Недопустимое имя папки");
-  const abs = safe(path.join(parentRel, name));
+  const abs = await safe(path.join(parentRel, name));
   await fs.mkdir(abs, { recursive: true });
 }
 
 export async function renameEntry(targetRel: string, newName: string): Promise<void> {
   if (!newName.trim() || /[/\\]/.test(newName)) throw new Error("Недопустимое имя");
-  const abs = safe(targetRel);
-  const dest = safe(path.join(path.dirname(targetRel), newName));
+  const abs = await safe(targetRel, true);
+  const dest = await safe(path.join(path.dirname(targetRel), newName), true);
   await fs.rename(abs, dest);
 }
 
 export async function moveEntry(srcRel: string, destDirRel: string): Promise<void> {
-  const src = safe(srcRel);
-  const destDir = safe(destDirRel);
-  const dest = path.join(destDir, path.basename(src));
+  const src = await safe(srcRel, true);
+  const dest = await safe(path.join(destDirRel, path.basename(src)), true);
+  const destDir = path.dirname(dest);
   await fs.mkdir(destDir, { recursive: true });
   await fs.rename(src, dest);
 }
 
 export async function removeEntry(targetRel: string): Promise<void> {
-  const abs = safe(targetRel);
+  const abs = await safe(targetRel, true);
   if (abs === path.resolve(root())) throw new Error("Нельзя удалить корень");
   await fs.rm(abs, { recursive: true, force: true });
 }

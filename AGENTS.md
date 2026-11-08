@@ -283,6 +283,10 @@ ssh braidner@hermes.lan 'cd ~/mission-control && docker compose -f docker-compos
     DNS-фильтрации AdGuard (`adguardProtection` → `POST /api/adguard/protection`). Данные
     (контейнеры, adguard) приходят пропсами из `App.tsx`. MCP `get_dns_stats` для Hermes.
 
+## Музыка и общая шапка
+
+`/music`, `/music/discovery`, `/music/session` — настоящая фонотека, поиск FLAC через Jackett, очередь qBittorrent и поток исходного файла Jellyfin. Жанры, исполнители и альбомы находятся на витрине; «Сеанс» показывает очередь. Для доступа к аудио нужны привязанный пользователь Jellyfin и его действующий токен. Музыкальные данные и stream URL не кэшируются PWA. Общее меню использует знак из трёх колец, подпись «Pultra / раздел» и вкладки раздела в шапке, включая «Настройки». См. [настройку, импорт плейлистов, REST и MCP](docs/music.md).
+
 ## Homelab-стек на hermes.lan (отдельный Docker compose)
 
 На том же VM крутится самостоятельный стек (`/srv/stack/docker-compose.yml`, диск 1ТБ на

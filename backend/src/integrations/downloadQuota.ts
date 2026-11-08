@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../db/client.js";
 
 const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1_000;
@@ -165,8 +166,8 @@ export function buildDownloadQuotaSnapshot(
   };
 }
 
-async function quotaSource(userId: string): Promise<DownloadQuotaSource | null> {
-  return prisma.appUser.findUnique({
+async function quotaSource(userId: string, db: Prisma.TransactionClient = prisma): Promise<DownloadQuotaSource | null> {
+  return db.appUser.findUnique({
     where: { id: userId },
     select: {
       id: true,
@@ -185,6 +186,20 @@ function isQuotaUser(userId: string | null | undefined): userId is string {
   return Boolean(userId && userId !== "app-token");
 }
 
+// Legacy movie/manual grabs perform a qB network call between the quota check
+// and the accounting write. Serialize grabs per account across both media sections.
+const pendingGrabs = new Map<string, Promise<void>>();
+
+export async function withUserDownloadLock<T>(userId: string | null, action: () => Promise<T>): Promise<T> {
+  if (!isQuotaUser(userId)) return action();
+  const previous = pendingGrabs.get(userId) ?? Promise.resolve();
+  const work = previous.then(action);
+  const tail = work.then(() => {}, () => {});
+  pendingGrabs.set(userId, tail);
+  try { return await work; }
+  finally { if (pendingGrabs.get(userId) === tail) pendingGrabs.delete(userId); }
+}
+
 export async function getUserDownloadQuota(
   userId: string | null | undefined,
   now = new Date(),
@@ -196,19 +211,20 @@ export async function getUserDownloadQuota(
 export async function assertUserCanDownload(
   userId: string | null | undefined,
   infohash?: string | null,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<void> {
   if (!isQuotaUser(userId)) return;
   const normalizedHash = infohash?.trim().toLowerCase();
   if (
     normalizedHash &&
-    (await prisma.userDownload.findUnique({
+    (await db.userDownload.findUnique({
       where: { infohash: normalizedHash },
       select: { id: true },
     }))
   ) {
     return;
   }
-  const quota = await getUserDownloadQuota(userId);
+  const quota = buildDownloadQuotaSnapshot(await quotaSource(userId, db));
   const blocking = quota.periods.find((period) => period.remaining === 0);
   if (blocking) throw new DownloadQuotaExceededError(blocking);
 }
@@ -218,11 +234,11 @@ export async function recordUserDownload(input: {
   infohash: string;
   releaseTitle?: string | null;
   size?: number | null;
-}): Promise<void> {
+}, db: Prisma.TransactionClient = prisma): Promise<void> {
   if (!isQuotaUser(input.userId)) return;
   const infohash = input.infohash.trim().toLowerCase();
   if (!infohash) return;
-  await prisma.userDownload.upsert({
+  await db.userDownload.upsert({
     where: { infohash },
     create: {
       appUserId: input.userId,
@@ -234,8 +250,8 @@ export async function recordUserDownload(input: {
   });
 }
 
-export async function releaseUserDownload(infohash: string): Promise<void> {
-  await prisma.userDownload.deleteMany({
+export async function releaseUserDownload(infohash: string, db: Prisma.TransactionClient = prisma): Promise<void> {
+  await db.userDownload.deleteMany({
     where: { infohash: infohash.trim().toLowerCase() },
   });
 }

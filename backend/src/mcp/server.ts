@@ -9,6 +9,7 @@ import { containerAction } from "../integrations/docker.js";
 import { notify } from "../integrations/notify.js";
 import { getMedia, qbAdd, jellyfinSessions, jellyfinPlayTo } from "../integrations/media.js";
 import { nativeLookup, nativeReleaseSearch, nativeGrabRelease } from "../integrations/nativeMedia.js";
+import { getMusicDownloads, grabMusicRelease, searchMusicReleases } from "../integrations/musicReleases.js";
 import { jackettHealth, jackettSearch } from "../integrations/jackett.js";
 import { torrserverAdd, pickVideoFile, isBrowserPlayable } from "../integrations/torrserver.js";
 import { getAdguard } from "../integrations/adguard.js";
@@ -355,6 +356,21 @@ export function createMcpServer() {
       return ok(pref);
     },
   );
+
+  server.tool(
+    "search_music_releases",
+    "Find declared FLAC music releases through Jackett. An empty query lists recent releases. A returned id is a temporary selection handle for grab_music_release.",
+    { query: z.string().max(160).default("") },
+    async ({query}) => ok(await searchMusicReleases("app-token", query)),
+  );
+  server.tool(
+    "grab_music_release",
+    "Download the chosen result of search_music_releases to the Jellyfin music folder with qBittorrent.",
+    { id: z.string().max(128) },
+    async ({id}) => ok(await grabMusicRelease("app-token", id)),
+  );
+  server.tool("get_music_downloads", "Show progress for music downloads added by Hermes.",
+    async () => ok(await getMusicDownloads("app-token")));
 
   server.tool(
     "list_jackett_indexers",

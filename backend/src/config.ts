@@ -180,6 +180,7 @@ function buildConfig() {
       qbittorrentRoot: env("QBITTORRENT_SAVE_ROOT") ?? "/data",
       tv: env("MEDIA_TV") ?? "tv",
       movies: env("MEDIA_MOVIES") ?? "movies",
+      music: env("MEDIA_MUSIC") ?? "music",
       get configured() { return Boolean(this.root); },
     },
 

@@ -12,10 +12,11 @@ interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: "/", icon: "grid", label: "Обзор" },
+  { to: "/", icon: "grid", label: "Обзор", roles: ["admin"] },
   { to: "/media", icon: "pulse", label: "Медиа" },
-  { to: "/hermes", icon: "bot", label: "Hermes" },
-  { to: "/system", icon: "server", label: "Система" },
+  { to: "/music", icon: "music", label: "Музыка" },
+  { to: "/hermes", icon: "bot", label: "Hermes", roles: ["admin"] },
+  { to: "/system", icon: "server", label: "Система", roles: ["admin"] },
   { to: "/settings", icon: "gear", label: "Настройки", roles: ["admin"] },
 ];
 

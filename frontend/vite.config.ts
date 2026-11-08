@@ -47,6 +47,11 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /^\/jf(?:\/|$)/, /^\/healthz$/],
         runtimeCaching: [
           {
+            // Collections belong to a signed-in user. Tickets and original audio also bypass Cache Storage.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith("/api/music/"),
+            handler: "NetworkOnly",
+          },
+          {
             // Original movie files can be tens of gigabytes. Stream them from
             // the backend only; cloning one into Cache Storage would corrupt
             // mobile downloads and quickly exhaust device storage.

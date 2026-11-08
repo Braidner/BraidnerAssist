@@ -1,0 +1,52 @@
+---
+id: pultra-live-flac
+name: Live Music Archive (FLAC)
+description: Public concert recordings in the Internet Archive Live Music Archive with both FLAC files and a downloadable torrent. Torrents may also contain artwork and listening copies.
+language: en-US
+type: public
+encoding: UTF-8
+links:
+  - https://archive.org/
+caps:
+  categories:
+    Concert: Audio/Lossless
+  modes:
+    search: [q]
+    music-search: [q]
+settings: []
+search:
+  keywordsfilters:
+    - name: re_replace
+      args: ['[^\p{L}\p{N}\s-]', ' ']
+  paths:
+    - path: advancedsearch.php
+      response:
+        type: json
+  inputs:
+    q: 'collection:etree AND format:("Flac") AND format:("Archive BitTorrent"){{ if .Keywords }} AND (title:("{{ .Keywords }}") OR creator:("{{ .Keywords }}")){{ else }}{{ end }}'
+    fl[]: identifier,title,item_size,publicdate
+    rows: 40
+    sort: "-publicdate"
+    output: json
+  rows:
+    selector: response.docs
+    count:
+      selector: response.numFound
+  fields:
+    _id:
+      selector: identifier
+    title:
+      selector: title
+      filters:
+        - name: append
+          args: " [FLAC]"
+    category:
+      text: Concert
+    details:
+      text: "details/{{ .Result._id }}"
+    download:
+      text: "download/{{ .Result._id }}/{{ .Result._id }}_archive.torrent"
+    size:
+      selector: item_size
+    date:
+      selector: publicdate

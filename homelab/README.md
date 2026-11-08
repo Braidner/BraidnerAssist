@@ -50,6 +50,16 @@ nano setup-creds.sh
 chmod +x setup-creds.sh && ./setup-creds.sh
 ```
 
+### Музыкальная библиотека Jellyfin
+
+После создания API-ключа запустите на сервере:
+
+```bash
+python3 ~/mission-control/homelab/setup-music-library.py
+```
+
+Скрипт создаёт `/srv/stack/media/music` и регистрирует его в Jellyfin как библиотеку типа Music с путём `/media/music`. qBittorrent видит этот каталог как `/data/music`. Повторный запуск проверяет существующую библиотеку. Ключ читается из `/srv/stack/.creds` или переменной `JELLYFIN_API_KEY`. При другой раскладке передайте скрипту значения `MEDIA_HOST_PATH` и `MEDIA_MUSIC` из конфигурации Pultra. Первое сканирование каталога с ранее загруженной музыкой можно запустить в панели Jellyfin.
+
 ## Обновление
 
 ```bash

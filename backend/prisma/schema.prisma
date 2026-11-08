@@ -26,6 +26,8 @@ model AppUser {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   downloads    UserDownload[]
+  musicLikes    MusicLike[]
+  musicPlaylists MusicPlaylist[]
 
   @@index([approvalStatus])
   @@index([jellyfinUserId])
@@ -207,4 +209,32 @@ model CalendarEvent {
   location    String?
   source      String   @default("local") // local | caldav | ics
   createdAt   DateTime @default(now())
+}
+
+model MusicLike {
+  appUserId String
+  appUser   AppUser @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  trackId   String
+  @@id([appUserId, trackId])
+}
+
+model MusicPlaylist {
+  appUserId String
+  appUser   AppUser @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  name      String
+  tracks    String
+  @@id([appUserId, name])
+}
+
+model MusicDownload {
+  id          String    @id @default(cuid())
+  infohash    String    @unique
+  appUserId   String
+  title       String
+  createdAt   DateTime  @default(now())
+  submittedAt DateTime?
+  scanRequestedAt DateTime? @map("scannedAt")
+
+  @@index([appUserId, createdAt])
+  @@index([scanRequestedAt], map: "MusicDownload_scannedAt_idx")
 }

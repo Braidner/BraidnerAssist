@@ -396,3 +396,35 @@ body.sb-locked {
     height: 26px;
   }
 }
+
+@font-face {font-family:"Pultra Brand";src:url("@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2");font-weight:100 900;font-display:swap;}
+/* One identity across the app. Tabs stay in the header's second row on phones. */
+.pultra-bar { display:flex; align-items:center; gap:clamp(.65rem,2vw,2rem); min-height:3rem; padding:0 1rem; }
+.pultra-lockup { display:inline-flex; align-items:center; flex:none; gap:.62rem; padding:.3rem 0; color:var(--ink); background:none; border:0; cursor:pointer; white-space:nowrap; line-height:1; }
+.pultra-lockup:focus-visible { outline:2px solid var(--accent); outline-offset:4px; border-radius:4px; }
+.pultra-mark { width:1.85rem; height:1.85rem; }
+.pultra-lockup b { font:800 1.42rem/1 "Pultra Brand", var(--font-ui); letter-spacing:-.045em; }
+.pultra-slash { color:var(--muted); font-size:1.25rem; margin-inline:.08rem; }
+.pultra-section { font-size:1.05rem; font-weight:600; letter-spacing:-.025em; }
+.pultra-bar-tabs { flex:1; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.pultra-bar-tabs::-webkit-scrollbar { display:none; }
+.pultra-bar-tools { margin-left:auto; }
+@media (max-width: 53.75rem) {
+  .pultra-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:.3rem; row-gap:0; padding:0 .72rem; }
+  .pultra-lockup { justify-self:start; min-height:3rem; gap:.4rem; }
+  .pultra-bar-tabs { grid-column:1/-1; grid-row:2; }
+  .pultra-bar-tools { grid-column:2; grid-row:1; }
+}
+@media (max-width: 25rem) {
+  .pultra-mark { width:1.42rem; height:1.42rem; }
+  .pultra-lockup b { font-size:1.18rem; }
+  .pultra-section { font-size:.9rem; }
+  .pultra-bar-tools button { max-width:2rem; }
+}
+.pultra-bar-tabs [role="tab"][data-state="inactive"] {color:var(--ink-soft);}
+@media (min-width: 70rem) {
+  .pultra-bar {display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);}
+  .pultra-lockup {justify-self:start;}
+  .pultra-bar-tabs {grid-column:2;max-width:48vw;}
+  .pultra-bar-tools {grid-column:3;justify-self:end;}
+}

@@ -155,24 +155,36 @@ function indexerIds(): string[] {
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-function categoryFor(kind?: "movie" | "series" | "manual"): string {
+type IndexerRelease = SearchResult & { reportedSeeders?: number | null };
+type SearchKind = "movie" | "series" | "manual" | "music";
+
+function categoryFor(kind?: SearchKind): string {
+  if (kind === "music") return "3000,3040";
   if (kind === "movie") return MOVIE_CATS;
   if (kind === "series") return SERIES_CATS;
   return BROAD_CATS;
 }
 
-async function searchIndexer(indexer: string, query: string, opts: { kind?: "movie" | "series" | "manual" }): Promise<SearchResult[]> {
+async function searchIndexer(indexer: string, query: string, opts: { kind?: SearchKind }): Promise<IndexerRelease[]> {
   const cfg = config.media.jackett;
   if (!cfg.configured) return [];
   const url = new URL(`${cfg.url}/api/v2.0/indexers/${encodeURIComponent(indexer)}/results/torznab/api`);
   url.searchParams.set("apikey", cfg.apiKey!);
   url.searchParams.set("t", "search");
-  url.searchParams.set("q", query);
+  if (query) url.searchParams.set("q", query);
   url.searchParams.set("cat", categoryFor(opts.kind));
   const res = await fetch(url, { signal: AbortSignal.timeout(50_000) });
   if (!res.ok) throw new Error(`Jackett ${indexer} ${res.status}`);
   const xml = await res.text();
-  return itemBlocks(xml).map((it, i) => {
+  if (opts.kind === "music" && !/<channel[\s>]/i.test(xml)) throw new Error("Некорректный ответ Jackett");
+  const items = itemBlocks(xml).filter(item => {
+    if (opts.kind !== "music") return true;
+    const categories = [...item.matchAll(/<torznab:attr\b[^>]*name=["']category["'][^>]*value=["'](\d+)["']/gi),
+      ...item.matchAll(/<category>(\d+)<\/category>/gi)].map(m => Number(m[1]));
+    const standard = categories.filter(cat => cat >= 1000 && cat < 10000);
+    return !standard.length || standard.some(cat => cat === 3000 || cat === 3040);
+  });
+  return items.map((it, i) => {
     const title = tag(it, "title") ?? "—";
     const guid = tag(it, "guid") ?? `${indexer}-${i}-${title}`;
     const enclosureUrl = attr(it, "enclosure", "url");
@@ -180,12 +192,12 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
     const comments = tag(it, "comments");
     const magnet = torznabAttr(it, "magneturl");
     const size = num(torznabAttr(it, "size"), attr(it, "enclosure", "length"), tag(it, "size")) ?? 0;
-    const seeders = num(torznabAttr(it, "seeders"), torznabAttr(it, "seed")) ?? 0;
+    const seeders = num(torznabAttr(it, "seeders"), torznabAttr(it, "seed"));
     const leechers = num(torznabAttr(it, "leechers"), torznabAttr(it, "leeches"), torznabAttr(it, "leech"));
     const peers = num(torznabAttr(it, "peers"));
     const grabs = num(torznabAttr(it, "grabs"), torznabAttr(it, "downloads"));
     const category = first(torznabAttr(it, "category"), tag(it, "category"));
-    const rawTrackerName = first(torznabAttr(it, "jackettindexer"), torznabAttr(it, "tracker"), torznabAttr(it, "site"), indexer) ?? indexer;
+    const rawTrackerName = first(tag(it, "jackettindexer"), torznabAttr(it, "jackettindexer"), torznabAttr(it, "tracker"), torznabAttr(it, "site"), indexer) ?? indexer;
     const detailUrl = detailUrlFrom(rawTrackerName, comments, guid, link);
     const trackerName = rawTrackerName !== "all"
       ? rawTrackerName
@@ -206,13 +218,14 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
       indexerId: indexer,
       title,
       size,
-      seeders,
+      seeders: seeders ?? 0,
+      ...(opts.kind === "music" ? { reportedSeeders: seeders } : {}),
       leechers,
       peers,
       grabs,
       indexer: trackerName,
       trackerName,
-      trackerId: indexer,
+      trackerId: attr(it, "jackettindexer", "id") ?? indexer,
       url: magnet ?? enclosureUrl ?? link,
       detailUrl,
       publishDate: publishDate && Number.isFinite(publishDate.getTime()) ? publishDate.toISOString() : published,
@@ -224,6 +237,12 @@ async function searchIndexer(indexer: string, query: string, opts: { kind?: "mov
       category,
     };
   });
+}
+
+export async function jackettMusicSearch(query: string): Promise<IndexerRelease[]> {
+  const batches = await Promise.allSettled(indexerIds().map(id => searchIndexer(id, query, { kind: "music" })));
+  if (batches.every(b => b.status === "rejected")) throw new Error("Поиск Jackett недоступен");
+  return batches.flatMap(b => b.status === "fulfilled" ? b.value : []);
 }
 
 export async function jackettSearch(

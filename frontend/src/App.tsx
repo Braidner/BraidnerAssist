@@ -7,6 +7,7 @@ import {
   setUnauthorizedHandler,
   type DownloadQuotaSnapshot,
 } from "./lib/api.ts";
+import { MusicPlaybackProvider } from "./pages/music/MusicPlayback";
 import { TabsProvider } from "./lib/tabsContext.tsx";
 import { TasksProvider } from "./lib/tasksContext.tsx";
 import { LogsPanel } from "./components/overlays/LogsPanel.tsx";
@@ -42,6 +43,7 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
+const MusicRoutes = lazy(() => import("./pages/music/MusicRoutes").then(({ MusicRoutes }) => ({ default: MusicRoutes })));
 const MediaRoutes = lazy(() =>
   import("./pages/media/MediaRoutes.tsx").then((module) => ({
     default: module.MediaRoutes,
@@ -189,6 +191,7 @@ export function App() {
 
   return (
     <TabsProvider>
+      <MusicPlaybackProvider key={user.id}>
       <TasksProvider>
         <div className={ui.shell} data-theme={theme}>
           <LogsPanel open={showLogs} onOpenChange={setShowLogs} />
@@ -218,6 +221,7 @@ export function App() {
                   {role === "admin" && <Route path="/hermes" element={<HermesPage />} />}
                   {role === "admin" && <Route path="/system" element={<SystemPage />} />}
                   {role === "admin" && <Route path="/settings" element={<SettingsPage />} />}
+                  <Route path="/music/*" element={<MusicRoutes />} />
                   <Route
                     path="/media/*"
                     element={<MediaRoutes allowSystem={role === "admin"} />}
@@ -232,6 +236,7 @@ export function App() {
           </div>
         </div>
       </TasksProvider>
+      </MusicPlaybackProvider>
     </TabsProvider>
   );
 }

@@ -260,7 +260,7 @@ async function jellyfinNowPlaying(): Promise<NowPlaying[]> {
   if (!res.ok) throw new Error(`Jellyfin responded ${res.status}`);
   const sessions = (await res.json()) as JfSession[];
   return sessions
-    .filter((s) => s.NowPlayingItem)
+    .filter((s) => s.NowPlayingItem && s.NowPlayingItem.Type !== "Audio")
     .map((s) => {
       const item = s.NowPlayingItem!;
       const runtime = item.RunTimeTicks ?? 0;
@@ -996,7 +996,7 @@ export async function jellyfinSessions(): Promise<PlayDevice[]> {
       id: s.Id!,
       deviceName: s.DeviceName!,
       client: s.Client ?? "—",
-      nowPlaying: s.NowPlayingItem?.Name ?? null,
+      nowPlaying: s.NowPlayingItem?.Type === "Audio" ? null : s.NowPlayingItem?.Name ?? null,
     }));
 }
 
@@ -1014,15 +1014,43 @@ export async function jellyfinPlayTo(sessionId: string, itemId: string): Promise
   if (!res.ok && res.status !== 204) throw new Error(`Jellyfin Playing responded ${res.status}`);
 }
 
-// Прозрачный реверс-прокси к Jellyfin: инжектит токен заголовком, api_key из запроса
-// игнорируется. Возвращает upstream Response для стриминга (плеер/изображения).
-export async function jellyfinProxy(subpath: string, query: URLSearchParams): Promise<Response> {
+const videoAccess = new Map<string, number>();
+
+export function videoProxyItem(path: string): string | null {
+  // This is the movie HLS / trickplay transport, never a generic service-key proxy.
+  const match = /^Videos\/([a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\/([a-z0-9_.-]+(?:\/[a-z0-9_.-]+)*)$/i.exec(path);
+  if (!match || match[2].split("/").some(x => x === "." || x === "..")) return null;
+  return match[1];
+}
+
+export async function canUseVideoTransport(itemId: string, ctx: MediaUserContext): Promise<boolean> {
+  if (!/^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.test(itemId)) return false;
+  const key = JSON.stringify([ctx.appUserId, itemId]);
+  if ((videoAccess.get(key) ?? 0) > Date.now()) return true;
+  const user = await jellyfinPlaybackContext(ctx);
+  const url = new URL(config.media.jellyfin.url + "/Items/" + itemId);
+  if (user?.userId) url.searchParams.set("UserId", user.userId);
+  const res = await fetch(url, {headers: user?.accessToken ? jellyfinUserHeaders(user.accessToken) : jfHeaders(),
+    signal: AbortSignal.timeout(8000), redirect: "error"});
+  if (!res.ok) { await res.body?.cancel(); return false; }
+  const item = await res.json() as { MediaType?: string; Type?: string; PlayAccess?: string };
+  if (item.MediaType !== "Video" || item.PlayAccess === "None") return false;
+  if (videoAccess.size >= 2048) videoAccess.delete(videoAccess.keys().next().value!);
+  videoAccess.set(key, Date.now() + 30_000);
+  return true;
+}
+
+export async function jellyfinProxy(subpath: string, query: URLSearchParams, ctx: MediaUserContext): Promise<Response> {
   if (!config.media.jellyfin.configured) throw new Error("Jellyfin не настроен");
+  const id = videoProxyItem(subpath);
+  if (!id || !await canUseVideoTransport(id, ctx)) return new Response(null, { status: 404 });
   const url = new URL(`${config.media.jellyfin.url}/${subpath}`);
   for (const [k, v] of query.entries()) {
-    if (k.toLowerCase() !== "api_key") url.searchParams.append(k, v);
+    if (!/^(api_key|apikey|x-emby-token|access_token|userid)$/i.test(k)) url.searchParams.append(k, v);
   }
-  return fetch(url, { headers: jfHeaders(), signal: AbortSignal.timeout(30_000) });
+  const user = await jellyfinPlaybackContext(ctx);
+  return fetch(url, { headers: user?.accessToken ? jellyfinUserHeaders(user.accessToken) : jfHeaders(),
+    signal: AbortSignal.timeout(30_000), redirect: "error" });
 }
 
 // Оригинальный файл из Jellyfin для браузерного download endpoint. Здесь намеренно
@@ -1070,15 +1098,30 @@ interface QbTorrent {
   save_path?: string;
 }
 
-export async function qbittorrentDownloads(): Promise<DownloadItem[]> {
+export async function getQbTorrents(filter: { hashes?: string; category?: string } = {}): Promise<QbTorrent[]> {
   if (!config.media.qbittorrent.configured) return [];
   const sid = await qbLogin();
-  const res = await fetch(`${config.media.qbittorrent.url}/api/v2/torrents/info`, {
+  const url = new URL(`${config.media.qbittorrent.url}/api/v2/torrents/info`);
+  for (const [key, value] of Object.entries(filter)) url.searchParams.set(key, value);
+  const res = await fetch(url, {
     headers: sid ? { Cookie: sid } : {},
     signal: AbortSignal.timeout(8_000),
   });
   if (!res.ok) throw new Error(`qBittorrent info ${res.status}`);
-  const torrents = (await res.json()) as QbTorrent[];
+  return (await res.json()) as QbTorrent[];
+}
+
+export const MUSIC_TORRENT_CATEGORY = "mc-music";
+
+export async function qbittorrentDownloads(): Promise<DownloadItem[]> {
+  const candidates = (await getQbTorrents()).filter(t => t.category !== MUSIC_TORRENT_CATEGORY);
+  const candidateHashes = candidates.flatMap(t => t.hash ? [t.hash.toLowerCase()] : []);
+  // A qB operator can change a torrent's category after it has been added.
+  const privateRows = candidateHashes.length
+    ? await prisma.musicDownload.findMany({ where: { infohash: { in: candidateHashes } }, select: { infohash: true } })
+    : [];
+  const privateHashes = new Set(privateRows.map(row => row.infohash));
+  const torrents = candidates.filter(t => !privateHashes.has(t.hash?.toLowerCase() ?? ""));
   const hashes = torrents.map((t) => t.hash?.toLowerCase()).filter(Boolean) as string[];
   const tracked = hashes.length
     ? await prisma.mediaTorrent.findMany({
@@ -1196,18 +1239,28 @@ async function assertQbAdded(res: Response): Promise<string[]> {
 // метод — qbAdd и пофайловый граб (qbApplySelection) идут через него.
 export async function qbAddRaw(
   urlOrMagnet: string,
-  opts: { paused?: boolean; category?: string; savePath?: string } = {},
+  opts: QbAddOptions = {},
+): Promise<string[]> {
+  if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
+  return qbAddResolved(await resolveTorrent(urlOrMagnet), opts);
+}
+
+interface QbAddOptions { paused?: boolean; category?: string; savePath?: string; autoTMM?: boolean }
+
+export async function qbAddResolved(
+  resolved: Awaited<ReturnType<typeof resolveTorrent>>,
+  opts: QbAddOptions,
 ): Promise<string[]> {
   if (!config.media.qbittorrent.configured) throw new Error("qBittorrent не настроен");
   const sid = await qbLogin();
   const addUrl = `${config.media.qbittorrent.url}/api/v2/torrents/add`;
-  const resolved = await resolveTorrent(urlOrMagnet);
 
   // Доп. поля: paused (4.x) + stopped (5.x), category, savepath.
   const extra: Record<string, string> = {};
   if (opts.paused) { extra.paused = "true"; extra.stopped = "true"; }
   if (opts.category) extra.category = opts.category;
   if (opts.savePath) extra.savepath = opts.savePath;
+  if (opts.autoTMM != null) extra.autoTMM = String(opts.autoTMM);
 
   let res: Response;
   if (resolved.magnet) {
